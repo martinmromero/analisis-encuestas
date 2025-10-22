@@ -1,0 +1,24 @@
+{
+    "folders": [
+        {
+            "name": "Análisis de Encuestas",
+            "path": "C:\\Users\\Public\\analisis-encuestas"
+        }
+    ],
+    "settings": {
+        "terminal.integrated.cwd": "C:\\Users\\Public\\analisis-encuestas",
+        "python.defaultInterpreterPath": "C:\\Users\\martin.romero\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "files.exclude": {
+            "node_modules": true,
+            "uploads": true,
+            ".github": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "ms-vscode.vscode-json",
+            "ms-vscode.vscode-typescript-next"
+        ]
+    }
+}

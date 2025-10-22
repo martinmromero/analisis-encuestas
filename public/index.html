@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Encuestas - Análisis de Sentimientos</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Análisis de Encuestas</h1>
+            <p>Sube tu archivo Excel y obtén un análisis de sentimientos detallado</p>
+        </header>
+
+        <main>
+            <!-- Navegación entre secciones -->
+            <nav class="section-nav">
+                <button id="analysisTab" class="nav-tab active">📊 Análisis de Encuestas</button>
+                <button id="dictionaryTab" class="nav-tab">📚 Gestión de Diccionario</button>
+                <button id="comparisonTab" class="nav-tab">⚖️ Comparar Motores</button>
+            </nav>
+
+            <!-- Sección de análisis de encuestas -->
+            <div id="analysisSection" class="main-section">
+                <!-- Sección de carga de archivo -->
+                <section class="upload-section">
+                <div class="upload-card">
+                    <h2>📁 Subir Archivo Excel</h2>
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls" required>
+                            <label for="excelFile" class="file-label">
+                                <span class="file-icon">📄</span>
+                                <span class="file-text">Seleccionar archivo Excel</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Selector de motor de análisis -->
+                        <div class="engine-selector-section">
+                            <h3>🤖 Seleccionar Motor de Análisis</h3>
+                            <div class="engine-options">
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="natural" checked>
+                                    <div class="engine-card">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">🧠</span>
+                                            <span class="engine-name">Natural.js Enhanced</span>
+                                            <span class="engine-badge recommended">Recomendado</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Diccionario personalizado de 894 palabras en español. Ideal para comentarios específicos y análisis preciso.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>📊 Efectividad: 8.5/10 para español</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="nlpjs">
+                                    <div class="engine-card">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">🚀</span>
+                                            <span class="engine-name">NLP.js (AXA)</span>
+                                            <span class="engine-badge advanced">Avanzado</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Motor de IA con procesamiento avanzado y soporte nativo multiidioma. Mejor para contexto complejo.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>🎯 Efectividad: 10.3/10 para español</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="both">
+                                    <div class="engine-card dual">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">⚖️</span>
+                                            <span class="engine-name">Análisis Dual</span>
+                                            <span class="engine-badge premium">Premium</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Combina ambos motores y genera un consenso inteligente. Máxima precisión pero mayor tiempo de procesamiento.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>🏆 Mejor precisión combinada</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button type="submit" class="analyze-btn">
+                                <span class="btn-icon">🔍</span>
+                                Analizar Encuesta
+                            </button>
+                            <button type="button" id="advancedReportBtn" class="advanced-report-btn">
+                                <span class="btn-icon">📋</span>
+                                Generar Reporte XLSX Completo
+                            </button>
+                        </div>
+                    </form>
+                    <div class="file-info">
+                        <p>💡 <strong>Formatos soportados:</strong> .xlsx, .xls</p>
+                        <p>📝 <strong>Requisitos:</strong> El archivo debe contener columnas como: carrera, materia, sede, docente, comentarios</p>
+                        <p>🎯 <strong>Reporte Completo:</strong> Incluye filtros automáticos, análisis por carrera/docente y colores por sentiment</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading spinner -->
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Procesando archivo y analizando sentimientos...</p>
+            </div>
+
+            <!-- Sección de resultados -->
+            <section id="results" class="results-section hidden">
+                <div class="results-header">
+                    <h2>📈 Resultados del Análisis</h2>
+                    <div class="export-buttons">
+                        <button id="exportJson" class="export-btn">
+                            <span>💾</span> Exportar JSON
+                        </button>
+                        <button id="exportCsv" class="export-btn">
+                            <span>📊</span> Exportar CSV
+                        </button>
+                        <button id="cleanMemory" class="export-btn cleanup-btn">
+                            <span>🧹</span> Limpiar Memoria
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estadísticas generales -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-content">
+                            <h3 id="totalResponses">0</h3>
+                            <p>Total Respuestas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-content">
+                            <h3 id="averageScore">0</h3>
+                            <p>Puntuación Promedio</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">😊</div>
+                        <div class="stat-content">
+                            <h3 id="positivePercent">0%</h3>
+                            <p>Sentimientos Positivos</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">😞</div>
+                        <div class="stat-content">
+                            <h3 id="negativePercent">0%</h3>
+                            <p>Sentimientos Negativos</p>
+                        </div>
+                    </div>
+                    <div class="stat-card engine-indicator">
+                        <div class="stat-icon" id="engineIcon">🤖</div>
+                        <div class="stat-content">
+                            <h3 id="usedEngine">Natural.js</h3>
+                            <p>Motor Utilizado</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráficos -->
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <div class="chart-card">
+                            <h3>Distribución de Sentimientos</h3>
+                            <div class="chart-container">
+                                <canvas id="sentimentChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div class="chart-card">
+                            <h3>Análisis por Categorías</h3>
+                            <div class="chart-container">
+                                <canvas id="categoryChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de resultados detallados -->
+                <div class="table-container">
+                    <h3>Resultados Detallados</h3>
+                    <div class="table-filters">
+                        <select id="filterSentiment">
+                            <option value="">Todos los sentimientos</option>
+                            <option value="Muy Positivo">Muy Positivo</option>
+                            <option value="Positivo">Positivo</option>
+                            <option value="Neutral">Neutral</option>
+                            <option value="Negativo">Negativo</option>
+                            <option value="Muy Negativo">Muy Negativo</option>
+                        </select>
+                        <input type="text" id="searchText" placeholder="Buscar en el texto...">
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Texto Principal</th>
+                                    <th>Clasificación</th>
+                                    <th>Puntuación</th>
+                                    <th>Confianza</th>
+                                    <th>Palabras Positivas</th>
+                                    <th>Palabras Negativas</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            </div>
+
+            <!-- Sección de gestión de diccionario -->
+            <div id="dictionarySection" class="main-section hidden">
+                <!-- Panel de visualización del diccionario actual -->
+                <section class="dictionary-viewer">
+                    <h2>📖 Diccionario Actual de Sentimientos</h2>
+                    <div class="dictionary-stats">
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalWords">0</span>
+                            <span class="stat-label">Palabras Total</span>
+                        </div>
+                        <div class="stat-item positive">
+                            <span class="stat-number" id="positiveWords">0</span>
+                            <span class="stat-label">Positivas</span>
+                        </div>
+                        <div class="stat-item negative">
+                            <span class="stat-number" id="negativeWords">0</span>
+                            <span class="stat-label">Negativas</span>
+                        </div>
+                        <div class="stat-item neutral">
+                            <span class="stat-number" id="neutralWords">0</span>
+                            <span class="stat-label">Neutrales</span>
+                        </div>
+                    </div>
+
+                    <!-- Filtros para el diccionario -->
+                    <div class="dictionary-filters">
+                        <select id="sentimentFilter">
+                            <option value="">Todos los sentimientos</option>
+                            <option value="positive">Solo Positivas</option>
+                            <option value="negative">Solo Negativas</option>
+                            <option value="neutral">Solo Neutrales</option>
+                        </select>
+                        <input type="text" id="wordSearch" placeholder="Buscar palabra o frase...">
+                        <button id="refreshDictionary" class="refresh-btn">🔄 Actualizar</button>
+                    </div>
+
+                    <!-- Lista de palabras del diccionario -->
+                    <div class="dictionary-list">
+                        <table id="dictionaryTable">
+                            <thead>
+                                <tr>
+                                    <th>Palabra/Frase</th>
+                                    <th>Puntuación</th>
+                                    <th>Tipo</th>
+                                    <th>Origen</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Panel de entrenamiento -->
+                <section class="training-panel">
+                    <h2>🎯 Entrenar Modelo de Sentimientos</h2>
+                    
+                    <div class="training-form">
+                        <div class="form-group">
+                            <label for="newWord">Palabra o Frase:</label>
+                            <input type="text" id="newWord" placeholder="Ej: excelente, muy bueno, no me gusta...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="sentimentScore">Puntuación de Sentimiento:</label>
+                            <div class="score-input">
+                                <input type="range" id="sentimentScore" min="-5" max="5" value="0" step="0.5">
+                                <div class="score-display">
+                                    <span id="scoreValue">0</span>
+                                    <span id="scoreLabel">Neutral</span>
+                                </div>
+                            </div>
+                            <div class="score-guide">
+                                <div class="score-item">-5 a -2: Muy Negativo</div>
+                                <div class="score-item">-2 a 0: Negativo</div>
+                                <div class="score-item">0: Neutral</div>
+                                <div class="score-item">0 a 2: Positivo</div>
+                                <div class="score-item">2 a 5: Muy Positivo</div>
+                            </div>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button id="addWord" class="add-btn">➕ Agregar al Diccionario</button>
+                            <button id="testWord" class="test-btn">🧪 Probar Análisis</button>
+                        </div>
+                    </div>
+
+                    <!-- Resultado de prueba -->
+                    <div id="testResult" class="test-result hidden">
+                        <h3>Resultado de Prueba:</h3>
+                        <div class="test-output"></div>
+                    </div>
+                </section>
+
+                <!-- Panel de importación/exportación -->
+                <section class="import-export-panel">
+                    <h2>💾 Gestión de Diccionario</h2>
+                    
+                    <div class="management-buttons">
+                        <button id="exportDictionary" class="management-btn export">
+                            📤 Exportar Diccionario
+                        </button>
+                        <button id="importDictionary" class="management-btn import">
+                            📥 Importar Diccionario
+                        </button>
+                        <button id="resetDictionary" class="management-btn reset">
+                            🔄 Restaurar Original
+                        </button>
+                    </div>
+
+                    <!-- Input oculto para importar archivos -->
+                    <input type="file" id="dictionaryFileInput" accept=".json" style="display: none;">
+                </section>
+            </div>
+
+            <!-- Sección de comparación de motores -->
+            <div id="comparisonSection" class="main-section hidden">
+                <header class="section-header">
+                    <h2>⚖️ Comparación de Motores de Análisis</h2>
+                    <p>Prueba diferentes motores de análisis de sentimientos para encontrar el mejor para tu caso de uso</p>
+                </header>
+
+                <!-- Panel de estado de Python -->
+                <section class="python-status-section">
+                    <div class="status-card" id="pythonStatusCard">
+                        <div class="status-loading">
+                            <div class="spinner-small"></div>
+                            <span>Verificando estado de Python...</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel de motores disponibles -->
+                <section class="engines-section">
+                    <h3>🔧 Motores Disponibles</h3>
+                    <div class="engines-grid" id="enginesGrid">
+                        <!-- Los motores se cargarán dinámicamente -->
+                    </div>
+                </section>
+
+                <!-- Panel de prueba de texto -->
+                <section class="test-section">
+                    <h3>🧪 Prueba de Análisis</h3>
+                    <div class="test-card">
+                        <div class="test-input">
+                            <label for="testText">Texto a analizar:</label>
+                            <textarea id="testText" rows="4" placeholder="Escribe aquí el texto que quieres analizar con diferentes motores...">El servicio fue excelente, superó mis expectativas completamente. Estoy muy satisfecho con la calidad.</textarea>
+                        </div>
+                        
+                        <div class="engine-selection">
+                            <label>Seleccionar motores para comparar:</label>
+                            <div class="engine-checkboxes" id="engineCheckboxes">
+                                <!-- Se cargarán dinámicamente -->
+                            </div>
+                        </div>
+                        
+                        <button id="compareEngines" class="compare-btn">
+                            <span>⚖️</span> Comparar Motores
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Loading para comparación -->
+                <div id="comparisonLoading" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Analizando con múltiples motores...</p>
+                </div>
+
+                <!-- Resultados de comparación -->
+                <section id="comparisonResults" class="comparison-results hidden">
+                    <h3>📊 Resultados de Comparación</h3>
+                    
+                    <!-- Resumen de consenso -->
+                    <div class="consensus-card" id="consensusCard">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                    
+                    <!-- Grid de resultados por motor -->
+                    <div class="results-grid" id="resultsGrid">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                    
+                    <!-- Tabla de métricas detalladas -->
+                    <div class="metrics-table-container">
+                        <h4>📋 Métricas Detalladas</h4>
+                        <table class="metrics-table" id="metricsTable">
+                            <thead>
+                                <tr>
+                                    <th>Motor</th>
+                                    <th>Puntuación</th>
+                                    <th>Clasificación</th>
+                                    <th>Confianza</th>
+                                    <th>Tiempo (ms)</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metricsTableBody">
+                                <!-- Se llenará dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Panel de instalación de Python -->
+                <section id="pythonInstallSection" class="install-section hidden">
+                    <div class="install-card">
+                        <h3>🐍 Instalar Python para Motores Avanzados</h3>
+                        <p>Para acceder a todos los motores de análisis, necesitas instalar Python y las dependencias.</p>
+                        
+                        <div class="install-steps">
+                            <div class="step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Ejecutar script de instalación</h4>
+                                    <p>Abre PowerShell como administrador y ejecuta:</p>
+                                    <code>.\install-python.ps1</code>
+                                </div>
+                            </div>
+                            
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Verificar instalación</h4>
+                                    <p>Haz clic en el botón para verificar que Python esté disponible</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="recheckPython" class="recheck-btn">
+                            🔄 Verificar Python
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <p>💡 Esta aplicación utiliza análisis de sentimientos para evaluar el contenido de texto en las encuestas</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
