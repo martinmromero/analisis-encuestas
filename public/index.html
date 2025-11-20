@@ -10,8 +10,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>📊 Análisis de Encuestas</h1>
-            <p>Sube tu archivo Excel y obtén un análisis de sentimientos detallado</p>
+            <div class="header-content">
+                <img src="logobarcelo_cmyk_jpg.jpg?v=1" alt="Fundación H.A. Barceló" class="header-logo" onerror="console.error('Error cargando logo')">
+                <div class="header-text">
+                    <h1>📊 Análisis de Encuestas</h1>
+                    <p>Sube tu archivo Excel y obtén un análisis de sentimientos detallado</p>
+                </div>
+            </div>
         </header>
 
         <main>
@@ -30,7 +35,7 @@
                     <h2>📁 Subir Archivo Excel</h2>
                     <form id="uploadForm" enctype="multipart/form-data">
                         <div class="file-input-wrapper">
-                            <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls" required>
+                            <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls,.csv" required>
                             <label for="excelFile" class="file-label">
                                 <span class="file-icon">📄</span>
                                 <span class="file-text">Seleccionar archivo Excel</span>
@@ -94,6 +99,13 @@
                             </div>
                         </div>
                         
+                        <!-- Indicador de diccionario activo -->
+                        <div id="activeDictionaryIndicator" style="background: #f0f7ff; border: 2px solid #4a90e2; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center;">
+                            <strong>📚 Diccionario Activo:</strong> 
+                            <span id="activeDictionaryName" style="color: #4a90e2; font-weight: bold;">Cargando...</span>
+                            <span id="activeDictionaryStats" style="color: #666; font-size: 0.9em; margin-left: 10px;"></span>
+                        </div>
+                        
                         <div class="button-group">
                             <button type="submit" class="analyze-btn">
                                 <span class="btn-icon">🔍</span>
@@ -106,7 +118,7 @@
                         </div>
                     </form>
                     <div class="file-info">
-                        <p>💡 <strong>Formatos soportados:</strong> .xlsx, .xls</p>
+                        <p>💡 <strong>Formatos soportados:</strong> .xlsx, .xls, .csv (separado por ; o ,)</p>
                         <p>📝 <strong>Requisitos:</strong> El archivo debe contener columnas como: carrera, materia, sede, docente, comentarios</p>
                         <p>🎯 <strong>Reporte Completo:</strong> Incluye filtros automáticos, análisis por carrera/docente y colores por sentiment</p>
                     </div>
@@ -123,10 +135,8 @@
             <section id="results" class="results-section hidden">
                 <div class="results-header">
                     <h2>📈 Resultados del Análisis</h2>
+                     <h3>📊  Análisis cualitativo</h3>
                     <div class="export-buttons">
-                        <button id="exportJson" class="export-btn">
-                            <span>💾</span> Exportar JSON
-                        </button>
                         <button id="exportCsv" class="export-btn">
                             <span>📊</span> Exportar CSV
                         </button>
@@ -175,6 +185,54 @@
                     </div>
                 </div>
 
+                <!-- Panel de Filtros -->
+                <div class="filters-panel">
+                    <h3>🔍 Filtrar Resultados</h3>
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label for="filterCarrera">Carrera:</label>
+                            <select id="filterCarrera" class="filter-select">
+                                <option value="">Todas las carreras</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterMateria">Materia:</label>
+                            <select id="filterMateria" class="filter-select">
+                                <option value="">Todas las materias</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterModalidad">Modalidad:</label>
+                            <select id="filterModalidad" class="filter-select">
+                                <option value="">Todas las modalidades</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterSede">Sede:</label>
+                            <select id="filterSede" class="filter-select">
+                                <option value="">Todas las sedes</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterDocente">Docente:</label>
+                            <select id="filterDocente" class="filter-select">
+                                <option value="">Todos los docentes</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFilters" class="filter-btn apply">
+                                <span>✓</span> Aplicar Filtros
+                            </button>
+                            <button id="clearFilters" class="filter-btn clear">
+                                <span>✕</span> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="filter-summary" id="filterSummary" style="display: none;">
+                        <span id="filterSummaryText"></span>
+                    </div>
+                </div>
+
                 <!-- Gráficos -->
                 <div class="charts-container">
                     <div class="chart-wrapper">
@@ -192,6 +250,14 @@
                                 <canvas id="categoryChart" width="400" height="300"></canvas>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Métricas Numéricas Promedio -->
+                <div class="numeric-metrics-container" id="numericMetricsContainer" style="display: none;">
+                    <h3>📊 Análisis cuantitativo</h3>
+                    <div class="metrics-grid" id="metricsGrid">
+                        <!-- Se llena dinámicamente con JavaScript -->
                     </div>
                 </div>
 
@@ -312,6 +378,7 @@
 
                         <div class="form-buttons">
                             <button id="addWord" class="add-btn">➕ Agregar al Diccionario</button>
+                            <button id="cancelEdit" type="button" class="test-btn hidden">✖️ Cancelar edición</button>
                             <button id="testWord" class="test-btn">🧪 Probar Análisis</button>
                         </div>
                     </div>
@@ -325,11 +392,20 @@
 
                 <!-- Panel de importación/exportación -->
                 <section class="import-export-panel">
-                    <h2>💾 Gestión de Diccionario</h2>
+                    <h2>💾 Gestión de Diccionarios</h2>
+                    
+                    <!-- Selector de diccionario activo -->
+                    <div class="dictionary-selector">
+                        <label for="activeDictionarySelect">Diccionario Activo:</label>
+                        <select id="activeDictionarySelect" class="dictionary-select">
+                            <option value="default">Diccionario Base (894 palabras)</option>
+                        </select>
+                        <button id="deleteDictionary" class="btn-small btn-danger" title="Eliminar diccionario seleccionado">🗑️</button>
+                    </div>
                     
                     <div class="management-buttons">
-                        <button id="exportDictionary" class="management-btn export">
-                            📤 Exportar Diccionario
+                        <button id="exportDictionaryExcel" class="management-btn export">
+                            📊 Exportar a Excel
                         </button>
                         <button id="importDictionary" class="management-btn import">
                             📥 Importar Diccionario
@@ -340,7 +416,7 @@
                     </div>
 
                     <!-- Input oculto para importar archivos -->
-                    <input type="file" id="dictionaryFileInput" accept=".json" style="display: none;">
+                    <input type="file" id="dictionaryFileInput" accept=".json,.xlsx,.xls,.csv" style="display: none;">
                 </section>
             </div>
 
@@ -350,16 +426,6 @@
                     <h2>⚖️ Comparación de Motores de Análisis</h2>
                     <p>Prueba diferentes motores de análisis de sentimientos para encontrar el mejor para tu caso de uso</p>
                 </header>
-
-                <!-- Panel de estado de Python -->
-                <section class="python-status-section">
-                    <div class="status-card" id="pythonStatusCard">
-                        <div class="status-loading">
-                            <div class="spinner-small"></div>
-                            <span>Verificando estado de Python...</span>
-                        </div>
-                    </div>
-                </section>
 
                 <!-- Panel de motores disponibles -->
                 <section class="engines-section">
@@ -431,37 +497,6 @@
                         </table>
                     </div>
                 </section>
-
-                <!-- Panel de instalación de Python -->
-                <section id="pythonInstallSection" class="install-section hidden">
-                    <div class="install-card">
-                        <h3>🐍 Instalar Python para Motores Avanzados</h3>
-                        <p>Para acceder a todos los motores de análisis, necesitas instalar Python y las dependencias.</p>
-                        
-                        <div class="install-steps">
-                            <div class="step">
-                                <div class="step-number">1</div>
-                                <div class="step-content">
-                                    <h4>Ejecutar script de instalación</h4>
-                                    <p>Abre PowerShell como administrador y ejecuta:</p>
-                                    <code>.\install-python.ps1</code>
-                                </div>
-                            </div>
-                            
-                            <div class="step">
-                                <div class="step-number">2</div>
-                                <div class="step-content">
-                                    <h4>Verificar instalación</h4>
-                                    <p>Haz clic en el botón para verificar que Python esté disponible</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <button id="recheckPython" class="recheck-btn">
-                            🔄 Verificar Python
-                        </button>
-                    </div>
-                </section>
             </div>
         </main>
 
@@ -470,6 +505,7 @@
         </footer>
     </div>
 
+    <script src="cascade-filters.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

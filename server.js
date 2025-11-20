@@ -7,15 +7,27 @@ const { NlpManager } = require('node-nlp');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { spanishSentimentDict, spanishPhrases, intensityModifiers, negationWords } = require('./sentiment-dict');
+// Solo usamos palabras de v4 y negaciones para invertir puntaje; no cargamos diccionarios extra.
+const { negationWords } = require('./sentiment-dict');
+const COLUMN_CONFIG = require('./column-config');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuración de middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ charset: 'utf-8' }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    } else if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    }
+  }
+}));
 
 // Configuración de multer para subida de archivos
 const storage = multer.diskStorage({
@@ -34,30 +46,51 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   fileFilter: function (req, file, cb) {
-    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-        file.mimetype === 'application/vnd.ms-excel') {
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv', // .csv
+      'application/csv',
+      'text/plain' // algunos navegadores envían CSV como text/plain
+    ];
+    
+    const allowedExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
-      cb(new Error('Solo se permiten archivos Excel (.xlsx, .xls)'), false);
+      cb(new Error('Solo se permiten archivos Excel (.xlsx, .xls) o CSV (.csv)'), false);
     }
   }
 });
 
-// Inicializar analizador de sentimientos con diccionario completo
-const sentiment = new Sentiment();
+// Inicializar analizador de sentimientos (instancia vacía)
+let sentiment = new Sentiment(); // Se recreará al activar un diccionario
 
-// Combinar diccionario de palabras y frases
-const completeSpanishDict = { ...spanishSentimentDict, ...spanishPhrases };
+// Cargar únicamente diccionario v4; si falta, se inicia vacío (no se mezclan otras fuentes)
+let completeSpanishDict = {};
+try {
+  const v4Path = path.join(__dirname, 'dictionaries', 'Diccionario_Sentimientos_v4.json');
+  if (fs.existsSync(v4Path)) {
+    const v4Data = JSON.parse(fs.readFileSync(v4Path, 'utf8'));
+    if (v4Data && v4Data.dictionary) {
+      completeSpanishDict = v4Data.dictionary;
+      console.log(`🆕 Diccionario v4 cargado (${Object.keys(completeSpanishDict).length} palabras)`);
+    } else {
+      console.error('❌ Diccionario v4 inválido (sin propiedad dictionary). Iniciando vacío.');
+    }
+  } else {
+    console.error('❌ Diccionario v4 no encontrado. Iniciando sin diccionario activo.');
+  }
+} catch (e) {
+  console.error('❌ Error leyendo diccionario v4:', e.message);
+}
 
-// Configurar idioma español con el formato correcto
-const spanishLanguage = {
-  labels: completeSpanishDict
-};
+// Mantener referencia directa al diccionario activo (labels) para motor propio
+let currentLabels = {}; // Se actualizará al activar/importar
 
-// Registrar diccionario español completo
-sentiment.registerLanguage('es', spanishLanguage);
-
-console.log(`📚 Diccionario cargado: ${Object.keys(completeSpanishDict).length} palabras/frases en español`);
+console.log(`📚 Diccionario v4 listo (solo este se usará): ${Object.keys(completeSpanishDict).length} palabras`);
 
 // Inicializar NLP.js para análisis de sentimientos en español
 const nlpManager = new NlpManager({ 
@@ -72,39 +105,113 @@ const nlpManager = new NlpManager({
 console.log(`🤖 NLP.js inicializado para análisis en español`);
 
 // Diccionario personalizado del usuario (se carga desde archivo)
-let userCustomDict = {};
-const USER_DICT_FILE = path.join(__dirname, 'user-dictionary.json');
+// Eliminado soporte de diccionario personalizado: solo se usa v4.
+let userCustomDict = {}; // Se mantiene variable para evitar errores residuales pero no se utiliza.
+// Variable para trackear el diccionario activo
+let activeDictionary = { name: null, fileName: null, wordCount: 0 };
+if (Object.keys(completeSpanishDict).length > 0) {
+  // Auto-activar v4 si existe (sin concepto de "base")
+  activeDictionary = {
+    name: 'Diccionario Sentimientos v4',
+    fileName: 'Diccionario_Sentimientos_v4',
+    wordCount: Object.keys(completeSpanishDict).length,
+    labels: completeSpanishDict
+  };
+  sentiment = new Sentiment();
+  const dictCopy = JSON.parse(JSON.stringify(completeSpanishDict));
+  sentiment.registerLanguage('es', { labels: dictCopy });
+  currentLabels = dictCopy;
+  console.log(`🚀 Diccionario v4 auto-activado al inicio (${activeDictionary.wordCount} palabras)`);
+}
+
+// Permitir configurar la ruta del diccionario vía variable de entorno para soportar Docker/volúmenes
+const USER_DICT_FILE = process.env.USER_DICT_FILE || path.join(__dirname, 'user-dictionary.json');
 
 // Cargar diccionario personalizado si existe
-function loadUserDictionary() {
-  try {
-    if (fs.existsSync(USER_DICT_FILE)) {
-      const data = fs.readFileSync(USER_DICT_FILE, 'utf8');
-      userCustomDict = JSON.parse(data);
-      console.log(`📝 Diccionario personalizado cargado: ${Object.keys(userCustomDict).length} palabras`);
-      
-      // Registrar diccionario combinado
-      const combinedDict = { ...completeSpanishDict, ...userCustomDict };
-      sentiment.registerLanguage('es', { labels: combinedDict });
+// Se eliminan loadUserDictionary y saveUserDictionary (no hay edición permitida)
+
+// ===== FUNCIONES DE CONFIGURACIÓN DE COLUMNAS =====
+// Usa el archivo column-config.js para la configuración
+
+// Función para determinar si una columna debe ser analizada para sentimiento
+function shouldAnalyzeColumn(columnName, value) {
+  // No analizar columnas de identificación
+  if (COLUMN_CONFIG.identificacion.includes(columnName)) {
+    return false;
+  }
+  
+  // No analizar columnas numéricas
+  if (COLUMN_CONFIG.numericas.includes(columnName)) {
+    return false;
+  }
+  
+  // Verificar si es una columna de texto libre (coincidencia exacta o parcial)
+  const isTextoLibre = COLUMN_CONFIG.textoLibre.some(pattern => 
+    columnName.includes(pattern) || pattern.includes(columnName)
+  );
+  
+  if (isTextoLibre) {
+    // Solo analizar si es string con contenido significativo
+    const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 10;
+    return typeof value === 'string' && value.trim().length > minLength;
+  } 
+  
+  // Para cualquier otra columna, aplicar reglas generales:
+  // - Debe ser string
+  // - Más de X caracteres (comentarios significativos)
+  // - No debe ser un número convertido a string
+  const minLength = COLUMN_CONFIG.analisis?.longitudMinimaOtros || 20;
+  if (typeof value === 'string' && value.trim().length > minLength) {
+    // Verificar que no sea solo un número
+    const trimmed = value.trim();
+    if (!isNaN(trimmed) && trimmed !== '') {
+      return false;
     }
-  } catch (error) {
-    console.error('Error cargando diccionario personalizado:', error);
-    userCustomDict = {};
+    return true;
   }
+  
+  return false;
 }
 
-// Guardar diccionario personalizado
-function saveUserDictionary() {
-  try {
-    fs.writeFileSync(USER_DICT_FILE, JSON.stringify(userCustomDict, null, 2));
-    console.log('💾 Diccionario personalizado guardado');
-  } catch (error) {
-    console.error('Error guardando diccionario personalizado:', error);
-  }
+// Helper reutilizable: obtiene columnas de texto que se deben analizar para sentimiento.
+// Retorna arreglo de objetos { column, text }
+function getSentimentColumns(row) {
+  const selected = [];
+  Object.entries(row).forEach(([columnName, value]) => {
+    if (shouldAnalyzeColumn(columnName, value)) {
+      if (typeof value === 'string') {
+        selected.push({ column: columnName, text: value });
+      }
+    }
+  });
+  return selected;
 }
 
-// Cargar al iniciar
-loadUserDictionary();
+// Función para obtener valores numéricos de columnas específicas
+function extractNumericValues(row) {
+  const numericData = {};
+  
+  COLUMN_CONFIG.numericas.forEach(columnName => {
+    if (row.hasOwnProperty(columnName)) {
+      const value = row[columnName];
+      // Convertir a número si es string numérico
+      if (typeof value === 'number') {
+        numericData[columnName] = value;
+      } else if (typeof value === 'string' && !isNaN(value) && value.trim() !== '') {
+        numericData[columnName] = parseFloat(value);
+      }
+    }
+  });
+  
+  return numericData;
+}
+
+// Se eliminó carga de diccionario personalizado: sólo v4.
+
+console.log('📋 Configuración de columnas cargada:');
+console.log(`   - Columnas de identificación: ${COLUMN_CONFIG.identificacion.length}`);
+console.log(`   - Columnas numéricas: ${COLUMN_CONFIG.numericas.length}`);
+console.log(`   - Patrones de texto libre: ${COLUMN_CONFIG.textoLibre.length}`);
 
 // Ruta principal
 app.get('/', (req, res) => {
@@ -118,11 +225,24 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       return res.status(400).json({ error: 'No se subió ningún archivo' });
     }
 
-    // Leer archivo Excel
-    const workbook = XLSX.readFile(req.file.path);
+    // Leer archivo Excel/CSV
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';' // Soportar CSV con separador punto y coma
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    
+    // Opciones para sheet_to_json para manejar CSV con ;
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+    if (jsonData.length > 0) {
+      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
+    }
 
     if (jsonData.length === 0) {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
@@ -137,15 +257,25 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
 
     // Análisis de sentimientos
     const results = jsonData.map((row, index) => {
-      const textFields = Object.values(row).filter(value => 
-        typeof value === 'string' && value.trim().length > 5
-      );
+      // Extraer solo los campos de texto que deben ser analizados
+      const textFields = [];
+      const columnNames = [];
+      
+      Object.entries(row).forEach(([columnName, value]) => {
+        if (shouldAnalyzeColumn(columnName, value)) {
+          textFields.push(value);
+          columnNames.push(columnName);
+        }
+      });
+      
+      // Extraer valores numéricos para métricas
+      const numericValues = extractNumericValues(row);
       
       let sentimentResults = [];
       let overallScore = 0;
       let overallComparative = 0;
 
-      textFields.forEach(text => {
+      textFields.forEach((text, idx) => {
         // Análisis mejorado con preprocesamiento
         const enhancedAnalysis = analyzeTextEnhanced(text);
         
@@ -153,6 +283,7 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
         
         sentimentResults.push({
+          column: columnNames[idx], // Incluir nombre de columna
           text: limitedText,
           score: enhancedAnalysis.score,
           comparative: enhancedAnalysis.comparative,
@@ -173,21 +304,30 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length 
         : 0.5;
 
+  // Promedio por columna (score ahora raw -5..+5, neutral = 0)
+  const perColumnAvgScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0; // 0 = neutral
+
       return {
         id: index + 1,
         originalData: row,
+        numericMetrics: numericValues, // Incluir métricas numéricas
         sentiment: {
-          overallScore: overallScore,
+          overallScore: overallScore, // suma total (puede exceder rango por múltiples columnas)
+          perColumnAvgScore: parseFloat(perColumnAvgScore.toFixed(2)), // score promedio -5..+5
           overallComparative: overallComparative,
-          classification: getClassification(overallScore, averageConfidence),
+          classification: getClassification(perColumnAvgScore, averageConfidence),
           confidence: Math.round(averageConfidence * 100) / 100,
-          details: sentimentResults
+          details: sentimentResults,
+          analyzedColumns: columnNames.length // Cantidad de columnas analizadas
         }
       };
     });
 
     // Estadísticas generales
     const stats = calculateStats(results);
+    
+    // Extraer valores únicos para filtros
+    const filterOptions = extractFilterOptions(jsonData);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -196,6 +336,7 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       success: true,
       totalResponses: results.length,
       statistics: stats,
+      filterOptions: filterOptions,
       results: results
     });
 
@@ -216,12 +357,22 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     const engine = req.body.engine || 'natural';
     console.log(`🔧 Analizando con motor específico: ${engine}`);
 
-    // Leer archivo Excel
-    const workbook = XLSX.readFile(req.file.path);
+    // Leer archivo Excel/CSV
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';' // Soportar CSV con separador punto y coma
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+    if (jsonData.length > 0) {
+      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
+    }
     if (jsonData.length === 0) {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
     }
@@ -235,28 +386,20 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
 
     // Análisis según el motor seleccionado
     const results = [];
-    console.log(`🔄 Procesando ${jsonData.length} registros con ${engine}...`);
+    console.log(`🔄 Procesando ${jsonData.length} registros con ${engine} (filtrado por configuración de columnas)...`);
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
-      
-      // Progreso cada 500 registros
+      const numericValues = extractNumericValues(row);
       if (i % 500 === 0 && i > 0) {
         console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
       }
-
-      const textFields = Object.values(row).filter(value => 
-        typeof value === 'string' && value.trim().length > 5
-      );
-      
+      const sentimentColumns = getSentimentColumns(row);
       let sentimentResults = [];
       let overallScore = 0;
       let overallComparative = 0;
-
-      for (const text of textFields) {
+      for (const { column, text } of sentimentColumns) {
         let analysis;
-        
-        // Análisis según motor seleccionado
         switch (engine) {
           case 'natural':
             analysis = analyzeTextEnhanced(text);
@@ -265,57 +408,41 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
             analysis = await analyzeWithNLPjs(text);
             break;
           default:
-            analysis = analyzeTextEnhanced(text); // Fallback a Natural.js
+            analysis = analyzeTextEnhanced(text);
         }
-        
-        // Limitar el texto para reducir memoria
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
-        
-        // Manejar valores de análisis de forma segura
-        const safeScore = typeof analysis.score === 'number' ? analysis.score : 5;
+        const safeScore = typeof analysis.score === 'number' ? analysis.score : 0;
         const safeComparative = typeof analysis.comparative === 'number' ? analysis.comparative : 0;
         const safeConfidence = typeof analysis.confidence === 'number' ? analysis.confidence : 0.5;
-        
         sentimentResults.push({
-          text: limitedText,
-          score: safeScore,
-          comparative: safeComparative,
-          positive: Array.isArray(analysis.positive) ? analysis.positive.slice(0, 5) : [],
-          negative: Array.isArray(analysis.negative) ? analysis.negative.slice(0, 5) : [],
-          classification: analysis.classification || 'Neutral',
-          confidence: safeConfidence,
-          engine: analysis.engine || engine
+          column,
+            text: limitedText,
+            score: safeScore,
+            comparative: safeComparative,
+            positive: Array.isArray(analysis.positive) ? analysis.positive.slice(0, 5) : [],
+            negative: Array.isArray(analysis.negative) ? analysis.negative.slice(0, 5) : [],
+            classification: analysis.classification || getClassification(safeScore, safeConfidence),
+            confidence: safeConfidence,
+            engine: analysis.engine || engine
         });
-
         overallScore += safeScore;
         overallComparative += safeComparative;
       }
-
       if (sentimentResults.length > 0) {
         overallComparative = overallComparative / sentimentResults.length;
       }
-
-      const averageScore = sentimentResults.length > 0 
-        ? overallScore / sentimentResults.length 
-        : 5;
-      
-      const averageConfidence = sentimentResults.length > 0 
-        ? sentimentResults.reduce((sum, r) => sum + (typeof r.confidence === 'number' ? r.confidence : 0.5), 0) / sentimentResults.length 
-        : 0.5;
-
-      // Asegurar que los valores sean números válidos antes de usar toFixed
-      const safeAverageScore = typeof averageScore === 'number' && !isNaN(averageScore) ? averageScore : 5;
-      const safeOverallComparative = typeof overallComparative === 'number' && !isNaN(overallComparative) ? overallComparative : 0;
-      const safeAverageConfidence = typeof averageConfidence === 'number' && !isNaN(averageConfidence) ? averageConfidence : 0.5;
-
+      const averageScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
+      const averageConfidence = sentimentResults.length > 0 ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length : 0.5;
       results.push({
         row: i + 1,
         ...row,
+        numericMetrics: numericValues,
         sentiment: {
-          score: parseFloat(safeAverageScore.toFixed(2)),
-          comparative: parseFloat(safeOverallComparative.toFixed(4)),
-          confidence: parseFloat(safeAverageConfidence.toFixed(2)),
-          engine: engine,
+          score: parseFloat(averageScore.toFixed(2)),
+          comparative: parseFloat((overallComparative || 0).toFixed(4)),
+          confidence: parseFloat(averageConfidence.toFixed(2)),
+          engine,
+          analyzedColumns: sentimentColumns.map(c => c.column),
           details: sentimentResults
         }
       });
@@ -324,6 +451,9 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     console.log(`✅ Análisis completado con ${engine}`);
 
     const stats = calculateStats(results);
+    
+    // Extraer valores únicos para filtros
+    const filterOptions = extractFilterOptions(jsonData);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -333,6 +463,7 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
       totalResponses: results.length,
       engine: engine,
       statistics: stats,
+      filterOptions: filterOptions,
       results: results
     });
 
@@ -351,11 +482,22 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
 
     console.log(`⚖️ Analizando con ambos motores (Natural.js + NLP.js)...`);
 
-    // Leer archivo Excel
-    const workbook = XLSX.readFile(req.file.path);
+    // Leer archivo Excel/CSV
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';' // Soportar CSV con separador punto y coma
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+    if (jsonData.length > 0) {
+      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
+    }
 
     if (jsonData.length === 0) {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
@@ -374,77 +516,59 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
-      
-      // Progreso cada 500 registros
       if (i % 500 === 0 && i > 0) {
         console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
       }
-
-      const textFields = Object.values(row).filter(value => 
-        typeof value === 'string' && value.trim().length > 5
-      );
-      
-      let dualAnalysis = {
-        natural: [],
-        nlpjs: [],
-        consensus: []
-      };
+      const sentimentColumns = getSentimentColumns(row);
+      let dualAnalysis = { natural: [], nlpjs: [], consensus: [] };
       let overallScore = 0;
       let overallComparative = 0;
       let analysisCount = 0;
-
-      for (const text of textFields) {
-        // Análisis con ambos motores
+      for (const { column, text } of sentimentColumns) {
         const [naturalResult, nlpResult] = await Promise.all([
           Promise.resolve(analyzeTextEnhanced(text)),
           analyzeWithNLPjs(text)
         ]);
-        
-        // Limitar el texto para reducir memoria
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
-        
-        // Determinar consenso
         const consensus = determineConsensus(naturalResult, nlpResult);
-        
         dualAnalysis.natural.push({
+          column,
           text: limitedText,
-          score: naturalResult.score || 5,
-          classification: naturalResult.classification || 'Neutral',
+          score: naturalResult.score || 0,
+          classification: naturalResult.classification || getClassification(naturalResult.score || 0, naturalResult.confidence || 0.5),
           confidence: naturalResult.confidence || 0.5
         });
-        
         dualAnalysis.nlpjs.push({
+          column,
           text: limitedText,
-          score: nlpResult.score || 5,
-          classification: nlpResult.classification || 'Neutral',
+          score: nlpResult.score || 0,
+          classification: nlpResult.classification || getClassification(nlpResult.score || 0, nlpResult.confidence || 0.5),
           confidence: nlpResult.confidence || 0.5
         });
-        
         dualAnalysis.consensus.push({
+          column,
           text: limitedText,
           classification: consensus,
-          naturalScore: naturalResult.score || 5,
-          nlpScore: nlpResult.score || 5,
-          averageScore: ((naturalResult.score || 5) + (nlpResult.score || 5)) / 2
+          naturalScore: naturalResult.score || 0,
+          nlpScore: nlpResult.score || 0,
+          averageScore: ((naturalResult.score || 0) + (nlpResult.score || 0)) / 2
         });
-
-        overallScore += ((naturalResult.score || 5) + (nlpResult.score || 5)) / 2;
+        overallScore += ((naturalResult.score || 0) + (nlpResult.score || 0)) / 2;
         overallComparative += ((naturalResult.comparative || 0) + (nlpResult.comparative || 0)) / 2;
         analysisCount++;
       }
-
-      const averageScore = analysisCount > 0 ? overallScore / analysisCount : 5;
+      const averageScore = analysisCount > 0 ? overallScore / analysisCount : 0;
       const averageComparative = analysisCount > 0 ? overallComparative / analysisCount : 0;
-
       results.push({
         row: i + 1,
         ...row,
         sentiment: {
           score: parseFloat(averageScore.toFixed(2)),
           comparative: parseFloat(averageComparative.toFixed(4)),
-          confidence: 0.8, // Mayor confianza por usar ambos motores
+          confidence: sentimentColumns.length > 0 ? 0.8 : 0.0,
           engine: 'both',
-          dualAnalysis: dualAnalysis
+          analyzedColumns: sentimentColumns.map(c => c.column),
+          dualAnalysis
         }
       });
     }
@@ -452,6 +576,9 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     console.log(`✅ Análisis dual completado`);
 
     const stats = calculateStats(results);
+    
+    // Extraer valores únicos para filtros
+    const filterOptions = extractFilterOptions(jsonData);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -461,6 +588,7 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
       totalResponses: results.length,
       engine: 'both',
       statistics: stats,
+      filterOptions: filterOptions,
       results: results
     });
 
@@ -470,133 +598,99 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
   }
 });
 
-// Función de análisis de sentimientos mejorada
+// Función de análisis de sentimientos (solo contenido del diccionario v4 activo)
 function analyzeTextEnhanced(text) {
-  // Normalizar texto
-  const normalizedText = text.toLowerCase().trim();
-  
-  // Detectar negaciones
+  const normalizedText = removeAccents(text.toLowerCase().trim());
+  const tokens = normalizedText.split(/[^a-zA-Záéíóúüñ0-9]+/).filter(t => t.length > 0);
+  const tokenSet = new Set(tokens);
   const hasNegation = negationWords.some(neg => normalizedText.includes(neg));
-  
-  // Análisis base con sentiment usando diccionario español
-  let analysis = sentiment.analyze(normalizedText, { language: 'es' });
-  
-  // Si no se encontraron palabras con el diccionario español, usar análisis estándar
-  if (analysis.score === 0 && analysis.positive.length === 0 && analysis.negative.length === 0) {
-    analysis = sentiment.analyze(normalizedText);
+
+  let rawScore = 0;
+  const positives = [];
+  const negatives = [];
+  let matchedCount = 0;
+
+  for (const [key, value] of Object.entries(currentLabels)) {
+    const normKey = removeAccents(key.toLowerCase().trim());
+    if (!normKey) continue;
+    if (normKey.includes(' ')) {
+      const regex = new RegExp(`(^|\b)${escapeRegex(normKey)}(\b|$)`, 'g');
+      const matches = normalizedText.match(regex);
+      if (matches) {
+        rawScore += value * matches.length;
+        matchedCount += matches.length;
+        if (value > 0) positives.push(key); else if (value < 0) negatives.push(key);
+      }
+    } else {
+      if (tokenSet.has(normKey)) {
+        rawScore += value;
+        matchedCount += 1;
+        if (value > 0) positives.push(key); else if (value < 0) negatives.push(key);
+      }
+    }
   }
-  
-  // Análisis de intensificadores
-  const intensityScore = analyzeIntensity(normalizedText);
-  
-  // Análisis adicional con patrones complejos
-  const patternScore = analyzeAdvancedPatterns(normalizedText);
-  
-  // Combinar scores
-  let finalScore = analysis.score + patternScore;
-  let finalComparative = analysis.comparative;
-  
-  // Aplicar modificadores de intensidad
-  if (intensityScore !== 1) {
-    finalScore = finalScore * intensityScore;
-    finalComparative = finalComparative * intensityScore;
+
+  if (matchedCount === 0 && normalizedText.length > 0 && normalizedText.split(/\s+/).length <= 30) {
+    console.log(`[DEBUG] Sin coincidencias para: "${normalizedText}" | Ejemplos diccionario:`, Object.keys(currentLabels).slice(0,5));
   }
-  
-  // Ajustar por negación
-  if (hasNegation && Math.abs(finalScore) > 0) {
-    finalScore = finalScore * -0.8; // Invertir por negación
-  }
-  
-  // Calcular confianza mejorada
-  const totalWords = normalizedText.split(/\s+/).length;
-  const recognizedWords = analysis.positive.length + analysis.negative.length;
-  const phraseMatches = countPhraseMatches(normalizedText);
-  const confidence = Math.min(1, ((recognizedWords + phraseMatches) / totalWords) + 0.2);
-  
-  // Convertir score a escala 0-10 para clasificación
-  const normalizedScore = (finalScore + 5) * 1; // Ajustar rango
-  const classification = getClassification(normalizedScore, confidence);
-  
+
+  if (hasNegation && rawScore !== 0) rawScore = -rawScore;
+
+  const totalWords = tokens.length;
+  const confidence = totalWords > 0 ? Math.min(1, matchedCount / totalWords) : 0;
+  const classification = getClassification(rawScore, confidence);
+  const comparative = totalWords > 0 ? rawScore / totalWords : 0;
+
   return {
-    score: normalizedScore,
-    comparative: Math.round(finalComparative * 100) / 100,
-    positive: analysis.positive,
-    negative: analysis.negative,
+    score: rawScore,
+    comparative: Math.round(comparative * 100) / 100,
+    positive: positives.slice(0,5),
+    negative: negatives.slice(0,5),
     confidence: Math.round(confidence * 100) / 100,
-    classification: classification,
+    classification,
     hasNegation,
-    intensity: intensityScore
+    intensity: 1,
+    matched: matchedCount,
+    totalWords,
+    recognizedWords: matchedCount,
+    phrases: []
   };
 }
 
-// Función para analizar intensificadores
-function analyzeIntensity(text) {
-  let maxIntensity = 1;
-  
-  for (const [modifier, multiplier] of Object.entries(intensityModifiers)) {
-    if (text.includes(modifier)) {
-      maxIntensity = Math.max(maxIntensity, multiplier);
-    }
-  }
-  
-  return maxIntensity;
-}
+function removeAccents(str) { return str.normalize('NFD').replace(/\p{Diacritic}/gu, ''); }
+function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-// Función para contar frases reconocidas
-function countPhraseMatches(text) {
-  let count = 0;
-  
-  for (const phrase of Object.keys(spanishPhrases)) {
-    if (text.includes(phrase)) {
-      count++;
-    }
-  }
-  
-  return count;
-}
+// Eliminadas funciones de intensificadores, frases y patrones avanzados para asegurar uso exclusivo del diccionario v4.
 
-// Función para patrones avanzados
-function analyzeAdvancedPatterns(text) {
-  let score = 0;
-  
-  // Patrones de contexto específicos
-  const contextPatterns = [
-    // Patrones muy positivos
-    { pattern: /mejor\s+de\s+lo\s+esperado/g, score: 3 },
-    { pattern: /superó\s+mis\s+expectativas/g, score: 4 },
-    { pattern: /sin\s+ningún\s+problema/g, score: 2 },
-    { pattern: /funcionó\s+perfecto/g, score: 3 },
-    { pattern: /calidad\s+precio/g, score: 2 },
-    { pattern: /muy\s+satisfecho/g, score: 3 },
-    
-    // Patrones negativos
-    { pattern: /peor\s+de\s+lo\s+esperado/g, score: -3 },
-    { pattern: /no\s+cumplió\s+expectativas/g, score: -3 },
-    { pattern: /lleno\s+de\s+bugs/g, score: -4 },
-    { pattern: /completamente\s+inútil/g, score: -4 },
-    { pattern: /perdí\s+mi\s+tiempo/g, score: -3 },
-    { pattern: /no\s+volvería\s+a\s+usar/g, score: -3 }
-  ];
-  
-  contextPatterns.forEach(({ pattern, score: patternScore }) => {
-    const matches = text.match(pattern);
-    if (matches) {
-      score += matches.length * patternScore;
-    }
-  });
-  
-  return score;
-}
+/*
+  INTENCIONALMENTE SIN funciones:
+  - analyzeIntensity
+  - countPhraseMatches
+  - analyzeAdvancedPatterns
+  Si se necesitan en el futuro, deberán basarse únicamente en el mismo diccionario activo.
+*/
+
+/*
+// Ejemplo anterior (referencia, ahora deshabilitado):
+// function analyzeAdvancedPatterns(text) {
+//   return 0;
+// }
+*/
+// (Se eliminó bloque de patrones avanzados para garantizar uso exclusivo de v4)
 
 // Función para clasificar sentimiento mejorada
 function getClassification(score, confidence = 0.5) {
-  // Ajustar umbrales basados en la confianza
-  const multiplier = confidence > 0.7 ? 1 : 1.2; // Ser más conservador con baja confianza
-  
-  if (score > (3 * multiplier)) return 'Muy Positivo';
-  if (score > (1 * multiplier)) return 'Positivo';
-  if (score >= (-1 * multiplier) && score <= (1 * multiplier)) return 'Neutral';
-  if (score > (-3 * multiplier)) return 'Negativo';
+  // Score esperado: -5 .. +5
+  // Umbrales fijos (independientes de confidence para estabilidad):
+  // >= +3 Muy Positivo
+  // >= +1 Positivo
+  // > -1 y < +1 Neutral
+  // >= -3 Negativo
+  // < -3 Muy Negativo
+  if (score >= 3) return 'Muy Positivo';
+  if (score >= 1) return 'Positivo';
+  if (score > -1 && score < 1) return 'Neutral';
+  if (score >= -3) return 'Negativo';
   return 'Muy Negativo';
 }
 
@@ -738,6 +832,72 @@ function calculateAgreement(results) {
   return 'Sin consenso';
 }
 
+// Función para extraer valores únicos de columnas para filtros
+function extractFilterOptions(data) {
+  const options = {
+    carreras: new Set(),
+    materias: new Set(),
+    modalidades: new Set(),
+    sedes: new Set(),
+    docentes: new Set()
+  };
+  
+  // Mostrar las columnas disponibles en el Excel
+  if (data.length > 0) {
+    const columnNames = Object.keys(data[0]);
+    console.log('📋 Columnas encontradas en el Excel:', columnNames);
+  }
+  
+  // Usar la configuración de filtros definida en column-config.js
+  const carreraCol = COLUMN_CONFIG.filtros?.carrera || 'CARRERA';
+  const materiaCol = COLUMN_CONFIG.filtros?.materia || 'MATERIA';
+  const modalidadCol = COLUMN_CONFIG.filtros?.modalidad || 'MODALIDAD';
+  const sedeCol = COLUMN_CONFIG.filtros?.sede || 'SEDE';
+  const docenteCol = COLUMN_CONFIG.filtros?.docente || 'DOCENTE';
+  
+  data.forEach(row => {
+    // Buscar CARRERA
+    if (row[carreraCol] && typeof row[carreraCol] === 'string' && row[carreraCol].trim()) {
+      options.carreras.add(row[carreraCol].trim());
+    }
+    
+    // Buscar MATERIA
+    if (row[materiaCol] && typeof row[materiaCol] === 'string' && row[materiaCol].trim()) {
+      options.materias.add(row[materiaCol].trim());
+    }
+    
+    // Buscar MODALIDAD
+    if (row[modalidadCol] && typeof row[modalidadCol] === 'string' && row[modalidadCol].trim()) {
+      options.modalidades.add(row[modalidadCol].trim());
+    }
+    
+    // Buscar SEDE
+    if (row[sedeCol] && typeof row[sedeCol] === 'string' && row[sedeCol].trim()) {
+      options.sedes.add(row[sedeCol].trim());
+    }
+    
+    // Buscar DOCENTE
+    if (row[docenteCol] && typeof row[docenteCol] === 'string' && row[docenteCol].trim()) {
+      options.docentes.add(row[docenteCol].trim());
+    }
+  });
+  
+  // Convertir Sets a arrays ordenados
+  const result = {
+    carreras: Array.from(options.carreras).sort(),
+    materias: Array.from(options.materias).sort(),
+    modalidades: Array.from(options.modalidades).sort(),
+    sedes: Array.from(options.sedes).sort(),
+    docentes: Array.from(options.docentes).sort(),
+    numericQuestions: COLUMN_CONFIG.numericas || []
+  };
+  
+  console.log(`📊 Filtros extraídos: ${result.carreras.length} carreras, ${result.materias.length} materias, ${result.modalidades.length} modalidades, ${result.sedes.length} sedes, ${result.docentes.length} docentes`);
+  console.log(`📊 Columnas numéricas: ${result.numericQuestions.length} preguntas`);
+  
+  return result;
+}
+
 // Función para calcular estadísticas
 function calculateStats(results) {
   const classifications = {
@@ -754,29 +914,31 @@ function calculateStats(results) {
 
   results.forEach(result => {
     if (result.sentiment) {
-      // Determinar clasificación basada en el score
-      const score = typeof result.sentiment.score === 'number' ? result.sentiment.score : 5;
+      const avgScore = typeof result.sentiment.perColumnAvgScore === 'number'
+        ? result.sentiment.perColumnAvgScore
+        : 0; // Neutral en nueva escala raw -5..+5
+
+      // Clasificación usando mismos umbrales raw
       let classification = 'Neutral';
-      
-      if (score >= 7) classification = 'Muy Positivo';
-      else if (score >= 5.5) classification = 'Positivo';
-      else if (score <= 3) classification = 'Muy Negativo';
-      else if (score <= 4.5) classification = 'Negativo';
-      
+      if (avgScore >= 3) classification = 'Muy Positivo';
+      else if (avgScore >= 1) classification = 'Positivo';
+      else if (avgScore <= -3) classification = 'Muy Negativo';
+      else if (avgScore <= -1) classification = 'Negativo';
+
       classifications[classification]++;
-      totalScore += score;
-      totalComparative += (typeof result.sentiment.comparative === 'number' ? result.sentiment.comparative : 0);
+      totalScore += avgScore;
+      totalComparative += (typeof result.sentiment.overallComparative === 'number' ? result.sentiment.overallComparative : 0);
       validResults++;
     }
   });
 
-  const averageScore = validResults > 0 ? totalScore / validResults : 5;
+  const averageScore = validResults > 0 ? totalScore / validResults : 0;
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   const totalResults = validResults > 0 ? validResults : 1; // Evitar división por cero
 
   return {
     classifications: classifications,
-    averageScore: parseFloat(averageScore.toFixed(2)),
+  averageScore: parseFloat(averageScore.toFixed(2)), // Promedio -5..+5
     averageComparative: parseFloat(averageComparative.toFixed(4)),
     percentages: {
       'Muy Positivo': parseFloat((classifications['Muy Positivo'] / totalResults * 100).toFixed(1)),
@@ -794,7 +956,7 @@ app.post('/api/export', (req, res) => {
     const { data, format } = req.body;
     
     if (format === 'json') {
-      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=analisis-resultados.json');
       res.send(JSON.stringify(data, null, 2));
     } else if (format === 'csv') {
@@ -1142,10 +1304,21 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
     console.log('📊 Generando reporte avanzado...');
 
     // Procesar el archivo como lo hacemos normalmente
-    const workbook = XLSX.readFile(req.file.path);
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';' // Soportar CSV con separador punto y coma
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+    if (jsonData.length > 0) {
+      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
+    }
 
     if (jsonData.length === 0) {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
@@ -1173,29 +1346,27 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
       const result = { ...row };
       
       // Identificar comentarios de materia y docente
-      const textFields = Object.keys(row).filter(key => 
-        typeof row[key] === 'string' && row[key].trim().length > 5
-      );
+      const sentimentColumns = getSentimentColumns(row); // Filtrar columnas de texto libre válidas
 
-      if (textFields.length > 0) {
+      if (sentimentColumns.length > 0) {
         result.sentimentAnalysis = {};
         
         // Intentar identificar comentarios específicos
-        const materiaField = textFields.find(field => 
-          field.toLowerCase().includes('materia') || 
-          field.toLowerCase().includes('asignatura') || 
-          field.toLowerCase().includes('curso')
+        const materiaField = sentimentColumns.find(c => 
+          c.column.toLowerCase().includes('materia') || 
+          c.column.toLowerCase().includes('asignatura') || 
+          c.column.toLowerCase().includes('curso')
         );
         
-        const docenteField = textFields.find(field => 
-          field.toLowerCase().includes('docente') || 
-          field.toLowerCase().includes('profesor') || 
-          field.toLowerCase().includes('teacher')
+        const docenteField = sentimentColumns.find(c => 
+          c.column.toLowerCase().includes('docente') || 
+          c.column.toLowerCase().includes('profesor') || 
+          c.column.toLowerCase().includes('teacher')
         );
 
         // Analizar comentario de materia
-        if (materiaField && row[materiaField]) {
-          const materiaText = row[materiaField];
+        if (materiaField && materiaField.text) {
+          const materiaText = materiaField.text;
           result.comentario_materia = materiaText;
           
           const [naturalResult, nlpResult] = await Promise.all([
@@ -1211,8 +1382,8 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
         }
 
         // Analizar comentario de docente
-        if (docenteField && row[docenteField]) {
-          const docenteText = row[docenteField];
+        if (docenteField && docenteField.text) {
+          const docenteText = docenteField.text;
           result.comentario_docente = docenteText;
           
           const [naturalResult, nlpResult] = await Promise.all([
@@ -1228,8 +1399,8 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
         }
 
         // Si no se identificaron campos específicos, analizar el primer campo de texto
-        if (!materiaField && !docenteField && textFields.length > 0) {
-          const mainText = row[textFields[0]];
+        if (!materiaField && !docenteField && sentimentColumns.length > 0) {
+          const mainText = sentimentColumns[0].text;
           const [naturalResult, nlpResult] = await Promise.all([
             Promise.resolve(analyzeTextEnhanced(mainText)),
             analyzeWithNLPjs(mainText)
@@ -1310,23 +1481,34 @@ app.listen(PORT, () => {
 // Obtener diccionario completo
 app.get('/api/dictionary', (req, res) => {
   try {
-    const combinedDict = { ...completeSpanishDict, ...userCustomDict };
-    const dictionaryData = Object.entries(combinedDict).map(([word, score]) => ({
-      word: word,
-      score: score,
-      type: score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral',
-      origin: userCustomDict.hasOwnProperty(word) ? 'user' : 'default'
+    if (!activeDictionary.fileName) {
+      return res.status(400).json({ error: 'No hay diccionario activo' });
+    }
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    let activeDict = {};
+    let dictName = activeDictionary.name;
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      activeDict = data.dictionary || {};
+      dictName = data.name || dictName;
+    } else {
+      activeDict = activeDictionary.labels || {};
+    }
+    const dictionaryData = Object.entries(activeDict).map(([word, score]) => ({
+      word,
+      score,
+      type: score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral'
     }));
-    
     res.json({
       success: true,
+      name: dictName,
       dictionary: dictionaryData,
       stats: {
         total: dictionaryData.length,
         positive: dictionaryData.filter(item => item.type === 'positive').length,
         negative: dictionaryData.filter(item => item.type === 'negative').length,
-        neutral: dictionaryData.filter(item => item.type === 'neutral').length,
-        user: dictionaryData.filter(item => item.origin === 'user').length
+        neutral: dictionaryData.filter(item => item.type === 'neutral').length
       }
     });
   } catch (error) {
@@ -1337,70 +1519,17 @@ app.get('/api/dictionary', (req, res) => {
 
 // Agregar nueva palabra al diccionario
 app.post('/api/dictionary/add', (req, res) => {
-  try {
-    const { word, score } = req.body;
-    
-    if (!word || score === undefined) {
-      return res.status(400).json({ error: 'Palabra y puntuación son requeridos' });
-    }
-    
-    const normalizedWord = word.toLowerCase().trim();
-    const numericScore = parseFloat(score);
-    
-    if (isNaN(numericScore) || numericScore < -5 || numericScore > 5) {
-      return res.status(400).json({ error: 'La puntuación debe ser un número entre -5 y 5' });
-    }
-    
-    // Agregar al diccionario personalizado
-    userCustomDict[normalizedWord] = numericScore;
-    
-    // Actualizar diccionario en sentiment
-    const combinedDict = { ...completeSpanishDict, ...userCustomDict };
-    sentiment.registerLanguage('es', { labels: combinedDict });
-    
-    // Guardar en archivo
-    saveUserDictionary();
-    
-    res.json({
-      success: true,
-      message: `Palabra "${normalizedWord}" agregada con puntuación ${numericScore}`,
-      word: normalizedWord,
-      score: numericScore
-    });
-    
-  } catch (error) {
-    console.error('Error agregando palabra:', error);
-    res.status(500).json({ error: 'Error agregando palabra al diccionario' });
-  }
+  return res.status(403).json({ error: 'Diccionario inmutable: sólo se usa contenido original de v4' });
 });
 
 // Eliminar palabra del diccionario personalizado
 app.delete('/api/dictionary/remove/:word', (req, res) => {
-  try {
-    const word = req.params.word.toLowerCase().trim();
-    
-    if (userCustomDict.hasOwnProperty(word)) {
-      delete userCustomDict[word];
-      
-      // Actualizar diccionario en sentiment
-      const combinedDict = { ...completeSpanishDict, ...userCustomDict };
-      sentiment.registerLanguage('es', { labels: combinedDict });
-      
-      // Guardar en archivo
-      saveUserDictionary();
-      
-      res.json({
-        success: true,
-        message: `Palabra "${word}" eliminada del diccionario personalizado`
-      });
-    } else {
-      res.status(404).json({ error: 'Palabra no encontrada en diccionario personalizado' });
-    }
-    
-  } catch (error) {
-    console.error('Error eliminando palabra:', error);
-    res.status(500).json({ error: 'Error eliminando palabra del diccionario' });
-  }
+  return res.status(403).json({ error: 'Diccionario inmutable: no se pueden eliminar palabras' });
+});
+
+// Actualizar/renombrar palabra del diccionario
+app.put('/api/dictionary/update', (req, res) => {
+  return res.status(403).json({ error: 'Diccionario inmutable: no se pueden actualizar palabras' });
 });
 
 // Probar análisis de una palabra o frase
@@ -1430,97 +1559,276 @@ app.post('/api/dictionary/test', (req, res) => {
 // Exportar diccionario personalizado
 app.get('/api/dictionary/export', (req, res) => {
   try {
+    if (!activeDictionary.fileName) {
+      return res.status(400).json({ error: 'No hay diccionario activo para exportar' });
+    }
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    let dictToExport = activeDictionary.labels || {};
+    let dictName = activeDictionary.fileName || 'diccionario';
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      dictToExport = data.dictionary || dictToExport;
+    }
     const exportData = {
       timestamp: new Date().toISOString(),
-      version: "1.0",
-      customDictionary: userCustomDict,
+      version: '2.0',
+      dictionaryName: activeDictionary.name,
+      customDictionary: dictToExport,
       stats: {
-        totalWords: Object.keys(userCustomDict).length,
-        positiveWords: Object.values(userCustomDict).filter(score => score > 0).length,
-        negativeWords: Object.values(userCustomDict).filter(score => score < 0).length,
-        neutralWords: Object.values(userCustomDict).filter(score => score === 0).length
+        totalWords: Object.keys(dictToExport).length,
+        positiveWords: Object.values(dictToExport).filter(score => score > 0).length,
+        negativeWords: Object.values(dictToExport).filter(score => score < 0).length,
+        neutralWords: Object.values(dictToExport).filter(score => score === 0).length
       }
     };
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename=diccionario-personalizado.json');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=${dictName}.json`);
     res.json(exportData);
-    
   } catch (error) {
     console.error('Error exportando diccionario:', error);
     res.status(500).json({ error: 'Error exportando diccionario' });
   }
 });
 
-// Importar diccionario personalizado
-app.post('/api/dictionary/import', upload.single('dictionaryFile'), (req, res) => {
+// Exportar diccionario a Excel
+app.get('/api/dictionary/export-excel', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    if (!activeDictionary.fileName) {
+      return res.status(400).json({ error: 'No hay diccionario activo para exportar' });
     }
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Diccionario de Sentimientos');
+    const dict = activeDictionary.labels || {};
+    const dictionaryData = Object.entries(dict).map(([word, score]) => ({
+      word,
+      score,
+      type: score > 0 ? 'Positivo' : score < 0 ? 'Negativo' : 'Neutral'
+    }));
     
-    const fileContent = fs.readFileSync(req.file.path, 'utf8');
-    const importedData = JSON.parse(fileContent);
+    // Configurar columnas
+    sheet.columns = [
+      { header: 'Palabra/Frase', key: 'word', width: 40 },
+      { header: 'Puntuación', key: 'score', width: 15 },
+      { header: 'Tipo', key: 'type', width: 15 },
+      { header: 'Origen', key: 'origin', width: 15 }
+    ];
     
-    if (importedData.customDictionary && typeof importedData.customDictionary === 'object') {
-      // Validar datos importados
-      const validEntries = {};
-      for (const [word, score] of Object.entries(importedData.customDictionary)) {
-        const numScore = parseFloat(score);
-        if (!isNaN(numScore) && numScore >= -5 && numScore <= 5) {
-          validEntries[word.toLowerCase().trim()] = numScore;
-        }
+    // Estilo del encabezado
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell(cell => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF366092' }
+      };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+    
+    // Agregar datos ordenados por puntuación (de más positivo a más negativo)
+    dictionaryData.sort((a, b) => b.score - a.score);
+    
+    dictionaryData.forEach((item, index) => {
+      const row = sheet.addRow(item);
+      
+      // Colorear según tipo
+      const scoreCell = row.getCell('score');
+      const typeCell = row.getCell('type');
+      
+      if (item.score > 0) {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E8' } };
+        scoreCell.font = { color: { argb: 'FF2E7D2E' }, bold: true };
+        typeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E8' } };
+        typeCell.font = { color: { argb: 'FF2E7D2E' } };
+      } else if (item.score < 0) {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E8' } };
+        scoreCell.font = { color: { argb: 'FFC53030' }, bold: true };
+        typeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E8' } };
+        typeCell.font = { color: { argb: 'FFC53030' } };
+      } else {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3E2' } };
+        scoreCell.font = { color: { argb: 'FF8B5A00' }, bold: true };
+        typeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3E2' } };
+        typeCell.font = { color: { argb: 'FF8B5A00' } };
       }
       
-      // Combinar con diccionario existente
-      userCustomDict = { ...userCustomDict, ...validEntries };
-      
-      // Actualizar diccionario en sentiment
-      const combinedDict = { ...completeSpanishDict, ...userCustomDict };
-      sentiment.registerLanguage('es', { labels: combinedDict });
-      
-      // Guardar en archivo
-      saveUserDictionary();
-      
-      // Limpiar archivo temporal
-      fs.unlinkSync(req.file.path);
-      
-      res.json({
-        success: true,
-        message: `${Object.keys(validEntries).length} palabras importadas exitosamente`,
-        importedCount: Object.keys(validEntries).length
-      });
-    } else {
-      res.status(400).json({ error: 'Formato de archivo inválido' });
-    }
+      // Resaltar palabras de usuario
+      if (item.origin === 'Usuario') {
+        row.getCell('origin').font = { bold: true, color: { argb: 'FF0066CC' } };
+      }
+    });
+    
+    // Aplicar filtros automáticos
+    sheet.autoFilter = {
+      from: 'A1',
+      to: 'D' + (dictionaryData.length + 1)
+    };
+    
+    // Agregar hoja de estadísticas
+    const statsSheet = workbook.addWorksheet('Estadísticas');
+    statsSheet.columns = [
+      { header: 'Métrica', key: 'metric', width: 30 },
+      { header: 'Valor', key: 'value', width: 20 }
+    ];
+    
+    const stats = [
+      { metric: 'Total de Palabras', value: dictionaryData.length },
+      { metric: 'Palabras Positivas', value: dictionaryData.filter(d => d.score > 0).length },
+      { metric: 'Palabras Negativas', value: dictionaryData.filter(d => d.score < 0).length },
+      { metric: 'Palabras Neutrales', value: dictionaryData.filter(d => d.score === 0).length },
+      { metric: 'Palabras del Sistema', value: dictionaryData.filter(d => d.origin === 'Sistema').length },
+      { metric: 'Palabras Personalizadas', value: dictionaryData.filter(d => d.origin === 'Usuario').length },
+      { metric: 'Fecha de Exportación', value: new Date().toLocaleString('es-AR') }
+    ];
+    
+    stats.forEach(stat => {
+      statsSheet.addRow(stat);
+    });
+    
+    // Estilo de estadísticas
+    statsSheet.getRow(1).eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D2E' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+    });
+    
+    // Generar archivo
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=diccionario-sentimientos.xlsx');
+    res.send(buffer);
+    
+    console.log('✅ Diccionario exportado a Excel exitosamente');
     
   } catch (error) {
-    console.error('Error importando diccionario:', error);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ error: 'Error importando diccionario' });
+    console.error('Error exportando diccionario a Excel:', error);
+    res.status(500).json({ error: 'Error exportando diccionario a Excel: ' + error.message });
   }
 });
+
+// Importar diccionario personalizado
+// Importar diccionario (JSON o Excel)
+app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, res) => {
+  return res.status(403).json({ error: 'Importación deshabilitada: sólo se permite el diccionario v4' });
+});
+
+// Obtener diccionario activo
+app.get('/api/dictionaries/active', (req, res) => {
+  res.json({ 
+    success: true,
+    activeDictionary: activeDictionary
+  });
+});
+
+// Listar diccionarios disponibles
+app.get('/api/dictionaries', (req, res) => {
+  try {
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const dictionaries = [];
+    if (fs.existsSync(dictionariesDir)) {
+      const files = fs.readdirSync(dictionariesDir);
+      files.forEach(file => {
+        if (file.endsWith('.json')) {
+          try {
+            const filePath = path.join(dictionariesDir, file);
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            dictionaries.push({
+              name: data.name || file.replace('.json', ''),
+              fileName: file.replace('.json', ''),
+              wordCount: data.wordCount || Object.keys(data.dictionary || {}).length,
+              created: data.created
+            });
+          } catch (e) {
+            console.error(`Error leyendo diccionario ${file}:`, e);
+          }
+        }
+      });
+    }
+    res.json({ dictionaries });
+  } catch (error) {
+    console.error('Error listando diccionarios:', error);
+    res.status(500).json({ error: 'Error listando diccionarios' });
+  }
+});
+
+// Activar diccionario
+app.post('/api/dictionaries/activate', (req, res) => {
+  try {
+    const { fileName } = req.body;
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${fileName}.json`);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Diccionario no encontrado' });
+    }
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const customDict = data.dictionary || {};
+    console.log(`📖 Activando diccionario "${data.name || fileName}" (${Object.keys(customDict).length} palabras)`);
+    sentiment = new Sentiment();
+    const dictCopy = JSON.parse(JSON.stringify(customDict));
+    sentiment.registerLanguage('es', { labels: dictCopy });
+    currentLabels = dictCopy;
+    activeDictionary = {
+      name: data.name || fileName,
+      fileName: fileName,
+      wordCount: Object.keys(customDict).length,
+      customWords: 0,
+      labels: currentLabels
+    };
+    console.log(`✅ Diccionario "${activeDictionary.name}" activado`);
+    res.json({ success: true, message: `Diccionario "${activeDictionary.name}" activado`, activeDictionary });
+  } catch (error) {
+    console.error('Error activando diccionario:', error);
+    res.status(500).json({ error: 'Error activando diccionario' });
+  }
+});
+
+// Eliminar diccionario
+app.delete('/api/dictionaries/:fileName', (req, res) => {
+  try {
+    const { fileName } = req.params;
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${fileName}.json`);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Diccionario no encontrado' });
+    }
+    fs.unlinkSync(filePath);
+    if (activeDictionary.fileName === fileName) {
+      activeDictionary = { name: null, fileName: null, wordCount: 0 };
+      currentLabels = {};
+    }
+    res.json({ success: true, message: 'Diccionario eliminado exitosamente' });
+  } catch (error) {
+    console.error('Error eliminando diccionario:', error);
+    res.status(500).json({ error: 'Error eliminando diccionario' });
+  }
+});
+
 
 // Restaurar diccionario original
 app.post('/api/dictionary/reset', (req, res) => {
   try {
-    userCustomDict = {};
-    
-    // Restaurar diccionario original en sentiment
-    sentiment.registerLanguage('es', { labels: completeSpanishDict });
-    
-    // Eliminar archivo de diccionario personalizado
-    if (fs.existsSync(USER_DICT_FILE)) {
-      fs.unlinkSync(USER_DICT_FILE);
+    if (!activeDictionary.fileName) {
+      return res.status(400).json({ error: 'No hay diccionario activo para restaurar' });
     }
-    
-    res.json({
-      success: true,
-      message: 'Diccionario restaurado a configuración original'
-    });
-    
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Archivo de diccionario no encontrado' });
+    }
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const dictCopy = JSON.parse(JSON.stringify(data.dictionary || {}));
+    sentiment = new Sentiment();
+    sentiment.registerLanguage('es', { labels: dictCopy });
+    currentLabels = dictCopy;
+    activeDictionary.wordCount = Object.keys(dictCopy).length;
+    res.json({ success: true, message: 'Diccionario recargado desde archivo original' });
   } catch (error) {
     console.error('Error restaurando diccionario:', error);
     res.status(500).json({ error: 'Error restaurando diccionario' });
@@ -1588,32 +1896,19 @@ app.post('/api/analyze-compare', async (req, res) => {
   }
 });
 
-// Endpoint para obtener lista de motores disponibles (solo efectivos para español)
+// Endpoint para obtener lista de motores disponibles (solo JavaScript, sin Python)
 app.get('/api/engines', (req, res) => {
   try {
     const engines = [
       {
         id: 'natural',
-        name: 'Natural.js Enhanced',
-        description: 'Motor especializado en español con diccionario extendido de 894+ palabras/frases',
-        language: 'Español nativo',
+        name: 'Natural.js v4 Only',
+        description: 'Motor de análisis usando exclusivamente el diccionario v4 (sin mezclas ni extensiones)',
+        language: 'Español',
         type: 'JavaScript',
-        features: ['Diccionario 894+ palabras', 'Frases contextuales', 'Intensificadores', 'Negaciones', 'Personalizable'],
+        features: ['Diccionario v4 fijo', 'Negaciones básicas', 'Escala -5..+5'],
         status: 'available',
         responseTime: 'Muy rápido (~5ms)',
-        effectiveness: 'Excelente para español',
-        recommended: true
-      },
-      {
-        id: 'nlpjs',
-        name: 'NLP.js (AXA)',
-        description: 'Motor avanzado de AXA Group con soporte nativo para español y múltiples características NLP',
-        language: 'Español nativo + multi-idioma',
-        type: 'JavaScript',
-        features: ['Soporte nativo español', 'Multi-idioma', 'NLU avanzado', 'Sentiment analysis', 'Entity recognition'],
-        status: 'available',
-        responseTime: 'Rápido (~15ms)',
-        effectiveness: 'Muy bueno para español',
         recommended: true
       }
     ];
@@ -1622,50 +1917,13 @@ app.get('/api/engines', (req, res) => {
       success: true,
       engines: engines,
       total: engines.length,
-      available: engines.filter(e => e.status === 'available').length,
-      pythonRequired: engines.filter(e => e.status === 'requires_python').length
+      available: engines.length
     });
     
   } catch (error) {
     console.error('Error obteniendo motores:', error);
     res.status(500).json({ error: 'Error obteniendo lista de motores' });
   }
-});
-
-// Endpoint para verificar estado de Python
-app.get('/api/python-status', (req, res) => {
-  const { exec } = require('child_process');
-  
-  exec('python --version', (error, stdout, stderr) => {
-    if (error) {
-      res.json({
-        available: false,
-        error: 'Python no encontrado',
-        message: 'Ejecuta install-python.ps1 para instalar Python y dependencias'
-      });
-    } else {
-      // Verificar dependencias
-      const packages = ['textblob', 'vaderSentiment', 'spacy'];
-      let packagesChecked = 0;
-      const packageStatus = {};
-      
-      packages.forEach(pkg => {
-        exec(`python -c "import ${pkg}; print('${pkg}:OK')"`, (err, out) => {
-          packageStatus[pkg] = !err;
-          packagesChecked++;
-          
-          if (packagesChecked === packages.length) {
-            res.json({
-              available: true,
-              version: stdout.trim(),
-              packages: packageStatus,
-              allPackagesAvailable: Object.values(packageStatus).every(status => status)
-            });
-          }
-        });
-      });
-    }
-  });
 });
 
 module.exports = app;

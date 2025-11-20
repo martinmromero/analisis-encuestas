@@ -186,6 +186,55 @@ Genera un reporte Excel avanzado con filtros y gráficos.
 - **Content-Type**: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
 - **Body**: Archivo Excel binario
 
+### 6. Gestión de Diccionario de Sentimientos
+
+El motor Natural.js Enhanced usa un diccionario español ampliado con posibilidad de personalización por el usuario. Estos endpoints permiten visualizar, añadir, actualizar, eliminar, exportar e importar entradas del diccionario personalizado. Nota: El diccionario personalizado afecta al motor Natural.js Enhanced. El motor NLP.js no utiliza este diccionario por defecto.
+
+#### Obtener diccionario combinado
+**GET** `/api/dictionary`
+
+Devuelve la combinación del diccionario por defecto y el personalizado, indicando origen y tipo.
+
+#### Agregar/override una palabra o frase
+**POST** `/api/dictionary/add`
+
+Body:
+```json
+{ "word": "excelente", "score": 5 }
+```
+Rango de score: -5 a 5. Si la palabra existe en el sistema, se crea un override de usuario.
+
+#### Actualizar o renombrar una entrada
+**PUT** `/api/dictionary/update`
+
+Body:
+```json
+{ "oldWord": "regular", "newWord": "normalito", "score": 0.5 }
+```
+Si solo desea ajustar el score sin renombrar, use el mismo valor en `oldWord` y `newWord`.
+
+#### Eliminar una entrada del diccionario de usuario
+**DELETE** `/api/dictionary/remove/:word`
+
+Elimina únicamente la entrada personalizada; la palabra del sistema (si existía) vuelve a aplicar su valor original.
+
+#### Probar una palabra o frase
+**POST** `/api/dictionary/test`
+
+Body:
+```json
+{ "text": "muy bueno" }
+```
+Permite verificar cómo impacta el diccionario en el análisis.
+
+#### Exportar/Importar diccionario personalizado
+**GET** `/api/dictionary/export`
+
+**POST** `/api/dictionary/import` (multipart/form-data con `dictionaryFile`)
+
+#### Restaurar diccionario original
+**POST** `/api/dictionary/reset`
+
 ## Error Responses
 
 ### 400 Bad Request

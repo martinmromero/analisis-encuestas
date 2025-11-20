@@ -40,51 +40,132 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Event listeners para exportación
-    document.getElementById('exportJson').addEventListener('click', () => exportResults('json'));
-    document.getElementById('exportCsv').addEventListener('click', () => exportResults('csv'));
+    console.log('📝 Configurando exportación...');
+    const exportCsvBtn = document.getElementById('exportCsv');
+    console.log('exportCsv:', exportCsvBtn ? '✓' : '✗');
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', () => exportResults('csv'));
     
     // Event listener para reporte avanzado XLSX
-    document.getElementById('advancedReportBtn').addEventListener('click', function() {
-        generateAdvancedReport();
-    });
+    console.log('📊 Configurando reporte avanzado...');
+    const advancedReportBtn = document.getElementById('advancedReportBtn');
+    console.log('advancedReportBtn:', advancedReportBtn ? '✓' : '✗');
+    if (advancedReportBtn) {
+        advancedReportBtn.addEventListener('click', function() {
+            generateAdvancedReport();
+        });
+    }
     
     // Event listener para limpieza manual de memoria
-    document.getElementById('cleanMemory').addEventListener('click', () => {
-        cleanupMemory();
-        alert('✅ Memoria limpiada exitosamente');
-    });
+    console.log('🧹 Configurando limpieza de memoria...');
+    const cleanMemoryBtn = document.getElementById('cleanMemory');
+    console.log('cleanMemory:', cleanMemoryBtn ? '✓' : '✗');
+    if (cleanMemoryBtn) {
+        cleanMemoryBtn.addEventListener('click', () => {
+            cleanupMemory();
+            alert('✅ Memoria limpiada exitosamente');
+        });
+    }
 
     // Event listeners para navegación entre secciones
-    document.getElementById('analysisTab').addEventListener('click', () => showSection('analysis'));
-    document.getElementById('dictionaryTab').addEventListener('click', () => showSection('dictionary'));
-    document.getElementById('comparisonTab').addEventListener('click', () => showSection('comparison'));
+    console.log('🔧 Agregando event listeners para navegación...');
+    const analysisTab = document.getElementById('analysisTab');
+    const dictionaryTab = document.getElementById('dictionaryTab');
+    const comparisonTab = document.getElementById('comparisonTab');
+    
+    if (!analysisTab) console.error('❌ analysisTab no encontrado');
+    if (!dictionaryTab) console.error('❌ dictionaryTab no encontrado');
+    if (!comparisonTab) console.error('❌ comparisonTab no encontrado');
+    
+    if (analysisTab) {
+        analysisTab.addEventListener('click', () => {
+            console.log('👆 Click en analysisTab');
+            showSection('analysis');
+        });
+    }
+    
+    if (dictionaryTab) {
+        dictionaryTab.addEventListener('click', () => {
+            console.log('👆 Click en dictionaryTab');
+            showSection('dictionary');
+        });
+    }
+    
+    if (comparisonTab) {
+        comparisonTab.addEventListener('click', () => {
+            console.log('👆 Click en comparisonTab');
+            showSection('comparison');
+        });
+    }
+
+    // Event listeners para filtros avanzados
+    const applyFilters = document.getElementById('applyFilters');
+    const clearFilters = document.getElementById('clearFilters');
+    if (applyFilters) applyFilters.addEventListener('click', filterResults);
+    if (clearFilters) clearFilters.addEventListener('click', clearAdvancedFilters);
 
     // Event listeners para gestión del diccionario
-    document.getElementById('refreshDictionary').addEventListener('click', loadDictionary);
-    document.getElementById('sentimentFilter').addEventListener('change', filterDictionary);
-    document.getElementById('wordSearch').addEventListener('input', filterDictionary);
+    const refreshDictionary = document.getElementById('refreshDictionary');
+    const sentimentFilter = document.getElementById('sentimentFilter');
+    const wordSearch = document.getElementById('wordSearch');
+    if (refreshDictionary) refreshDictionary.addEventListener('click', loadDictionary);
+    if (sentimentFilter) sentimentFilter.addEventListener('change', filterDictionary);
+    if (wordSearch) wordSearch.addEventListener('input', filterDictionary);
     
     // Event listener para el slider de puntuación
-    document.getElementById('sentimentScore').addEventListener('input', updateScoreDisplay);
+    const sentimentScore = document.getElementById('sentimentScore');
+    if (sentimentScore) sentimentScore.addEventListener('input', updateScoreDisplay);
     
     // Event listeners para entrenamiento
-    document.getElementById('addWord').addEventListener('click', addWordToDictionary);
-    document.getElementById('testWord').addEventListener('click', testWordAnalysis);
+    const addWord = document.getElementById('addWord');
+    const testWord = document.getElementById('testWord');
+    if (addWord) addWord.addEventListener('click', addWordToDictionary);
+    if (testWord) testWord.addEventListener('click', testWordAnalysis);
     
     // Event listeners para gestión de archivos
-    document.getElementById('exportDictionary').addEventListener('click', exportDictionary);
-    document.getElementById('importDictionary').addEventListener('click', () => {
-        document.getElementById('dictionaryFileInput').click();
-    });
-    document.getElementById('dictionaryFileInput').addEventListener('change', importDictionary);
-    document.getElementById('resetDictionary').addEventListener('click', resetDictionary);
+    const exportDictionaryBtn = document.getElementById('exportDictionary');
+    const importDictionaryBtn = document.getElementById('importDictionary');
+    const dictionaryFileInput = document.getElementById('dictionaryFileInput');
+    const resetDictionaryBtn = document.getElementById('resetDictionary');
+    const activeDictionarySelect = document.getElementById('activeDictionarySelect');
+    const deleteDictionaryBtn = document.getElementById('deleteDictionary');
+    
+    if (exportDictionaryBtn) exportDictionaryBtn.addEventListener('click', exportDictionary);
+    if (importDictionaryBtn) {
+        importDictionaryBtn.addEventListener('click', () => {
+            if (dictionaryFileInput) dictionaryFileInput.click();
+        });
+    }
+    if (dictionaryFileInput) dictionaryFileInput.addEventListener('change', importDictionary);
+    if (resetDictionaryBtn) resetDictionaryBtn.addEventListener('click', resetDictionary);
+    
+    // Event listeners para gestión de diccionarios
+    if (activeDictionarySelect) {
+        activeDictionarySelect.addEventListener('change', (e) => {
+            activateDictionary(e.target.value);
+        });
+    }
+    if (deleteDictionaryBtn) {
+        deleteDictionaryBtn.addEventListener('click', deleteDictionary);
+    }
+    
+    // Cargar diccionarios disponibles al inicio
+    loadAvailableDictionaries();
+    
+    // Actualizar indicador de diccionario activo
+    updateActiveDictionaryIndicator();
 
     // Inicializar display del score
-    updateScoreDisplay();
+    if (typeof updateScoreDisplay === 'function') {
+        updateScoreDisplay();
+    }
 
-    // Event listeners para filtros
-    document.getElementById('filterSentiment').addEventListener('change', filterResults);
-    document.getElementById('searchText').addEventListener('input', filterResults);
+    // Event listeners para filtros de resultados
+    const filterSentimentSelect = document.getElementById('filterSentiment');
+    const searchTextInput = document.getElementById('searchText');
+    if (filterSentimentSelect) filterSentimentSelect.addEventListener('change', filterResults);
+    if (searchTextInput) searchTextInput.addEventListener('input', filterResults);
+    
+    console.log('✅ Event listeners configurados correctamente');
 });
 
 // Función para analizar el archivo
@@ -233,6 +314,15 @@ function displayResults(data) {
     // Crear gráficos
     createSentimentChart(data.statistics);
     createCategoryChart(data.statistics);
+
+    // Calcular y mostrar métricas numéricas si hay filterOptions
+    if (data.filterOptions) {
+        displayNumericMetrics(data.results, data.filterOptions);
+        // Inicializar filtros en cascada
+        if (typeof initCascadeFilters === 'function') {
+            initCascadeFilters(data.filterOptions, data.results);
+        }
+    }
 
     // Inicializar filteredResults y mostrar tabla de resultados
     filteredResults = data.results.slice(); // Copia superficial
@@ -508,12 +598,73 @@ function changePage(newPage) {
     displayResultsTable(filteredResults);
 }
 
+// Función para calcular y mostrar métricas numéricas
+function displayNumericMetrics(results, filterOptions) {
+    const container = document.getElementById('numericMetricsContainer');
+    if (!container) {
+        console.warn('⚠️ Container numericMetricsContainer no encontrado');
+        return;
+    }
+
+    // Obtener columnas numéricas del servidor
+    const numericColumns = filterOptions.numericQuestions || [];
+    
+    console.log('📊 Columnas numéricas recibidas:', numericColumns.length);
+    
+    if (numericColumns.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    // Calcular promedios para cada columna numérica
+    const metrics = numericColumns.map(column => {
+        const values = results
+            .map(row => parseFloat(row[column]))
+            .filter(val => !isNaN(val) && val > 0);
+        
+        const avg = values.length > 0 
+            ? values.reduce((sum, val) => sum + val, 0) / values.length 
+            : 0;
+
+        return { column, avg, count: values.length };
+    });
+
+    console.log('📊 Métricas calculadas:', metrics.length);
+
+    // Actualizar solo el grid, no todo el container
+    const metricsGrid = document.getElementById('metricsGrid');
+    if (metricsGrid) {
+        metricsGrid.innerHTML = metrics.map(metric => {
+            const scoreClass = metric.avg >= 8 ? 'score-high' : 
+                              metric.avg >= 6 ? 'score-medium' : 'score-low';
+            return `
+                <div class="metric-card ${scoreClass}">
+                    <h4>${metric.column}</h4>
+                    <div class="metric-value">${metric.avg.toFixed(2)}</div>
+                    <div class="metric-label">Promedio (${metric.count} respuestas)</div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // Hacer visible el container
+    container.style.display = 'block';
+    console.log('✅ Métricas numéricas mostradas');
+}
+
 // Filtrar resultados optimizado
 function filterResults() {
     if (!currentResults) return;
 
     const sentimentFilter = document.getElementById('filterSentiment').value;
     const searchText = document.getElementById('searchText').value.toLowerCase();
+
+    // Obtener filtros avanzados
+    const carrera = document.getElementById('filterCarrera')?.value || '';
+    const materia = document.getElementById('filterMateria')?.value || '';
+    const modalidad = document.getElementById('filterModalidad')?.value || '';
+    const sede = document.getElementById('filterSede')?.value || '';
+    const docente = document.getElementById('filterDocente')?.value || '';
 
     // Resetear página al filtrar
     currentPage = 1;
@@ -539,7 +690,111 @@ function filterResults() {
         });
     }
 
+    // Filtros avanzados
+    if (carrera) {
+        filteredResults = filteredResults.filter(result => result.CARRERA === carrera);
+    }
+    if (materia) {
+        filteredResults = filteredResults.filter(result => result.MATERIA === materia);
+    }
+    if (modalidad) {
+        filteredResults = filteredResults.filter(result => result.MODALIDAD === modalidad);
+    }
+    if (sede) {
+        filteredResults = filteredResults.filter(result => result.SEDE === sede);
+    }
+    if (docente) {
+        filteredResults = filteredResults.filter(result => result.DOCENTE === docente);
+    }
+
+    // Recalcular métricas con resultados filtrados
+    if (currentResults.filterOptions) {
+        displayNumericMetrics(filteredResults, currentResults.filterOptions);
+    }
+
+    // Recalcular estadísticas con resultados filtrados
+    const filteredStats = calculateFilteredStats(filteredResults);
+    
+    // Actualizar gráficos con nuevas estadísticas
+    createSentimentChart(filteredStats);
+    createCategoryChart(filteredStats);
+    
+    // Actualizar estadísticas en las tarjetas
+    updateStatsCards(filteredResults, filteredStats);
+
     displayResultsTable(filteredResults);
+}
+
+// Calcular estadísticas de resultados filtrados
+function calculateFilteredStats(results) {
+    const classifications = {
+        'Muy Positivo': 0,
+        'Positivo': 0,
+        'Neutral': 0,
+        'Negativo': 0,
+        'Muy Negativo': 0
+    };
+
+    let totalScore = 0;
+    let scoreCount = 0;
+
+    results.forEach(result => {
+        if (result.sentiment && result.sentiment.classification) {
+            classifications[result.sentiment.classification]++;
+        }
+        if (result.sentiment && typeof result.sentiment.score === 'number') {
+            totalScore += result.sentiment.score;
+            scoreCount++;
+        }
+    });
+
+    const total = results.length;
+    const percentages = {};
+    Object.keys(classifications).forEach(key => {
+        percentages[key] = total > 0 ? ((classifications[key] / total) * 100).toFixed(1) : '0.0';
+    });
+
+    const averageScore = scoreCount > 0 ? totalScore / scoreCount : 0;
+
+    return {
+        classifications,
+        percentages,
+        averageScore,
+        totalResults: total
+    };
+}
+
+// Actualizar tarjetas de estadísticas
+function updateStatsCards(results, stats) {
+    document.getElementById('totalResponses').textContent = stats.totalResults;
+    document.getElementById('averageScore').textContent = stats.averageScore.toFixed(2);
+    
+    const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 
+                          parseFloat(stats.percentages['Positivo'] || 0);
+    const negativePercent = parseFloat(stats.percentages['Muy Negativo'] || 0) + 
+                          parseFloat(stats.percentages['Negativo'] || 0);
+    
+    document.getElementById('positivePercent').textContent = positivePercent.toFixed(1) + '%';
+    document.getElementById('negativePercent').textContent = negativePercent.toFixed(1) + '%';
+}
+
+// Función para limpiar filtros avanzados
+function clearAdvancedFilters() {
+    document.getElementById('filterCarrera').value = '';
+    document.getElementById('filterMateria').value = '';
+    document.getElementById('filterModalidad').value = '';
+    document.getElementById('filterSede').value = '';
+    document.getElementById('filterDocente').value = '';
+    document.getElementById('filterSentiment').value = '';
+    document.getElementById('searchText').value = '';
+    
+    // Repoblar filtros en cascada si existe la función
+    if (typeof updateDependentFilters === 'function') {
+        updateDependentFilters();
+    }
+    
+    // Aplicar filtros (que ahora están vacíos)
+    filterResults();
 }
 
 // Exportar resultados
@@ -663,26 +918,52 @@ setInterval(() => {
 
 // Mostrar sección específica
 function showSection(sectionName) {
+    console.log('🔍 Cambiando a sección:', sectionName);
+    
+    // Verificar que las secciones existen
+    const analysisSection = document.getElementById('analysisSection');
+    const dictionarySection = document.getElementById('dictionarySection');
+    const comparisonSection = document.getElementById('comparisonSection');
+    
+    if (!analysisSection) console.error('❌ analysisSection no encontrada');
+    if (!dictionarySection) console.error('❌ dictionarySection no encontrada');
+    if (!comparisonSection) console.error('❌ comparisonSection no encontrada');
+    
     // Ocultar todas las secciones
-    document.getElementById('analysisSection').classList.add('hidden');
-    document.getElementById('dictionarySection').classList.add('hidden');
-    document.getElementById('comparisonSection').classList.add('hidden');
+    if (analysisSection) analysisSection.classList.add('hidden');
+    if (dictionarySection) dictionarySection.classList.add('hidden');
+    if (comparisonSection) comparisonSection.classList.add('hidden');
     
     // Remover clase active de todas las pestañas
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
     
     // Mostrar sección seleccionada
     if (sectionName === 'analysis') {
-        document.getElementById('analysisSection').classList.remove('hidden');
-        document.getElementById('analysisTab').classList.add('active');
+        if (analysisSection) {
+            analysisSection.classList.remove('hidden');
+            document.getElementById('analysisTab')?.classList.add('active');
+            console.log('✅ Sección de análisis mostrada');
+        }
     } else if (sectionName === 'dictionary') {
-        document.getElementById('dictionarySection').classList.remove('hidden');
-        document.getElementById('dictionaryTab').classList.add('active');
-        loadDictionary(); // Cargar diccionario cuando se muestra la sección
+        if (dictionarySection) {
+            dictionarySection.classList.remove('hidden');
+            document.getElementById('dictionaryTab')?.classList.add('active');
+            console.log('✅ Sección de diccionario mostrada');
+            loadDictionary().catch(error => {
+                console.error('❌ Error cargando diccionario:', error);
+                alert('Error al cargar el diccionario: ' + error.message);
+            });
+        }
     } else if (sectionName === 'comparison') {
-        document.getElementById('comparisonSection').classList.remove('hidden');
-        document.getElementById('comparisonTab').classList.add('active');
-        initializeComparison(); // Inicializar sección de comparación
+        if (comparisonSection) {
+            comparisonSection.classList.remove('hidden');
+            document.getElementById('comparisonTab')?.classList.add('active');
+            console.log('✅ Sección de comparación mostrada');
+            initializeComparison().catch(error => {
+                console.error('❌ Error inicializando comparación:', error);
+                alert('Error al cargar comparación de motores: ' + error.message);
+            });
+        }
     }
 }
 
@@ -974,8 +1255,18 @@ async function importDictionary(event) {
     const file = event.target.files[0];
     if (!file) return;
     
+    // Solicitar nombre del diccionario
+    const dictionaryName = prompt('Ingrese un nombre para este diccionario:', 
+        file.name.replace(/\.(json|xlsx|xls)$/i, ''));
+    
+    if (!dictionaryName) {
+        event.target.value = '';
+        return;
+    }
+    
     const formData = new FormData();
     formData.append('dictionaryFile', file);
+    formData.append('dictionaryName', dictionaryName);
     
     try {
         const response = await fetch('/api/dictionary/import', {
@@ -987,7 +1278,17 @@ async function importDictionary(event) {
         
         if (data.success) {
             alert(`✅ ${data.message}`);
-            loadDictionary(); // Recargar diccionario
+            await loadAvailableDictionaries(); // Actualizar lista
+            
+            // Seleccionar automáticamente el diccionario recién importado
+            const select = document.getElementById('activeDictionarySelect');
+            if (select && data.fileName) {
+                select.value = data.fileName;
+                showNotification(`Diccionario "${data.dictionaryName}" está ahora activo`, 'success');
+            }
+            
+            // Actualizar indicador visual
+            await updateActiveDictionaryIndicator();
         } else {
             throw new Error(data.error);
         }
@@ -998,6 +1299,127 @@ async function importDictionary(event) {
     
     // Limpiar input
     event.target.value = '';
+}
+
+// Cargar diccionarios disponibles
+async function loadAvailableDictionaries() {
+    try {
+        const response = await fetch('/api/dictionaries');
+        const data = await response.json();
+        
+        const select = document.getElementById('activeDictionarySelect');
+        if (!select) return;
+        
+        select.innerHTML = '';
+        
+        data.dictionaries.forEach(dict => {
+            const option = document.createElement('option');
+            option.value = dict.fileName;
+            option.textContent = `${dict.name} (${dict.wordCount} palabras)`;
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Error cargando diccionarios:', error);
+    }
+}
+
+// Activar diccionario seleccionado
+async function activateDictionary(fileName) {
+    try {
+        const response = await fetch('/api/dictionaries/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            // Actualizar indicador visual
+            await updateActiveDictionaryIndicator();
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (error) {
+        console.error('Error activando diccionario:', error);
+        alert('Error activando diccionario: ' + error.message);
+    }
+}
+
+// Eliminar diccionario
+async function deleteDictionary() {
+    const select = document.getElementById('activeDictionarySelect');
+    if (!select) return;
+    
+    const fileName = select.value;
+    
+    if (fileName === 'base') {
+        alert('No se puede eliminar el diccionario base');
+        return;
+    }
+    
+    const selectedOption = select.options[select.selectedIndex];
+    const dictName = selectedOption.textContent;
+    
+    if (!confirm(`¿Está seguro de eliminar el diccionario "${dictName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/dictionaries/${fileName}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            await loadAvailableDictionaries();
+            // Activar diccionario base
+            select.value = 'base';
+            await activateDictionary('base');
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (error) {
+        console.error('Error eliminando diccionario:', error);
+        alert('Error eliminando diccionario: ' + error.message);
+    }
+}
+
+// Mostrar notificación
+function showNotification(message, type = 'info') {
+    // Si existe un sistema de notificaciones, usarlo
+    // Si no, usar console
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+// Actualizar indicador de diccionario activo
+async function updateActiveDictionaryIndicator() {
+    try {
+        const response = await fetch('/api/dictionaries/active');
+        const data = await response.json();
+        
+        if (data.success && data.activeDictionary) {
+            const nameElement = document.getElementById('activeDictionaryName');
+            const statsElement = document.getElementById('activeDictionaryStats');
+            
+            if (nameElement) {
+                nameElement.textContent = data.activeDictionary.name;
+            }
+            
+            if (statsElement) {
+                // Siempre mostrar solo el total de palabras del diccionario activo
+                statsElement.textContent = `(${data.activeDictionary.wordCount} palabras)`;
+            }
+            
+            console.log('📚 Diccionario activo:', data.activeDictionary);
+        }
+    } catch (error) {
+        console.error('Error obteniendo diccionario activo:', error);
+    }
 }
 
 // Restaurar diccionario original
@@ -1033,9 +1455,15 @@ let pythonStatus = null;
 
 // Inicializar sección de comparación
 async function initializeComparison() {
-    await checkPythonStatus();
-    await loadAvailableEngines();
-    setupComparisonEventListeners();
+    console.log('🔧 Inicializando comparación de motores...');
+    try {
+        await loadAvailableEngines();
+        setupComparisonEventListeners();
+        console.log('✅ Comparación inicializada correctamente');
+    } catch (error) {
+        console.error('❌ Error en initializeComparison:', error);
+        throw error;
+    }
 }
 
 // Verificar estado de Python
@@ -1059,6 +1487,16 @@ async function checkPythonStatus() {
 function updatePythonStatusDisplay() {
     const statusCard = document.getElementById('pythonStatusCard');
     const installSection = document.getElementById('pythonInstallSection');
+    
+    if (!statusCard) {
+        console.error('❌ pythonStatusCard no encontrado');
+        return;
+    }
+    
+    if (!installSection) {
+        console.error('❌ pythonInstallSection no encontrado');
+        return;
+    }
     
     if (pythonStatus.available) {
         statusCard.className = 'status-card status-available';
@@ -1164,9 +1602,14 @@ function updateEngineCheckboxes() {
 // Configurar event listeners para comparación
 function setupComparisonEventListeners() {
     // Botón de comparar motores
-    document.getElementById('compareEngines').addEventListener('click', compareEngines);
+    const compareEnginesBtn = document.getElementById('compareEngines');
+    if (compareEnginesBtn) {
+        compareEnginesBtn.addEventListener('click', compareEngines);
+    } else {
+        console.error('❌ compareEngines button no encontrado');
+    }
     
-    // Botón de recheck Python
+    // Botón de recheck Python (opcional)
     const recheckBtn = document.getElementById('recheckPython');
     if (recheckBtn) {
         recheckBtn.addEventListener('click', async () => {

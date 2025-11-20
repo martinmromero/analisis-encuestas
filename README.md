@@ -1,199 +1,576 @@
-# Sistema de Análisis de Sentimientos para Encuestas 📊🎓
+# Sistema de Análisis de Sentimientos para Encuestas 📊🎓# Sistema de Análisis de Sentimientos para Encuestas 📊🎓
 
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Spanish](https://img.shields.io/badge/Optimizado%20para-Español-red.svg)](README.md)
+
+
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[![Spanish](https://img.shields.io/badge/Optimizado%20para-Español-red.svg)](README.md)[![Spanish](https://img.shields.io/badge/Optimizado%20para-Español-red.svg)](README.md)
+
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](Dockerfile)
 
 Sistema web completo para el análisis de sentimientos de encuestas educativas en español, con múltiples motores de análisis y generación avanzada de reportes en Excel.
+
+Sistema web completo para el análisis de sentimientos de encuestas educativas en español, con múltiples motores de análisis JavaScript y generación avanzada de reportes en Excel.
+
+## 🚀 Características
 
 ## 🚀 Características
 
 - **Subida de archivos Excel**: Soporta formatos .xlsx y .xls
-- **Análisis de sentimientos**: Utiliza procesamiento de lenguaje natural para analizar el tono emocional
-- **Visualizaciones interactivas**: Gráficos dinámicos con Chart.js
-- **Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico
-- **Exportación de datos**: Descarga resultados en formato JSON o CSV
-- **Interfaz moderna**: Diseño responsivo y fácil de usar
 
-## 📊 Funcionalidades del Análisis
+- **📁 Subida de archivos Excel**: Soporta formatos .xlsx y .xls- **Análisis de sentimientos**: Utiliza procesamiento de lenguaje natural para analizar el tono emocional
+
+- **🧠 Análisis de sentimientos**: Dos motores JavaScript especializados en español- **Visualizaciones interactivas**: Gráficos dinámicos con Chart.js
+
+- **📊 Visualizaciones interactivas**: Gráficos dinámicos con Chart.js- **Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico
+
+- **🔍 Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico- **Exportación de datos**: Descarga resultados en formato JSON o CSV
+
+- **💾 Exportación de datos**: Descarga resultados en JSON, CSV o reportes Excel avanzados- **Interfaz moderna**: Diseño responsivo y fácil de usar
+
+- **📚 Diccionario personalizable**: Gestión completa de términos de sentimiento
+
+- **🐳 Dockerizado**: Desarrollo local con hot-reload y producción optimizada## 📊 Funcionalidades del Análisis
+
+- **🎨 Interfaz moderna**: Diseño responsivo y fácil de usar
 
 ### Clasificaciones de Sentimiento
-- **Muy Positivo**: Puntuación > 2
-- **Positivo**: Puntuación 0 a 2
-- **Neutral**: Puntuación = 0
-- **Negativo**: Puntuación -2 a 0
-- **Muy Negativo**: Puntuación < -2
 
-### Estadísticas Generadas
+## 📊 Motores de Análisis- **Muy Positivo**: Puntuación > 2
+
+- **Positivo**: Puntuación 0 a 2
+
+### Natural.js Enhanced 🧠- **Neutral**: Puntuación = 0
+
+- Diccionario personalizado de **894+ palabras y frases** en español- **Negativo**: Puntuación -2 a 0
+
+- Análisis de intensificadores y negaciones- **Muy Negativo**: Puntuación < -2
+
+- Frases contextuales específicas
+
+- **Personalizable** desde la UI### Estadísticas Generadas
+
 - Total de respuestas procesadas
-- Puntuación promedio de sentimientos
-- Distribución porcentual por categorías
-- Palabras clave positivas y negativas identificadas
+
+### NLP.js (AXA Group) 🚀- Puntuación promedio de sentimientos
+
+- Motor de IA avanzado con soporte nativo multiidioma- Distribución porcentual por categorías
+
+- Procesamiento de lenguaje natural completo- Palabras clave positivas y negativas identificadas
+
+- Alta precisión en contextos complejos
 
 ## 🛠️ Tecnologías Utilizadas
 
-### Backend
-- **Node.js**: Runtime de JavaScript
-- **Express.js**: Framework web
+### Análisis Dual ⚖️
+
+- Combina ambos motores para máxima precisión### Backend
+
+- Genera consenso inteligente entre resultados- **Node.js 20+**: Runtime de JavaScript
+
+- Mayor confiabilidad en textos ambiguos- **Express.js**: Framework web minimalista
+
 - **Multer**: Manejo de archivos subidos
-- **XLSX**: Procesamiento de archivos Excel
-- **Sentiment**: Análisis de sentimientos
-- **CORS**: Habilitación de peticiones cross-origin
 
-### Frontend
-- **HTML5**: Estructura semántica
-- **CSS3**: Estilos modernos con gradientes y animaciones
+## 🛠️ Tecnologías Utilizadas- **XLSX**: Procesamiento de archivos Excel
+
+- **ExcelJS**: Generación de reportes Excel avanzados
+
+### Backend- **Sentiment**: Análisis de sentimientos con diccionario personalizado
+
+- **Node.js 20+**: Runtime de JavaScript- **NLP.js**: Motor de procesamiento de lenguaje natural de AXA Group
+
+- **Express.js**: Framework web minimalista- **CORS**: Habilitación de peticiones cross-origin
+
+- **Multer**: Manejo de archivos subidos
+
+- **XLSX**: Procesamiento de archivos Excel### Frontend
+
+- **ExcelJS**: Generación de reportes Excel avanzados- **HTML5**: Estructura semántica
+
+- **Sentiment**: Análisis de sentimientos con diccionario personalizado- **CSS3**: Estilos modernos con gradientes y animaciones
+
+- **NLP.js**: Motor de procesamiento de lenguaje natural de AXA Group- **JavaScript ES6+**: Funcionalidad interactiva
+
+- **CORS**: Habilitación de peticiones cross-origin- **Chart.js**: Visualizaciones de datos
+
+
+
+### Frontend### Motores de Análisis de Sentimientos
+
+- **HTML5**: Estructura semántica- **Natural.js Enhanced**: Motor personalizado con diccionario español de 894+ palabras/frases
+
+- **CSS3**: Estilos modernos con gradientes y animaciones- **NLP.js (AXA)**: Motor avanzado con soporte nativo multiidioma
+
 - **JavaScript ES6+**: Funcionalidad interactiva
-- **Chart.js**: Visualizaciones de datos
 
-## 📦 Instalación
+- **Chart.js**: Visualizaciones de datos## 📦 Instalación
 
-1. **Clonar o descargar el proyecto**
+
+
+## 📦 Instalación Rápida1. **Clonar o descargar el proyecto**
+
    ```bash
+
+### Opción 1: Docker (Recomendado)   cd analisis-encuestas
+
+   ```
+
+**Desarrollo con edición en vivo:**
+
+```powershell2. **Instalar dependencias**
+
+docker compose --profile dev up --build   ```bash
+
+```   npm install
+
+Navega a http://localhost:3000 y edita el código localmente - se recarga automáticamente.   ```
+
+
+
+**Producción:**3. **Iniciar el servidor**
+
+```powershell   ```bash
+
+docker compose --profile prod up -d --build   npm start
+
+```   ```
+
+   
+
+### Opción 2: Instalación Local
+
+   ## 🐳 Docker
+
+1. **Clonar el proyecto**
+
+   ```bash   Puedes ejecutar la app en Docker tanto para desarrollo (edición en vivo) como para producción.
+
    cd analisis-encuestas
+
+   ```   ### Requisitos
+
+   - Docker Desktop
+
+2. **Instalar dependencias**   - Docker Compose v2
+
+   ```bash
+
+   npm install   ### Desarrollo (editar en vivo desde tu carpeta)
+
    ```
 
-2. **Instalar dependencias**
-   ```bash
-   npm install
-   ```
+   Este modo monta tu carpeta local dentro del contenedor y usa `nodemon` para recargar:
 
 3. **Iniciar el servidor**
+
+   ```bash   ```powershell
+
+   npm start   Para desarrollo con recarga automática:
+
+   ```   ```bash
+
+      npm run dev
+
+   Para desarrollo con recarga automática:   ```
+
    ```bash
-   npm start
-   ```
-   
-   Para desarrollo con recarga automática:
-   ```bash
-   npm run dev
+
+   npm run dev4. **Abrir en el navegador**
+
    ```
 
-4. **Abrir en el navegador**
+   - Tu código local se monta en `/app` dentro del contenedor (bind mount).
+
+4. **Abrir en el navegador**   - Los cambios se reflejan al instante (nodemon).
+
+   ```   - Las subidas se persisten en el volumen `uploads_data`.
+
+   http://localhost:3000   - El diccionario personalizado usa el archivo `/app/user-dictionary.json` (tu archivo local).
+
    ```
+
+   ### Producción (imagen inmutable)
+
+## 🐳 Docker - Guía Completa
+
+   Este modo construye una imagen optimizada y persiste solo datos necesarios:
+
+### Requisitos
+
+- Docker Desktop instalado   ```powershell
+
+- Docker Compose v2 (incluido en Docker Desktop)   ```
+
    http://localhost:3000
-   ```
 
-## 🔧 Uso de la Aplicación
+### Desarrollo Local con Edición en Vivo ✏️   ```
 
-### 1. Preparar el archivo Excel
-- Asegúrate de que tu archivo contenga texto en las columnas
+
+
+**Ideal para desarrollo:** monta tu carpeta local y recarga automáticamente:## 🔧 Uso de la Aplicación
+
+
+
+```powershell### 1. Preparar el archivo Excel
+
+# Levantar contenedor de desarrollo
+
+docker compose --profile dev up --build   - El código queda dentro de la imagen (no editable en caliente).
+
+   - Se persisten dos volúmenes: `uploads_data` (subidas) y `app_data` (diccionario en `/data/user-dictionary.json`).
+
+# Para ejecutar en segundo plano
+
+docker compose --profile dev up -d --build   ### Ejecución sin Compose (opcional)
+
+
+
+# Ver logs en tiempo real   ```powershell
+
+docker logs -f analisis-encuestas-dev- Asegúrate de que tu archivo contenga texto en las columnas
+
 - Los formatos soportados son .xlsx y .xls
-- El texto debe ser suficientemente descriptivo para el análisis
 
-### 2. Subir y analizar
+# Detener- El texto debe ser suficientemente descriptivo para el análisis
+
+docker compose --profile dev down
+
+```### 2. Subir y analizar
+
 1. Haz clic en "Seleccionar archivo Excel"
-2. Elige tu archivo desde el explorador
-3. Presiona "Analizar Encuesta"
-4. Espera a que se procese el archivo
 
-### 3. Revisar resultados
-- **Estadísticas generales**: Vista rápida de los números clave
+**✅ Ventajas del modo desarrollo:**2. Elige tu archivo desde el explorador
+
+- Editas el código desde VS Code o cualquier editor3. Presiona "Analizar Encuesta"
+
+- Los cambios se reflejan automáticamente (hot reload con nodemon)4. Espera a que se procese el archivo
+
+- Persistencia de archivos subidos en volumen `uploads_data`
+
+- Diccionario personalizado usa tu archivo local `user-dictionary.json`   ### Preguntas frecuentes
+
+- Puerto 3000 mapeado a localhost
+
+   - ¿Puedo seguir editando el código si está dockerizado?
+
+**Flujo de trabajo:**
+
+1. Mantén el contenedor corriendo: `docker compose --profile dev up`### 3. Revisar resultados
+
+2. Edita archivos en tu carpeta local   - ¿Se persisten los datos?
+
+3. Los cambios se aplican al guardar- **Estadísticas generales**: Vista rápida de los números clave
+
+4. Navega a http://localhost:3000   - ¿Puedo cambiar la ruta del diccionario?
+
 - **Gráficos**: Visualización de la distribución de sentimientos
-- **Tabla detallada**: Resultados específicos por respuesta
+
+### Producción (Deployment) 🚀- **Tabla detallada**: Resultados específicos por respuesta
+
 - **Filtros**: Refina los resultados por sentimiento o texto
 
+Para deploys en servidores:
+
 ### 4. Exportar datos
-- Usa los botones de exportación para descargar resultados
-- Disponible en formato JSON (datos completos) o CSV (tabla)
+
+```powershell- Usa los botones de exportación para descargar resultados
+
+# Construir y levantar en modo producción- Disponible en formato JSON (datos completos) o CSV (tabla)
+
+docker compose --profile prod up -d --build
 
 ## 📁 Estructura del Proyecto
 
-```
+# Ver logs
+
+docker logs -f analisis-encuestas```
+
 analisis-encuestas/
-├── public/                 # Archivos estáticos del frontend
-│   ├── index.html         # Página principal
-│   ├── styles.css         # Estilos CSS
+
+# Detener├── public/                 # Archivos estáticos del frontend
+
+docker compose --profile prod down│   ├── index.html         # Página principal
+
+```│   ├── styles.css         # Estilos CSS
+
 │   └── app.js            # JavaScript del cliente
-├── uploads/               # Carpeta temporal para archivos subidos
-├── server.js             # Servidor Express y API
-├── package.json          # Dependencias y scripts
-└── README.md            # Este archivo
-```
+
+**🔒 Características de producción:**├── uploads/               # Carpeta temporal para archivos subidos
+
+- Imagen optimizada sin dependencias de desarrollo├── server.js             # Servidor Express y API
+
+- Persistencia de uploads en volumen `uploads_data`├── package.json          # Dependencias y scripts
+
+- Diccionario personalizado en volumen `app_data` (path `/data/user-dictionary.json`)└── README.md            # Este archivo
+
+- Restart automático con `unless-stopped````
+
+- Código inmutable dentro de la imagen
 
 ## 🌐 API Endpoints
 
-### POST `/api/analyze`
-Procesa un archivo Excel y devuelve el análisis de sentimientos.
+**Actualizar en servidor:**
+
+1. Sube tu código actualizado (git pull, scp, etc.)### POST `/api/analyze`
+
+2. Reconstruye: `docker compose --profile prod build`Procesa un archivo Excel y devuelve el análisis de sentimientos.
+
+3. Reinicia: `docker compose --profile prod up -d`
 
 **Request**: FormData con archivo Excel
-**Response**: JSON con resultados y estadísticas
 
-### POST `/api/export`
-Exporta resultados en el formato especificado.
+### Ejecutar sin Docker Compose**Response**: JSON con resultados y estadísticas
+
+
+
+```powershell### POST `/api/export`
+
+# Construir imagen de producciónExporta resultados en el formato especificado.
+
+docker build -t analisis-encuestas:latest --target prod .
 
 **Request**: JSON con datos y formato
-**Response**: Archivo descargable
 
-## 🎯 Ejemplos de Uso
+# Ejecutar**Response**: Archivo descargable
 
-### Encuestas de Satisfacción
-- Analiza comentarios de clientes
-- Identifica áreas de mejora
+docker run --name analisis-encuestas -p 3000:3000 `
+
+  -v uploads_data:/app/uploads `## 🎯 Ejemplos de Uso
+
+  -v app_data:/data `
+
+  -e USER_DICT_FILE=/data/user-dictionary.json `### Encuestas de Satisfacción
+
+  analisis-encuestas:latest- Analiza comentarios de clientes
+
+```- Identifica áreas de mejora
+
 - Mide el sentimiento general
 
-### Feedback de Empleados
-- Evalúa el clima laboral
-- Detecta problemas organizacionales
-- Monitorea la moral del equipo
+### Gestión de Volúmenes
 
-### Investigación de Mercado
-- Analiza respuestas a productos
-- Evalúa campañas publicitarias
+### Feedback de Empleados
+
+```powershell- Evalúa el clima laboral
+
+# Listar volúmenes- Detecta problemas organizacionales
+
+docker volume ls- Monitorea la moral del equipo
+
+
+
+# Inspeccionar volumen### Investigación de Mercado
+
+docker volume inspect uploads_data- Analiza respuestas a productos
+
+docker volume inspect app_data- Evalúa campañas publicitarias
+
 - Estudia percepciones de marca
+
+# Backup del diccionario personalizado
+
+docker cp analisis-encuestas:/data/user-dictionary.json ./backup-dictionary.json## ⚙️ Configuración Avanzada
+
+
+
+# Restaurar diccionario### Variables de Entorno
+
+docker cp ./backup-dictionary.json analisis-encuestas:/data/user-dictionary.json```bash
+
+```PORT=3000  # Puerto del servidor (por defecto: 3000)
+
+```
+
+## 🔧 Uso de la Aplicación
+
+### Personalización del Análisis
+
+### 1. Preparar el archivo ExcelEl archivo `server.js` contiene las funciones de análisis que puedes modificar:
+
+- Asegúrate de que contenga columnas con texto- `getClassification()`: Ajusta los rangos de clasificación
+
+- Formatos: .xlsx o .xls- `calculateStats()`: Modifica las estadísticas calculadas
+
+- Estructura sugerida: carrera, materia, docente, comentarios, etc.
+
+## 🐛 Solución de Problemas
+
+### 2. Subir y analizar
+
+1. Selecciona un motor (Natural.js, NLP.js o Análisis Dual)### Error: "Solo se permiten archivos Excel"
+
+2. Haz clic en "Seleccionar archivo Excel"- Verifica que el archivo tenga extensión .xlsx o .xls
+
+3. Presiona "Analizar Encuesta"- Asegúrate de que no esté corrupto
+
+4. Espera el procesamiento
+
+### Error: "El archivo Excel está vacío"
+
+### 3. Revisar resultados- Confirma que el archivo contenga datos
+
+- **Estadísticas generales**: Vista rápida de métricas clave- Verifica que no esté protegido con contraseña
+
+- **Gráficos**: Distribución visual de sentimientos
+
+- **Tabla detallada**: Resultados específicos por respuesta### Error de procesamiento
+
+- **Filtros**: Refina por sentimiento o busca texto- Revisa que el archivo no sea demasiado grande
+
+- Asegúrate de que contenga texto analizable
+
+### 4. Gestión de Diccionario
+
+- Pestaña "📚 Gestión de Diccionario"## 🔄 Actualizaciones Futuras
+
+- Agrega, edita o elimina términos
+
+- Ajusta puntuaciones de palabras existentes- [ ] Soporte para más formatos de archivo (CSV, JSON)
+
+- Prueba el impacto en tiempo real- [ ] Análisis en múltiples idiomas
+
+- [ ] Integración con APIs de análisis más avanzadas
+
+### 5. Comparar Motores- [ ] Dashboard de administración
+
+- Pestaña "⚖️ Comparar Motores"- [ ] Autenticación de usuarios
+
+- Prueba el mismo texto con ambos motores- [ ] Base de datos para historial de análisis
+
+- Compara resultados y tiempos de respuesta
+
+## 📄 Licencia
+
+### 6. Exportar datos
+
+- JSON: datos completos del análisisEste proyecto está bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
+
+- CSV: tabla simple
+
+- XLSX Avanzado: reporte completo con filtros y formato## 🤝 Contribuciones
+
+
+
+## 📁 Estructura del ProyectoLas contribuciones son bienvenidas. Por favor:
+
+
+
+```1. Fork el proyecto
+
+analisis-encuestas/2. Crea una rama para tu característica
+
+├── public/                  # Frontend3. Commit tus cambios
+
+│   ├── index.html          # Página principal4. Push a la rama
+
+│   ├── styles.css          # Estilos5. Abre un Pull Request
+
+│   └── app.js             # JavaScript cliente
+
+├── uploads/                # Archivos temporales## 📞 Soporte
+
+├── server.js              # Servidor Express y API
+
+├── sentiment-dict.js      # Diccionario españolSi encuentras algún problema o tienes sugerencias, no dudes en abrir un issue en el repositorio del proyecto.
+
+├── user-dictionary.json   # Diccionario personalizado
+
+├── package.json           # Dependencias---
+
+├── Dockerfile             # Imagen Docker multi-stage
+
+├── docker-compose.yml     # Orquestación**¡Disfruta analizando tus encuestas! 📊✨**
+├── .dockerignore          # Archivos excluidos del build
+└── README.md             # Esta documentación
+```
+
+## 🌐 API Endpoints Principales
+
+### Análisis
+- `POST /api/analyze-with-engine` - Analiza con motor específico
+- `POST /api/analyze-dual-file` - Análisis dual con consenso
+- `POST /api/analyze-compare` - Compara motores en texto
+
+### Diccionario
+- `GET /api/dictionary` - Obtener diccionario completo
+- `POST /api/dictionary/add` - Agregar término
+- `PUT /api/dictionary/update` - Actualizar/renombrar término
+- `DELETE /api/dictionary/remove/:word` - Eliminar término
+- `POST /api/dictionary/test` - Probar análisis de término
+
+### Motores
+- `GET /api/engines` - Lista de motores disponibles
+
+Ver [API-DOCS.md](API-DOCS.md) para documentación completa.
 
 ## ⚙️ Configuración Avanzada
 
 ### Variables de Entorno
 ```bash
-PORT=3000  # Puerto del servidor (por defecto: 3000)
+PORT=3000                              # Puerto del servidor
+USER_DICT_FILE=/app/user-dictionary.json  # Ruta del diccionario personalizado
+NODE_ENV=production                    # Entorno (development/production)
 ```
 
 ### Personalización del Análisis
-El archivo `server.js` contiene las funciones de análisis que puedes modificar:
-- `getClassification()`: Ajusta los rangos de clasificación
-- `calculateStats()`: Modifica las estadísticas calculadas
+Edita `server.js`:
+- `analyzeTextEnhanced()`: Lógica de análisis Natural.js
+- `getClassification()`: Umbrales de clasificación
+- `spanishSentimentDict`: Diccionario base (en `sentiment-dict.js`)
 
 ## 🐛 Solución de Problemas
 
 ### Error: "Solo se permiten archivos Excel"
-- Verifica que el archivo tenga extensión .xlsx o .xls
+- Verifica extensión .xlsx o .xls
 - Asegúrate de que no esté corrupto
 
 ### Error: "El archivo Excel está vacío"
-- Confirma que el archivo contenga datos
+- Confirma que contenga datos
 - Verifica que no esté protegido con contraseña
 
-### Error de procesamiento
-- Revisa que el archivo no sea demasiado grande
-- Asegúrate de que contenga texto analizable
+### Docker: Cambios no se reflejan
+- Asegúrate de usar perfil `dev`: `docker compose --profile dev up`
+- Verifica que el volumen esté montado correctamente
 
-## 🔄 Actualizaciones Futuras
+### Problemas de memoria
+- Usa el botón "🧹 Limpiar Memoria" en la UI
+- Limita archivos a max 5000 registros
 
-- [ ] Soporte para más formatos de archivo (CSV, JSON)
-- [ ] Análisis en múltiples idiomas
-- [ ] Integración con APIs de análisis más avanzadas
+## 🔄 Roadmap
+
+- [x] Dockerización completa
+- [x] Gestión de diccionario con edición
+- [x] Análisis dual y comparación de motores
+- [ ] Soporte para CSV directo
+- [ ] API REST completa con autenticación
 - [ ] Dashboard de administración
-- [ ] Autenticación de usuarios
-- [ ] Base de datos para historial de análisis
+- [ ] Base de datos para historial
+- [ ] Análisis de tendencias temporales
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
+MIT License - Ver [LICENSE](LICENSE)
 
 ## 🤝 Contribuciones
 
-Las contribuciones son bienvenidas. Por favor:
+¡Contribuciones bienvenidas!
 
 1. Fork el proyecto
-2. Crea una rama para tu característica
-3. Commit tus cambios
-4. Push a la rama
+2. Crea una rama: `git checkout -b feature/nueva-caracteristica`
+3. Commit: `git commit -m 'Agrega nueva característica'`
+4. Push: `git push origin feature/nueva-caracteristica`
 5. Abre un Pull Request
 
 ## 📞 Soporte
 
-Si encuentras algún problema o tienes sugerencias, no dudes en abrir un issue en el repositorio del proyecto.
+- Issues: [GitHub Issues](https://github.com/martinmromero/analisis-encuestas/issues)
+- Documentación API: [API-DOCS.md](API-DOCS.md)
 
 ---
+
+**Desarrollado con ❤️ para análisis de encuestas educativas en español**
 
 **¡Disfruta analizando tus encuestas! 📊✨**

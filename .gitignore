@@ -78,6 +78,17 @@ jspm_packages/
 *.swo
 *~
 
+# Python (ya no usado pero por si acaso)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.python-version
+
 # OS generated files
 .DS_Store
 .DS_Store?
