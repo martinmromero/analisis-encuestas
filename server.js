@@ -153,7 +153,11 @@ function shouldAnalyzeColumn(columnName, value) {
   if (isTextoLibre) {
     // Solo analizar si es string con contenido significativo
     const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 10;
-    return typeof value === 'string' && value.trim().length > minLength;
+    const shouldProcess = typeof value === 'string' && value.trim().length > minLength;
+    if (!shouldProcess && typeof value === 'string') {
+      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} <= ${minLength}`);
+    }
+    return shouldProcess;
   } 
   
   // Para cualquier otra columna, aplicar reglas generales:
@@ -178,12 +182,15 @@ function shouldAnalyzeColumn(columnName, value) {
 function getSentimentColumns(row) {
   const selected = [];
   Object.entries(row).forEach(([columnName, value]) => {
-    if (shouldAnalyzeColumn(columnName, value)) {
-      if (typeof value === 'string') {
-        selected.push({ column: columnName, text: value });
-      }
+    const shouldAnalyze = shouldAnalyzeColumn(columnName, value);
+    if (shouldAnalyze && typeof value === 'string') {
+      selected.push({ column: columnName, text: value });
+      console.log(`[SENTIMENT] Analizando columna: "${columnName}" | Longitud: ${value.length} | Preview: "${value.substring(0, 50)}..."`);
     }
   });
+  if (selected.length === 0) {
+    console.log(`[SENTIMENT] ⚠️ Ninguna columna cumple filtro shouldAnalyzeColumn. Columnas disponibles:`, Object.keys(row));
+  }
   return selected;
 }
 

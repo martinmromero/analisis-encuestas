@@ -66,7 +66,7 @@ module.exports = {
    */
   analisis: {
     // Longitud mínima de texto para análisis (en caracteres)
-    longitudMinimaTextoLibre: 10,
+    longitudMinimaTextoLibre: 3,  // Cambiado de 10 a 3 para aceptar comentarios cortos
     longitudMinimaOtros: 20,
     
     // Longitud máxima de texto a almacenar en resultados
