@@ -154,8 +154,12 @@ function shouldAnalyzeColumn(columnName, value) {
     // Solo analizar si es string con contenido significativo
     const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 10;
     const shouldProcess = typeof value === 'string' && value.trim().length > minLength;
-    if (!shouldProcess && typeof value === 'string') {
-      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} <= ${minLength}`);
+    if (!shouldProcess && typeof value === 'string' && value.trim().length > 0) {
+      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} <= ${minLength} | Valor: "${value.substring(0, 50)}"`);
+    } else if (!shouldProcess && (!value || (typeof value === 'string' && value.trim().length === 0))) {
+      console.log(`[FILTRO] ⚠️ Columna texto libre "${columnName}" vacía: tipo=${typeof value} valor="${value}"`);
+    } else if (shouldProcess) {
+      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA: longitud ${value.trim().length} > ${minLength}`);
     }
     return shouldProcess;
   } 
@@ -185,11 +189,13 @@ function getSentimentColumns(row) {
     const shouldAnalyze = shouldAnalyzeColumn(columnName, value);
     if (shouldAnalyze && typeof value === 'string') {
       selected.push({ column: columnName, text: value });
-      console.log(`[SENTIMENT] Analizando columna: "${columnName}" | Longitud: ${value.length} | Preview: "${value.substring(0, 50)}..."`);
+      console.log(`[SENTIMENT] ✅ Analizando columna: "${columnName}" | Longitud: ${value.length} | Preview: "${value.substring(0, 50)}..."`);
     }
   });
   if (selected.length === 0) {
-    console.log(`[SENTIMENT] ⚠️ Ninguna columna cumple filtro shouldAnalyzeColumn. Columnas disponibles:`, Object.keys(row));
+    // Mostrar detalles de TODAS las columnas para debug
+    console.log(`[SENTIMENT] ⚠️ Ninguna columna cumple filtro shouldAnalyzeColumn.`);
+    console.log(`[DEBUG] Primera fila completa:`, JSON.stringify(row, null, 2).substring(0, 1000));
   }
   return selected;
 }
@@ -621,11 +627,11 @@ function analyzeTextEnhanced(text) {
     const normKey = removeAccents(key.toLowerCase().trim());
     if (!normKey) continue;
     if (normKey.includes(' ')) {
-      const regex = new RegExp(`(^|\b)${escapeRegex(normKey)}(\b|$)`, 'g');
-      const matches = normalizedText.match(regex);
-      if (matches) {
-        rawScore += value * matches.length;
-        matchedCount += matches.length;
+      // Buscar frases completas sin word boundaries estrictos
+      if (normalizedText.includes(normKey)) {
+        const count = (normalizedText.match(new RegExp(escapeRegex(normKey), 'g')) || []).length;
+        rawScore += value * count;
+        matchedCount += count;
         if (value > 0) positives.push(key); else if (value < 0) negatives.push(key);
       }
     } else {
@@ -945,8 +951,9 @@ function calculateStats(results) {
 
   return {
     classifications: classifications,
-  averageScore: parseFloat(averageScore.toFixed(2)), // Promedio -5..+5
+    averageScore: parseFloat(averageScore.toFixed(2)), // Promedio -5..+5
     averageComparative: parseFloat(averageComparative.toFixed(4)),
+    totalResults: validResults, // Total de respuestas procesadas
     percentages: {
       'Muy Positivo': parseFloat((classifications['Muy Positivo'] / totalResults * 100).toFixed(1)),
       'Positivo': parseFloat((classifications['Positivo'] / totalResults * 100).toFixed(1)),

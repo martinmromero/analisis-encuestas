@@ -766,7 +766,8 @@ function calculateFilteredStats(results) {
 
 // Actualizar tarjetas de estadísticas
 function updateStatsCards(results, stats) {
-    document.getElementById('totalResponses').textContent = stats.totalResults;
+    // No sobrescribir totalResponses aquí - ya se configuró en displayResults
+    // document.getElementById('totalResponses').textContent = stats.totalResults;
     document.getElementById('averageScore').textContent = stats.averageScore.toFixed(2);
     
     const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 

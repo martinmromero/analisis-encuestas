@@ -53,11 +53,10 @@ module.exports = {
    * será analizada para sentimiento.
    */
   textoLibre: [
-    'Si su respuesta se ubica entre 1 y 6, por favor indique los motivos',
+    'indique los motivos', // Patrón más flexible que acepta variaciones de espacios
     'comentarios',
     'observaciones',
-    'sugerencias',
-    'motivos'
+    'sugerencias'
   ],
   
   /**

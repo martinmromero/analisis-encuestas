@@ -1,7 +1,7 @@
 {
     "name": "Diccionario Sentimientos v4",
     "created": "2025-11-25T00:00:00.000Z",
-    "wordCount": 567,
+    "wordCount": 569,
     "dictionary": {
         "normal": 0,
         "regular": 0,
@@ -131,6 +131,8 @@
         "venía mal predispuesto": -4,
         "mal humor": -4,
         "malhumor": -4,
+        "dudoso": -3,
+        "dudosa": -3,
         "consignas no son claras": -4,
         "falta de apoyo": -4,
         "malas formas": -4,
