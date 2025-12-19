@@ -134,19 +134,22 @@ const USER_DICT_FILE = process.env.USER_DICT_FILE || path.join(__dirname, 'user-
 // Usa el archivo column-config.js para la configuración
 
 // Función para determinar si una columna debe ser analizada para sentimiento
-function shouldAnalyzeColumn(columnName, value) {
+// Acepta configuración personalizada opcional
+function shouldAnalyzeColumn(columnName, value, customConfig = null) {
+  const config = customConfig || COLUMN_CONFIG;
+  
   // No analizar columnas de identificación
-  if (COLUMN_CONFIG.identificacion.includes(columnName)) {
+  if (config.identificacion.includes(columnName)) {
     return false;
   }
   
   // No analizar columnas numéricas
-  if (COLUMN_CONFIG.numericas.includes(columnName)) {
+  if (config.numericas.includes(columnName)) {
     return false;
   }
   
   // Verificar si es una columna de texto libre (coincidencia exacta o parcial)
-  const isTextoLibre = COLUMN_CONFIG.textoLibre.some(pattern => 
+  const isTextoLibre = config.textoLibre.some(pattern => 
     columnName.includes(pattern) || pattern.includes(columnName)
   );
   
@@ -183,10 +186,10 @@ function shouldAnalyzeColumn(columnName, value) {
 
 // Helper reutilizable: obtiene columnas de texto que se deben analizar para sentimiento.
 // Retorna arreglo de objetos { column, text }
-function getSentimentColumns(row) {
+function getSentimentColumns(row, customConfig = null) {
   const selected = [];
   Object.entries(row).forEach(([columnName, value]) => {
-    const shouldAnalyze = shouldAnalyzeColumn(columnName, value);
+    const shouldAnalyze = shouldAnalyzeColumn(columnName, value, customConfig);
     if (shouldAnalyze && typeof value === 'string') {
       selected.push({ column: columnName, text: value });
       console.log(`[SENTIMENT] ✅ Analizando columna: "${columnName}" | Longitud: ${value.length} | Preview: "${value.substring(0, 50)}..."`);
@@ -341,6 +344,11 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData);
+    
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = results.filter(row => {
+      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
+    }).length;
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -348,6 +356,7 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
     res.json({
       success: true,
       totalResponses: results.length,
+      quantitativeResponses: quantitativeResponses,
       statistics: stats,
       filterOptions: filterOptions,
       results: results
@@ -368,6 +377,18 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
 
     // Obtener el motor del cuerpo de la petición (viene como FormData)
     const engine = req.body.engine || 'natural';
+    
+    // Obtener configuración de columnas personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.warn('⚠️ Error parseando columnConfig, usando default');
+      }
+    }
+    
     console.log(`🔧 Analizando con motor específico: ${engine}`);
 
     // Leer archivo Excel/CSV
@@ -407,7 +428,7 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
       if (i % 500 === 0 && i > 0) {
         console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
       }
-      const sentimentColumns = getSentimentColumns(row);
+      const sentimentColumns = getSentimentColumns(row, customConfig);
       let sentimentResults = [];
       let overallScore = 0;
       let overallComparative = 0;
@@ -452,7 +473,9 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
         numericMetrics: numericValues,
         sentiment: {
           score: parseFloat(averageScore.toFixed(2)),
+          perColumnAvgScore: parseFloat(averageScore.toFixed(2)),
           comparative: parseFloat((overallComparative || 0).toFixed(4)),
+          overallComparative: parseFloat((overallComparative || 0).toFixed(4)),
           confidence: parseFloat(averageConfidence.toFixed(2)),
           engine,
           analyzedColumns: sentimentColumns.map(c => c.column),
@@ -466,7 +489,12 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     const stats = calculateStats(results);
     
     // Extraer valores únicos para filtros
-    const filterOptions = extractFilterOptions(jsonData);
+    const filterOptions = extractFilterOptions(jsonData, customConfig);
+    
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = results.filter(row => {
+      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
+    }).length;
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -474,6 +502,7 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     res.json({
       success: true,
       totalResponses: results.length,
+      quantitativeResponses: quantitativeResponses,
       engine: engine,
       statistics: stats,
       filterOptions: filterOptions,
@@ -577,11 +606,14 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
         ...row,
         sentiment: {
           score: parseFloat(averageScore.toFixed(2)),
+          perColumnAvgScore: parseFloat(averageScore.toFixed(2)),
           comparative: parseFloat(averageComparative.toFixed(4)),
+          overallComparative: parseFloat(averageComparative.toFixed(4)),
           confidence: sentimentColumns.length > 0 ? 0.8 : 0.0,
           engine: 'both',
           analyzedColumns: sentimentColumns.map(c => c.column),
-          dualAnalysis
+          dualAnalysis,
+          details: dualAnalysis.consensus || []
         }
       });
     }
@@ -592,6 +624,11 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData);
+    
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = results.filter(row => {
+      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
+    }).length;
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -599,6 +636,7 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     res.json({
       success: true,
       totalResponses: results.length,
+      quantitativeResponses: quantitativeResponses,
       engine: 'both',
       statistics: stats,
       filterOptions: filterOptions,
@@ -846,7 +884,9 @@ function calculateAgreement(results) {
 }
 
 // Función para extraer valores únicos de columnas para filtros
-function extractFilterOptions(data) {
+function extractFilterOptions(data, customConfig = null) {
+  const config = customConfig || COLUMN_CONFIG;
+  
   const options = {
     carreras: new Set(),
     materias: new Set(),
@@ -861,12 +901,12 @@ function extractFilterOptions(data) {
     console.log('📋 Columnas encontradas en el Excel:', columnNames);
   }
   
-  // Usar la configuración de filtros definida en column-config.js
-  const carreraCol = COLUMN_CONFIG.filtros?.carrera || 'CARRERA';
-  const materiaCol = COLUMN_CONFIG.filtros?.materia || 'MATERIA';
-  const modalidadCol = COLUMN_CONFIG.filtros?.modalidad || 'MODALIDAD';
-  const sedeCol = COLUMN_CONFIG.filtros?.sede || 'SEDE';
-  const docenteCol = COLUMN_CONFIG.filtros?.docente || 'DOCENTE';
+  // Usar la configuración de filtros definida en column-config.js o customConfig
+  const carreraCol = config.filtros?.carrera || 'CARRERA';
+  const materiaCol = config.filtros?.materia || 'MATERIA';
+  const modalidadCol = config.filtros?.modalidad || 'MODALIDAD';
+  const sedeCol = config.filtros?.sede || 'SEDE';
+  const docenteCol = config.filtros?.docente || 'DOCENTE';
   
   data.forEach(row => {
     // Buscar CARRERA
@@ -902,7 +942,7 @@ function extractFilterOptions(data) {
     modalidades: Array.from(options.modalidades).sort(),
     sedes: Array.from(options.sedes).sort(),
     docentes: Array.from(options.docentes).sort(),
-    numericQuestions: COLUMN_CONFIG.numericas || []
+    numericQuestions: config.numericas || []
   };
   
   console.log(`📊 Filtros extraídos: ${result.carreras.length} carreras, ${result.materias.length} materias, ${result.modalidades.length} modalidades, ${result.sedes.length} sedes, ${result.docentes.length} docentes`);
@@ -926,7 +966,7 @@ function calculateStats(results) {
   let validResults = 0;
 
   results.forEach(result => {
-    if (result.sentiment) {
+    if (result.sentiment && result.sentiment.details && result.sentiment.details.length > 0) {
       const avgScore = typeof result.sentiment.perColumnAvgScore === 'number'
         ? result.sentiment.perColumnAvgScore
         : 0; // Neutral en nueva escala raw -5..+5
@@ -948,10 +988,14 @@ function calculateStats(results) {
   const averageScore = validResults > 0 ? totalScore / validResults : 0;
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   const totalResults = validResults > 0 ? validResults : 1; // Evitar división por cero
+  
+  // Normalizar score de escala -5..+5 a 0..10
+  const normalizedScore = ((averageScore + 5) / 10) * 10;
 
   return {
     classifications: classifications,
-    averageScore: parseFloat(averageScore.toFixed(2)), // Promedio -5..+5
+    averageScore: parseFloat(normalizedScore.toFixed(2)), // Promedio 0..10 (normalizado)
+    rawScore: parseFloat(averageScore.toFixed(2)), // Score original -5..+5
     averageComparative: parseFloat(averageComparative.toFixed(4)),
     totalResults: validResults, // Total de respuestas procesadas
     percentages: {
@@ -1937,6 +1981,256 @@ app.get('/api/engines', (req, res) => {
   } catch (error) {
     console.error('Error obteniendo motores:', error);
     res.status(500).json({ error: 'Error obteniendo lista de motores' });
+  }
+});
+
+// ========================================
+// ENDPOINTS PARA GESTIÓN DE CONFIGURACIÓN DE COLUMNAS
+// ========================================
+
+// Archivo para guardar configuraciones
+const CONFIGS_FILE = path.join(__dirname, 'column-configs.json');
+
+// Cargar configuraciones guardadas
+function loadColumnConfigs() {
+  try {
+    if (fs.existsSync(CONFIGS_FILE)) {
+      const data = fs.readFileSync(CONFIGS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error cargando configuraciones:', error);
+  }
+  return [];
+}
+
+// Guardar configuraciones
+function saveColumnConfigs(configs) {
+  try {
+    fs.writeFileSync(CONFIGS_FILE, JSON.stringify(configs, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error guardando configuraciones:', error);
+    return false;
+  }
+}
+
+// Obtener configuración actual de column-config.js
+app.get('/api/column-config', (req, res) => {
+  res.json({
+    identificacion: COLUMN_CONFIG.identificacion,
+    numericas: COLUMN_CONFIG.numericas,
+    textoLibre: COLUMN_CONFIG.textoLibre
+  });
+});
+
+// Detectar columnas de un archivo Excel
+app.post('/api/detect-columns', upload.single('excelFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    const workbook = XLSX.readFile(req.file.path, { raw: false, FS: ';' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+
+    if (jsonData.length > 0) {
+      const columns = Object.keys(jsonData[0]);
+      console.log('📋 Columnas detectadas:', columns);
+      
+      // Limpiar archivo temporal
+      fs.unlinkSync(req.file.path);
+      
+      res.json({
+        success: true,
+        columns: columns,
+        totalRows: jsonData.length
+      });
+    } else {
+      fs.unlinkSync(req.file.path);
+      res.status(400).json({ error: 'El archivo está vacío' });
+    }
+  } catch (error) {
+    console.error('Error detectando columnas:', error);
+    if (req.file) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: 'Error procesando archivo' });
+  }
+});
+
+// Analizar metadata de columnas (detectar escalas automáticamente)
+app.post('/api/analyze-column-metadata', upload.single('excelFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    const workbook = XLSX.readFile(req.file.path, { raw: false, FS: ';' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+
+    if (jsonData.length === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'El archivo está vacío' });
+    }
+
+    const columns = Object.keys(jsonData[0]);
+    const escalas = {};
+    
+    // Analizar cada columna
+    columns.forEach(columnName => {
+      const samples = jsonData.slice(0, 100).map(row => row[columnName]).filter(v => v && v.trim());
+      
+      if (samples.length === 0) return;
+      
+      // Detectar si es numérica con escala (ej: "1. Muy útil", "5. Excelente")
+      const scalePattern = /^(\d+)\s*[.\-:)]\s*(.+)$/;
+      const scaleValues = [];
+      const labels = {};
+      
+      samples.forEach(sample => {
+        const match = String(sample).match(scalePattern);
+        if (match) {
+          const value = parseInt(match[1]);
+          const label = match[2].trim();
+          scaleValues.push(value);
+          labels[value] = label;
+        }
+      });
+      
+      // Si encontró al menos 2 valores con patrón de escala
+      if (scaleValues.length >= 2) {
+        const min = Math.min(...scaleValues);
+        const max = Math.max(...scaleValues);
+        
+        escalas[columnName] = {
+          type: 'scale',
+          min: min,
+          max: max,
+          labels: labels,
+          pattern: 'numeric-labeled', // "1. Opción" - "5. Opción"
+          detected: true
+        };
+        
+        console.log(`📊 Escala detectada en "${columnName}": ${min}-${max}`);
+      } else {
+        // Detectar si es numérica simple (solo números)
+        const numericValues = samples
+          .map(v => parseFloat(v))
+          .filter(v => !isNaN(v));
+        
+        if (numericValues.length >= samples.length * 0.7) { // 70% numéricos
+          const min = Math.min(...numericValues);
+          const max = Math.max(...numericValues);
+          
+          escalas[columnName] = {
+            type: 'numeric',
+            min: min,
+            max: max,
+            pattern: 'pure-numeric', // Números puros
+            detected: true
+          };
+          
+          console.log(`🔢 Columna numérica "${columnName}": ${min}-${max}`);
+        }
+      }
+    });
+
+    // Limpiar archivo temporal
+    fs.unlinkSync(req.file.path);
+
+    res.json({
+      success: true,
+      metadata: {
+        escalas: escalas,
+        totalColumns: columns.length,
+        analyzedRows: Math.min(jsonData.length, 100)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error analizando metadata:', error);
+    if (req.file) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: 'Error procesando archivo' });
+  }
+});
+
+// Guardar una configuración de columnas
+app.post('/api/save-column-config', (req, res) => {
+  try {
+    const { name, identificacion, numericas, textoLibre, escalas } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+    
+    const configs = loadColumnConfigs();
+    
+    // Buscar si ya existe una configuración con este nombre
+    const existingIndex = configs.findIndex(c => c.name === name);
+    
+    const newConfig = {
+      name,
+      identificacion: identificacion || [],
+      numericas: numericas || [],
+      textoLibre: textoLibre || [],
+      escalas: escalas || {}, // Guardar metadata de escalas
+      created: existingIndex >= 0 ? configs[existingIndex].created : new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    
+    if (existingIndex >= 0) {
+      configs[existingIndex] = newConfig;
+    } else {
+      configs.push(newConfig);
+    }
+    
+    if (saveColumnConfigs(configs)) {
+      console.log(`💾 Configuración "${name}" guardada`);
+      res.json({ success: true, config: newConfig });
+    } else {
+      res.status(500).json({ error: 'Error guardando configuración' });
+    }
+  } catch (error) {
+    console.error('Error en save-column-config:', error);
+    res.status(500).json({ error: 'Error guardando configuración' });
+  }
+});
+
+// Obtener todas las configuraciones guardadas
+app.get('/api/saved-column-configs', (req, res) => {
+  try {
+    const configs = loadColumnConfigs();
+    res.json({ success: true, configs });
+  } catch (error) {
+    console.error('Error obteniendo configuraciones:', error);
+    res.status(500).json({ error: 'Error obteniendo configuraciones' });
+  }
+});
+
+// Eliminar una configuración
+app.post('/api/delete-column-config', (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+    
+    const configs = loadColumnConfigs();
+    const filteredConfigs = configs.filter(c => c.name !== name);
+    
+    if (saveColumnConfigs(filteredConfigs)) {
+      console.log(`🗑️ Configuración "${name}" eliminada`);
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: 'Error eliminando configuración' });
+    }
+  } catch (error) {
+    console.error('Error eliminando configuración:', error);
+    res.status(500).json({ error: 'Error eliminando configuración' });
   }
 });
 

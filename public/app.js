@@ -178,12 +178,21 @@ async function analyzeFile() {
         return;
     }
 
+    // Obtener configuración de columnas actual
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
+    
     // Obtener motor seleccionado
     const selectedEngine = document.querySelector('input[name="analysisEngine"]:checked').value;
     console.log('Motor seleccionado:', selectedEngine);
+    console.log('Configuración de columnas:', columnConfig);
 
     const formData = new FormData();
     formData.append('excelFile', file);
+    
+    // Agregar configuración de columnas si existe
+    if (columnConfig) {
+        formData.append('columnConfig', JSON.stringify(columnConfig));
+    }
 
     try {
         // Limpiar análisis anterior para liberar memoria
@@ -259,13 +268,38 @@ function hideLoading() {
 // Mostrar resultados
 function displayResults(data) {
     // Actualizar estadísticas
-    document.getElementById('totalResponses').textContent = data.totalResponses;
+    const totalElement = document.getElementById('totalResponses');
+    if (totalElement) totalElement.textContent = data.totalResponses;
     
-    // Verificar que statistics existe y tiene averageScore
+    const quantElement = document.getElementById('quantitativeResponses');
+    if (quantElement) quantElement.textContent = data.quantitativeResponses || 0;
+    
+    // Verificar que statistics existe y tiene averageScore (0-10)
     const averageScore = data.statistics && typeof data.statistics.averageScore === 'number' 
         ? data.statistics.averageScore 
         : 5;
-    document.getElementById('averageScore').textContent = averageScore.toFixed(2);
+    
+    // Aplicar clase de color según el score
+    const scoreElement = document.getElementById('averageScore');
+    if (scoreElement) {
+        const scoreCard = scoreElement.closest('.stat-card');
+        
+        if (scoreCard) {
+            // Remover clases previas
+            scoreCard.classList.remove('score-high', 'score-medium', 'score-low');
+            
+            // Aplicar nueva clase según valor
+            if (averageScore >= 8) {
+                scoreCard.classList.add('score-high');
+            } else if (averageScore >= 6) {
+                scoreCard.classList.add('score-medium');
+            } else {
+                scoreCard.classList.add('score-low');
+            }
+        }
+        
+        scoreElement.textContent = averageScore.toFixed(2);
+    }
     
     // Verificar que percentages existen
     const percentages = data.statistics?.percentages || {
@@ -280,35 +314,40 @@ function displayResults(data) {
     const negativePercent = parseFloat(percentages['Muy Negativo'] || 0) + 
                           parseFloat(percentages['Negativo'] || 0);
     
-    document.getElementById('positivePercent').textContent = positivePercent.toFixed(1) + '%';
-    document.getElementById('negativePercent').textContent = negativePercent.toFixed(1) + '%';
+    const posElement = document.getElementById('positivePercent');
+    if (posElement) posElement.textContent = positivePercent.toFixed(1) + '%';
+    
+    const negElement = document.getElementById('negativePercent');
+    if (negElement) negElement.textContent = negativePercent.toFixed(1) + '%';
     
     // Mostrar motor utilizado
     const engineIcon = document.getElementById('engineIcon');
     const usedEngine = document.getElementById('usedEngine');
     
-    if (data.engine) {
-        switch (data.engine) {
-            case 'natural':
-                engineIcon.textContent = '🧠';
-                usedEngine.textContent = 'Natural.js Enhanced';
-                break;
-            case 'nlpjs':
-                engineIcon.textContent = '🚀';
-                usedEngine.textContent = 'NLP.js (AXA)';
-                break;
-            case 'both':
-                engineIcon.textContent = '⚖️';
-                usedEngine.textContent = 'Análisis Dual';
-                break;
-            default:
-                engineIcon.textContent = '🤖';
-                usedEngine.textContent = 'Motor por defecto';
+    if (engineIcon && usedEngine) {
+        if (data.engine) {
+            switch (data.engine) {
+                case 'natural':
+                    engineIcon.textContent = '🧠';
+                    usedEngine.textContent = 'Natural.js Enhanced';
+                    break;
+                case 'nlpjs':
+                    engineIcon.textContent = '🚀';
+                    usedEngine.textContent = 'NLP.js (AXA)';
+                    break;
+                case 'both':
+                    engineIcon.textContent = '⚖️';
+                    usedEngine.textContent = 'Análisis Dual';
+                    break;
+                default:
+                    engineIcon.textContent = '🤖';
+                    usedEngine.textContent = 'Motor por defecto';
+            }
+        } else {
+            // Para compatibility con resultados de comparación
+            engineIcon.textContent = '🤖';
+            usedEngine.textContent = 'Natural.js Enhanced';
         }
-    } else {
-        // Para compatibility con resultados de comparación
-        engineIcon.textContent = '🤖';
-        usedEngine.textContent = 'Natural.js Enhanced';
     }
 
     // Crear gráficos
@@ -616,17 +655,50 @@ function displayNumericMetrics(results, filterOptions) {
         return;
     }
 
+    // Obtener escalas de la configuración actual
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : {};
+    const escalas = columnConfig.escalas || {};
+
     // Calcular promedios para cada columna numérica
     const metrics = numericColumns.map(column => {
+        // Obtener valores y extraer números si tienen formato "1. Opción"
         const values = results
-            .map(row => parseFloat(row[column]))
+            .map(row => {
+                let val = row[column];
+                if (typeof val === 'string') {
+                    // Extraer número si tiene formato "1. Texto" o "5. Opción"
+                    const match = val.match(/^(\d+)\s*[.\-:)]/);
+                    if (match) {
+                        val = parseInt(match[1]);
+                    } else {
+                        val = parseFloat(val);
+                    }
+                } else {
+                    val = parseFloat(val);
+                }
+                return val;
+            })
             .filter(val => !isNaN(val) && val > 0);
         
         const avg = values.length > 0 
             ? values.reduce((sum, val) => sum + val, 0) / values.length 
             : 0;
 
-        return { column, avg, count: values.length };
+        // Determinar escala real (de metadata o inferida de valores)
+        let escala = escalas[column];
+        if (!escala && values.length > 0) {
+            // Inferir escala de los valores presentes
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            escala = { min, max };
+        }
+
+        return { 
+            column, 
+            avg, 
+            count: values.length,
+            escala: escala || { min: 1, max: 10 } // Default 1-10
+        };
     });
 
     console.log('📊 Métricas calculadas:', metrics.length);
@@ -635,13 +707,38 @@ function displayNumericMetrics(results, filterOptions) {
     const metricsGrid = document.getElementById('metricsGrid');
     if (metricsGrid) {
         metricsGrid.innerHTML = metrics.map(metric => {
-            const scoreClass = metric.avg >= 8 ? 'score-high' : 
-                              metric.avg >= 6 ? 'score-medium' : 'score-low';
+            // Normalizar score según la escala real y dirección (0-10)
+            const range = metric.escala.max - metric.escala.min;
+            let normalizedAvg;
+            
+            if (range > 0) {
+                // Calcular normalizado base (0-10)
+                normalizedAvg = ((metric.avg - metric.escala.min) / range) * 10;
+                
+                // Si la escala es descendente, invertir (5=malo, 1=bueno)
+                if (metric.escala.direction === 'descending') {
+                    normalizedAvg = 10 - normalizedAvg;
+                }
+            } else {
+                normalizedAvg = metric.avg;
+            }
+            
+            const scoreClass = normalizedAvg >= 8 ? 'score-high' : 
+                              normalizedAvg >= 6 ? 'score-medium' : 'score-low';
+            
+            const directionIcon = metric.escala.direction === 'descending' ? '⬇️' : '⬆️';
+            const directionLabel = metric.escala.direction === 'descending' ? 'Descendente' : 'Ascendente';
+            
+            const scaleLabel = metric.escala.min !== 1 || metric.escala.max !== 10
+                ? `<div class="scale-info" style="font-size: 0.85em; color: #666;">Escala: ${metric.escala.min}-${metric.escala.max} ${directionIcon}</div>`
+                : '';
+            
             return `
                 <div class="metric-card ${scoreClass}">
                     <h4>${metric.column}</h4>
                     <div class="metric-value">${metric.avg.toFixed(2)}</div>
                     <div class="metric-label">Promedio (${metric.count} respuestas)</div>
+                    ${scaleLabel}
                 </div>
             `;
         }).join('');
@@ -738,17 +835,20 @@ function calculateFilteredStats(results) {
     let totalScore = 0;
     let scoreCount = 0;
 
+    // Solo contar registros con análisis de texto (como en el servidor)
     results.forEach(result => {
-        if (result.sentiment && result.sentiment.classification) {
-            classifications[result.sentiment.classification]++;
-        }
-        if (result.sentiment && typeof result.sentiment.score === 'number') {
-            totalScore += result.sentiment.score;
-            scoreCount++;
+        if (result.sentiment && result.sentiment.details && result.sentiment.details.length > 0) {
+            if (result.sentiment.classification) {
+                classifications[result.sentiment.classification]++;
+            }
+            if (typeof result.sentiment.score === 'number') {
+                totalScore += result.sentiment.score;
+                scoreCount++;
+            }
         }
     });
 
-    const total = results.length;
+    const total = scoreCount > 0 ? scoreCount : 1; // Base = registros con análisis
     const percentages = {};
     Object.keys(classifications).forEach(key => {
         percentages[key] = total > 0 ? ((classifications[key] / total) * 100).toFixed(1) : '0.0';
@@ -759,24 +859,59 @@ function calculateFilteredStats(results) {
     return {
         classifications,
         percentages,
-        averageScore,
-        totalResults: total
+        averageScore, // Escala raw -5..+5
+        totalResults: scoreCount
     };
 }
 
 // Actualizar tarjetas de estadísticas
 function updateStatsCards(results, stats) {
-    // No sobrescribir totalResponses aquí - ya se configuró en displayResults
-    // document.getElementById('totalResponses').textContent = stats.totalResults;
-    document.getElementById('averageScore').textContent = stats.averageScore.toFixed(2);
+    // Actualizar total de respuestas filtradas
+    const totalElement = document.getElementById('totalResponses');
+    if (totalElement) totalElement.textContent = results.length;
+    
+    // Contar respuestas cualitativas (con análisis de texto)
+    const qualitativeCount = results.filter(row => {
+        return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
+    }).length;
+    const quantElement = document.getElementById('quantitativeResponses');
+    if (quantElement) quantElement.textContent = qualitativeCount;
+    
+    // Normalizar score de -5..+5 a 0..10 (mismo cálculo que en el servidor)
+    const normalizedScore = ((stats.averageScore + 5) / 10) * 10;
+    
+    // Aplicar clase de color según el score normalizado
+    const scoreElement = document.getElementById('averageScore');
+    if (scoreElement) {
+        const scoreCard = scoreElement.closest('.stat-card');
+        
+        if (scoreCard) {
+            // Remover clases previas
+            scoreCard.classList.remove('score-high', 'score-medium', 'score-low');
+            
+            // Aplicar nueva clase según valor
+            if (normalizedScore >= 8) {
+                scoreCard.classList.add('score-high');
+            } else if (normalizedScore >= 6) {
+                scoreCard.classList.add('score-medium');
+            } else {
+                scoreCard.classList.add('score-low');
+            }
+        }
+        
+        scoreElement.textContent = normalizedScore.toFixed(2);
+    }
     
     const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 
                           parseFloat(stats.percentages['Positivo'] || 0);
     const negativePercent = parseFloat(stats.percentages['Muy Negativo'] || 0) + 
                           parseFloat(stats.percentages['Negativo'] || 0);
     
-    document.getElementById('positivePercent').textContent = positivePercent.toFixed(1) + '%';
-    document.getElementById('negativePercent').textContent = negativePercent.toFixed(1) + '%';
+    const posElement = document.getElementById('positivePercent');
+    if (posElement) posElement.textContent = positivePercent.toFixed(1) + '%';
+    
+    const negElement = document.getElementById('negativePercent');
+    if (negElement) negElement.textContent = negativePercent.toFixed(1) + '%';
 }
 
 // Función para limpiar filtros avanzados
@@ -794,7 +929,7 @@ function clearAdvancedFilters() {
         updateDependentFilters();
     }
     
-    // Aplicar filtros (que ahora están vacíos)
+    // Aplicar filtros para volver a totales absolutos
     filterResults();
 }
 
@@ -925,6 +1060,12 @@ function showSection(sectionName) {
     const analysisSection = document.getElementById('analysisSection');
     const dictionarySection = document.getElementById('dictionarySection');
     const comparisonSection = document.getElementById('comparisonSection');
+    const resultsSection = document.getElementById('results');
+    
+    // Elementos específicos a ocultar/mostrar
+    const chartsContainer = document.getElementById('chartsContainer');
+    const numericMetricsContainer = document.getElementById('numericMetricsContainer');
+    const detailedResultsTable = document.getElementById('detailedResultsTable');
     
     if (!analysisSection) console.error('❌ analysisSection no encontrada');
     if (!dictionarySection) console.error('❌ dictionarySection no encontrada');
@@ -943,12 +1084,20 @@ function showSection(sectionName) {
         if (analysisSection) {
             analysisSection.classList.remove('hidden');
             document.getElementById('analysisTab')?.classList.add('active');
+            // Mostrar todos los elementos en análisis
+            if (chartsContainer) chartsContainer.style.display = '';
+            if (numericMetricsContainer) numericMetricsContainer.style.display = '';
+            if (detailedResultsTable) detailedResultsTable.style.display = '';
             console.log('✅ Sección de análisis mostrada');
         }
     } else if (sectionName === 'dictionary') {
         if (dictionarySection) {
             dictionarySection.classList.remove('hidden');
             document.getElementById('dictionaryTab')?.classList.add('active');
+            // Ocultar gráficos, métricas y tabla en pestaña de diccionario
+            if (chartsContainer) chartsContainer.style.display = 'none';
+            if (numericMetricsContainer) numericMetricsContainer.style.display = 'none';
+            if (detailedResultsTable) detailedResultsTable.style.display = 'none';
             console.log('✅ Sección de diccionario mostrada');
             loadDictionary().catch(error => {
                 console.error('❌ Error cargando diccionario:', error);
@@ -959,6 +1108,10 @@ function showSection(sectionName) {
         if (comparisonSection) {
             comparisonSection.classList.remove('hidden');
             document.getElementById('comparisonTab')?.classList.add('active');
+            // Ocultar gráficos, métricas y tabla en pestaña de comparación
+            if (chartsContainer) chartsContainer.style.display = 'none';
+            if (numericMetricsContainer) numericMetricsContainer.style.display = 'none';
+            if (detailedResultsTable) detailedResultsTable.style.display = 'none';
             console.log('✅ Sección de comparación mostrada');
             initializeComparison().catch(error => {
                 console.error('❌ Error inicializando comparación:', error);
@@ -1403,7 +1556,7 @@ async function updateActiveDictionaryIndicator() {
         const response = await fetch('/api/dictionaries/active');
         const data = await response.json();
         
-        if (data.success && data.activeDictionary) {
+        if (data.success && data.activeDictionary && data.activeDictionary.name) {
             const nameElement = document.getElementById('activeDictionaryName');
             const statsElement = document.getElementById('activeDictionaryStats');
             
@@ -1417,9 +1570,19 @@ async function updateActiveDictionaryIndicator() {
             }
             
             console.log('📚 Diccionario activo:', data.activeDictionary);
+        } else {
+            // Si no hay diccionario activo o no tiene nombre, mostrar mensaje por defecto
+            const nameElement = document.getElementById('activeDictionaryName');
+            if (nameElement) {
+                nameElement.textContent = 'Ninguno';
+            }
         }
     } catch (error) {
         console.error('Error obteniendo diccionario activo:', error);
+        const nameElement = document.getElementById('activeDictionaryName');
+        if (nameElement) {
+            nameElement.textContent = 'Error al cargar';
+        }
     }
 }
 

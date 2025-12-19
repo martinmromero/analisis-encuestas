@@ -29,10 +29,11 @@
 
             <!-- Sección de análisis de encuestas -->
             <div id="analysisSection" class="main-section">
-                <!-- Sección de carga de archivo -->
+                
+                <!-- Sección de carga de archivo - PRIMERO -->
                 <section class="upload-section">
                 <div class="upload-card">
-                    <h2>📁 Subir Archivo Excel</h2>
+                    <h2>📁 1. Subir Archivo Excel</h2>
                     <form id="uploadForm" enctype="multipart/form-data">
                         <div class="file-input-wrapper">
                             <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls,.csv" required>
@@ -125,6 +126,52 @@
                 </div>
             </section>
 
+            <!-- Configuración de Columnas - SEGUNDO -->
+            <section class="column-config-section">
+                <div class="config-card">
+                    <h2>⚙️ 2. Configuración de Columnas</h2>
+                    <p class="config-description">Define qué columnas son de identificación, numéricas (cuantitativas) o de texto libre (cualitativas)</p>
+                    
+                    <div class="config-controls" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+                        <!-- Mitad izquierda: Selector de configuración -->
+                        <div class="config-selector" style="display: flex; flex-direction: column; gap: 10px;">
+                            <label for="savedConfigsSelect">📋 Configuraciones Guardadas:</label>
+                            <select id="savedConfigsSelect" style="width: 100%; padding: 10px; font-size: 1em;">
+                                <option value="">-- Seleccionar configuración --</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Mitad derecha: Botones -->
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button id="deleteConfigBtn" class="btn-danger" style="flex: 1; min-width: 140px;">🗑️ Eliminar</button>
+                            <button id="showConfigModalBtn" class="btn-primary" style="flex: 1 1 100%; min-width: 200px;">✏️ Configurar Columnas</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuración actual con detalle colapsable -->
+                    <div id="currentConfigPreview" class="config-preview hidden" style="margin-top: 20px;">
+                        <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="document.getElementById('configDetails').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('configDetails').classList.contains('hidden') ? '▶' : '▼';">
+                            <span class="toggle-icon">▶</span>
+                            📊 Configuración Actual: <span id="currentConfigName">Default</span>
+                        </h3>
+                        <div id="configDetails" class="config-columns hidden">
+                            <div class="column-type-preview">
+                                <h4>🏷️ Identificación (<span id="previewIdCount">0</span>)</h4>
+                                <div id="previewIdColumns" class="column-pills"></div>
+                            </div>
+                            <div class="column-type-preview">
+                                <h4>📊 Numéricas (<span id="previewNumCount">0</span>)</h4>
+                                <div id="previewNumColumns" class="column-pills"></div>
+                            </div>
+                            <div class="column-type-preview">
+                                <h4>💬 Cualitativas (<span id="previewTextCount">0</span>)</h4>
+                                <div id="previewTextColumns" class="column-pills"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Loading spinner -->
             <div id="loading" class="loading hidden">
                 <div class="spinner"></div>
@@ -156,10 +203,17 @@
                         </div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <h3 id="quantitativeResponses">0</h3>
+                            <p>Respuestas Cualitativas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
                         <div class="stat-icon">⭐</div>
                         <div class="stat-content">
                             <h3 id="averageScore">0</h3>
-                            <p>Puntuación Promedio</p>
+                            <p>Puntuación Promedio (0-10)</p>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -176,7 +230,7 @@
                             <p>Sentimientos Negativos</p>
                         </div>
                     </div>
-                    <div class="stat-card engine-indicator">
+                    <div class="stat-card engine-indicator" style="display: none;">
                         <div class="stat-icon" id="engineIcon">🤖</div>
                         <div class="stat-content">
                             <h3 id="usedEngine">Natural.js</h3>
@@ -187,8 +241,11 @@
 
                 <!-- Panel de Filtros -->
                 <div class="filters-panel">
-                    <h3>🔍 Filtrar Resultados</h3>
-                    <div class="filters-grid">
+                    <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none;" onclick="document.getElementById('filtersContent').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('filtersContent').classList.contains('hidden') ? '▶' : '▼';">
+                        <span class="toggle-icon">▶</span>
+                        🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
+                    </h3>
+                    <div id="filtersContent" class="filters-grid hidden">
                         <div class="filter-group">
                             <label for="filterCarrera">Carrera:</label>
                             <select id="filterCarrera" class="filter-select">
@@ -231,10 +288,11 @@
                     <div class="filter-summary" id="filterSummary" style="display: none;">
                         <span id="filterSummaryText"></span>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Gráficos -->
-                <div class="charts-container">
+                <div class="charts-container" id="chartsContainer">
                     <div class="chart-wrapper">
                         <div class="chart-card">
                             <h3>Distribución de Sentimientos</h3>
@@ -262,8 +320,9 @@
                 </div>
 
                 <!-- Tabla de resultados detallados -->
-                <div class="table-container">
-                    <h3>Resultados Detallados</h3>
+                <div class="table-container" id="detailedResultsTable">
+                    <h3 onclick="const content = this.nextElementSibling; content.classList.toggle('hidden'); const icon = this.querySelector('.collapse-icon'); icon.textContent = content.classList.contains('hidden') ? '▶' : '▼';" style="cursor: pointer; user-select: none;"><span class="collapse-icon">▶</span> Resultados Detallados</h3>
+                    <div class="hidden">
                     <div class="table-filters">
                         <select id="filterSentiment">
                             <option value="">Todos los sentimientos</option>
@@ -291,11 +350,10 @@
                             <tbody></tbody>
                         </table>
                     </div>
+                    </div>
                 </div>
             </section>
-            </div>
-
-            <!-- Sección de gestión de diccionario -->
+        </div>            <!-- Sección de gestión de diccionario -->
             <div id="dictionarySection" class="main-section hidden">
                 <!-- Panel de visualización del diccionario actual -->
                 <section class="dictionary-viewer">
@@ -505,7 +563,109 @@
         </footer>
     </div>
 
+    <!-- Modal de Configuración de Columnas -->
+    <div id="columnConfigModal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>⚙️ Configurar Columnas de Análisis</h2>
+                <button class="modal-close" id="closeConfigModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-instructions">
+                    <p>📋 <strong>Instrucciones:</strong> Arrastra las columnas a las categorías correspondientes o usa los botones para moverlas.</p>
+                    <p>💡 <strong>Tip:</strong> Las columnas de identificación y numéricas NO se analizan para sentiment.</p>
+                </div>
+                
+                <div class="config-name-section">
+                    <label for="configNameInput">📝 Nombre de esta configuración:</label>
+                    <input type="text" id="configNameInput" placeholder="Ej: Encuesta Docentes 2025" value="Default">
+                    <button id="saveConfigBtn" class="btn-success">💾 Guardar Configuración</button>
+                </div>
+                
+                <div class="columns-config-grid">
+                    <div class="column-category" data-type="identificacion">
+                        <h3>🏷️ Identificación</h3>
+                        <p class="category-desc">Datos para filtrar y agrupar (no se analizan)</p>
+                        <div id="idColumnsList" class="columns-list" data-category="identificacion"></div>
+                    </div>
+                    
+                    <div class="column-category" data-type="numericas">
+                        <h3>📊 Numéricas (Cuantitativas)</h3>
+                        <p class="category-desc">Escalas numéricas para estadísticas</p>
+                        <div id="numColumnsList" class="columns-list" data-category="numericas"></div>
+                    </div>
+                    
+                    <div class="column-category" data-type="textoLibre">
+                        <h3>💬 Texto Libre (Cualitativas)</h3>
+                        <p class="category-desc">Comentarios para análisis de sentiment</p>
+                        <div id="textColumnsList" class="columns-list" data-category="textoLibre"></div>
+                    </div>
+                    
+                    <div class="column-category unassigned" data-type="unassigned">
+                        <h3>❓ Sin Asignar</h3>
+                        <p class="category-desc">Columnas detectadas en el archivo</p>
+                        <div id="unassignedColumnsList" class="columns-list" data-category="unassigned"></div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="applyConfigBtn" class="btn-primary">✅ Aplicar y Continuar</button>
+                    <button id="cancelConfigBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración de Escala -->
+    <div id="scaleConfigModal" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2>⚙️ Configurar Escala Numérica</h2>
+                <button class="modal-close" id="closeScaleModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="scale-config-form">
+                    <p><strong>Columna:</strong> <span id="scaleColumnName"></span></p>
+                    
+                    <div class="form-group">
+                        <label for="scaleMinInput">Valor Mínimo:</label>
+                        <input type="number" id="scaleMinInput" placeholder="Ej: 1" value="1" min="0" step="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scaleMaxInput">Valor Máximo:</label>
+                        <input type="number" id="scaleMaxInput" placeholder="Ej: 5" value="5" min="1" step="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scaleDirectionSelect">Dirección de la Escala:</label>
+                        <select id="scaleDirectionSelect" class="scale-direction-select">
+                            <option value="ascending">⬆️ Ascendente (1 = Peor, 5 = Mejor)</option>
+                            <option value="descending">⬇️ Descendente (5 = Peor, 1 = Mejor)</option>
+                        </select>
+                        <p class="direction-hint" id="directionHint">El valor mínimo representa la peor calificación</p>
+                    </div>
+                    
+                    <div class="scale-examples">
+                        <p><strong>Ejemplos comunes:</strong></p>
+                        <ul>
+                            <li>Escala 1-5 Ascendente (Likert estándar)</li>
+                            <li>Escala 1-10 Ascendente (NPS)</li>
+                            <li>Escala 5-1 Descendente (ranking inverso)</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="saveScaleBtn" class="btn-success">✅ Guardar Escala</button>
+                    <button id="cancelScaleBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="cascade-filters.js"></script>
     <script src="app.js"></script>
+    <script src="column-config-manager.js"></script>
 </body>
 </html>

@@ -14,79 +14,116 @@ Sistema web completo para el análisis de sentimientos de encuestas educativas e
 
 Sistema web completo para el análisis de sentimientos de encuestas educativas en español, con múltiples motores de análisis JavaScript y generación avanzada de reportes en Excel.
 
-## 🚀 Características
+## 📋 Tabla de Contenidos
+
+- [🚀 Características](#-características)
+- [📊 Métricas Calculadas](#-métricas-calculadas)
+- [🧠 Motores de Análisis](#-motores-de-análisis)
+- [🛠️ Tecnologías Utilizadas](#️-tecnologías-utilizadas)
+- [💻 Instalación](#-instalación)
+- [🔧 Uso de la Aplicación](#-uso-de-la-aplicación)
+- [📚 Documentación Técnica](#-documentación-técnica)
+  - [📐 Guía de Cálculo de Métricas](GUIA-CALCULOS-METRICAS.md) ⭐ **Fórmulas y ejemplos detallados**
+  - [📑 Índice Completo de Documentación](DOCUMENTACION-INDICE.md) 📖 **Navegación por todas las guías**
+- [🐛 Solución de Problemas](#-solución-de-problemas)
+- [🔄 Roadmap](#-roadmap)
+- [📄 Licencia](#-licencia)
+
+---
 
 ## 🚀 Características
 
-- **Subida de archivos Excel**: Soporta formatos .xlsx y .xls
-
-- **📁 Subida de archivos Excel**: Soporta formatos .xlsx y .xls- **Análisis de sentimientos**: Utiliza procesamiento de lenguaje natural para analizar el tono emocional
-
-- **🧠 Análisis de sentimientos**: Dos motores JavaScript especializados en español- **Visualizaciones interactivas**: Gráficos dinámicos con Chart.js
-
-- **📊 Visualizaciones interactivas**: Gráficos dinámicos con Chart.js- **Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico
-
-- **🔍 Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico- **Exportación de datos**: Descarga resultados en formato JSON o CSV
-
-- **💾 Exportación de datos**: Descarga resultados en JSON, CSV o reportes Excel avanzados- **Interfaz moderna**: Diseño responsivo y fácil de usar
-
+- **📁 Subida de archivos Excel**: Soporta formatos .xlsx y .xls
+- **🧠 Análisis de sentimientos**: Dos motores JavaScript especializados en español
+- **📊 Visualizaciones interactivas**: Gráficos dinámicos con Chart.js
+- **🔍 Filtros y búsqueda**: Filtra resultados por sentimiento o busca texto específico
+- **💾 Exportación de datos**: Descarga resultados en JSON, CSV o reportes Excel avanzados
 - **📚 Diccionario personalizable**: Gestión completa de términos de sentimiento
-
-- **🐳 Dockerizado**: Desarrollo local con hot-reload y producción optimizada## 📊 Funcionalidades del Análisis
-
+- **⚙️ Configuración de columnas**: Clasifica columnas interactivamente (ID, numéricas, cualitativas)
+- **🐳 Dockerizado**: Desarrollo local con hot-reload y producción optimizada
 - **🎨 Interfaz moderna**: Diseño responsivo y fácil de usar
 
-### Clasificaciones de Sentimiento
+## 📊 Métricas Calculadas
 
-## 📊 Motores de Análisis- **Muy Positivo**: Puntuación > 2
+### 📈 Análisis Cuantitativo (Preguntas Numéricas)
 
-- **Positivo**: Puntuación 0 a 2
+**Qué se calcula:**
+```
+Promedio por pregunta = Σ(respuestas_válidas) / cantidad_respuestas
 
-### Natural.js Enhanced 🧠- **Neutral**: Puntuación = 0
+Ejemplo: Pregunta "El docente demostró dominio de los contenidos"
+  Respuestas: [10, 9, 10, 8, 10, 9, 10]
+  Promedio: (10+9+10+8+10+9+10) / 7 = 9.43/10
+```
 
-- Diccionario personalizado de **894+ palabras y frases** en español- **Negativo**: Puntuación -2 a 0
+**Incluye:**
+- ✅ Promedio por cada pregunta de escala (1-10)
+- ✅ Cantidad de respuestas válidas
+- ✅ Código de colores según rendimiento (verde ≥8, amarillo ≥6, naranja ≥4, rojo <4)
 
-- Análisis de intensificadores y negaciones- **Muy Negativo**: Puntuación < -2
+### 🎭 Análisis Cualitativo (Comentarios de Texto Libre)
 
-- Frases contextuales específicas
+**Qué se calcula:**
+```
+Score de sentimiento = Σ(palabras_positivas) - Σ(palabras_negativas)
 
-- **Personalizable** desde la UI### Estadísticas Generadas
+Escala: -5 (muy negativo) a +5 (muy positivo)
 
-- Total de respuestas procesadas
+Ejemplo: "Excelente profesor pero muy desorganizado"
+  Positivas: "excelente" (+5), "profesor" (+0) = +5
+  Negativas: "desorganizado" (-3) = -3
+  Score final: +5 - 3 = +2 (Positivo)
 
-### NLP.js (AXA Group) 🚀- Puntuación promedio de sentimientos
+Confianza = (palabras_reconocidas / total_palabras) × 80%
+Intensidad = |Score| / 5 × 100%
+```
 
-- Motor de IA avanzado con soporte nativo multiidioma- Distribución porcentual por categorías
+**Incluye:**
+- ✅ Clasificación: Muy Positivo, Positivo, Neutral, Negativo, Muy Negativo
+- ✅ Score numérico (-5 a +5)
+- ✅ Porcentaje de confianza (basado en palabras reconocidas del diccionario)
+- ✅ Intensidad del sentimiento (0-100%)
+- ✅ Palabras clave positivas y negativas detectadas
+- ✅ Distribución porcentual por categoría
+- ✅ Promedio global de sentimientos
 
-- Procesamiento de lenguaje natural completo- Palabras clave positivas y negativas identificadas
+**📐 Ver detalles completos en:** [GUIA-CALCULOS-METRICAS.md](GUIA-CALCULOS-METRICAS.md)
 
+## 🧠 Motores de Análisis
+
+### Natural.js Enhanced 🎯
+- Diccionario personalizado de **569+ palabras y frases** en español (v4)
+- Análisis de negaciones ("no es bueno" → negativo)
+- Detección de frases contextuales
+- **Personalizable** desde la UI
+
+### NLP.js (AXA Group) 🚀
+- Motor de IA avanzado con soporte nativo multiidioma
+- Procesamiento de lenguaje natural completo
 - Alta precisión en contextos complejos
+
+### Análisis Dual ⚖️
+- Combina ambos motores para máxima precisión
+- Genera consenso inteligente entre resultados
+- Mayor confiabilidad en textos ambiguos
 
 ## 🛠️ Tecnologías Utilizadas
 
-### Análisis Dual ⚖️
-
-- Combina ambos motores para máxima precisión### Backend
-
-- Genera consenso inteligente entre resultados- **Node.js 20+**: Runtime de JavaScript
-
-- Mayor confiabilidad en textos ambiguos- **Express.js**: Framework web minimalista
-
+### Backend
+- **Node.js 20+**: Runtime de JavaScript
+- **Express.js**: Framework web minimalista
 - **Multer**: Manejo de archivos subidos
-
-## 🛠️ Tecnologías Utilizadas- **XLSX**: Procesamiento de archivos Excel
-
+- **XLSX**: Procesamiento de archivos Excel
 - **ExcelJS**: Generación de reportes Excel avanzados
+- **Sentiment**: Análisis de sentimientos con diccionario personalizado
+- **NLP.js**: Motor de procesamiento de lenguaje natural de AXA Group
+- **CORS**: Habilitación de peticiones cross-origin
 
-### Backend- **Sentiment**: Análisis de sentimientos con diccionario personalizado
-
-- **Node.js 20+**: Runtime de JavaScript- **NLP.js**: Motor de procesamiento de lenguaje natural de AXA Group
-
-- **Express.js**: Framework web minimalista- **CORS**: Habilitación de peticiones cross-origin
-
-- **Multer**: Manejo de archivos subidos
-
-- **XLSX**: Procesamiento de archivos Excel### Frontend
+### Frontend
+- **HTML5**: Estructura semántica
+- **CSS3**: Estilos modernos con gradientes y animaciones
+- **JavaScript ES6+**: Funcionalidad interactiva
+- **Chart.js**: Visualizaciones de datos
 
 - **ExcelJS**: Generación de reportes Excel avanzados- **HTML5**: Estructura semántica
 
@@ -520,6 +557,47 @@ Edita `server.js`:
 - `analyzeTextEnhanced()`: Lógica de análisis Natural.js
 - `getClassification()`: Umbrales de clasificación
 - `spanishSentimentDict`: Diccionario base (en `sentiment-dict.js`)
+
+## 📚 Documentación Técnica
+
+### Guías Detalladas
+
+- **[📐 GUIA-CALCULOS-METRICAS.md](GUIA-CALCULOS-METRICAS.md)** - **Cálculo de métricas cuantitativas y cualitativas**
+  - Fórmulas matemáticas exactas
+  - Ejemplos paso a paso con datos reales
+  - Explicación de promedios, scores y porcentajes
+  
+- **[🔍 COMO-FUNCIONA-ANALISIS.md](COMO-FUNCIONA-ANALISIS.md)** - Funcionamiento del análisis de sentimientos
+  - Sistema de diccionario v4
+  - Proceso de normalización y tokenización
+  - Detección de negaciones
+
+- **[🎭 SENTIMENT-GUIDE.md](SENTIMENT-GUIDE.md)** - Guía de análisis de sentimientos
+  - Mejores prácticas para diccionarios
+  - Interpretación de resultados
+  - Troubleshooting
+
+- **[🚀 MULTI-MOTOR-GUIDE.md](MULTI-MOTOR-GUIDE.md)** - Comparación de motores
+  - Natural.js vs NLP.js
+  - Análisis dual y consenso
+  - Métricas de rendimiento
+
+- **[⚙️ COLUMN-CONFIG-GUIDE.md](COLUMN-CONFIG-GUIDE.md)** - Configuración de columnas
+  - Clasificación de columnas (identificación, numéricas, cualitativas)
+  - Guardar y cargar configuraciones
+  - Patrones de matching
+
+- **[📡 API-DOCS.md](API-DOCS.md)** - Documentación de endpoints
+  - `/api/analyze-with-engine` - Análisis con motor específico
+  - `/api/analyze-dual-file` - Análisis con ambos motores
+  - `/api/export` - Exportación de resultados
+  - `/api/column-config` - Gestión de configuraciones
+
+### Recursos Adicionales
+
+- **[🐳 DOCKER-GUIDE.md](DOCKER-GUIDE.md)** - Despliegue con Docker
+- **[💾 DEVELOPMENT.md](DEVELOPMENT.md)** - Guía de desarrollo
+- **[🔧 INSTALL.md](INSTALL.md)** - Instalación detallada
 
 ## 🐛 Solución de Problemas
 
