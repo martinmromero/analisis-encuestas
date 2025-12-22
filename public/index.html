@@ -195,6 +195,7 @@
 
                 <!-- Estadísticas generales -->
                 <div class="stats-grid">
+                    <!-- Fila 1: Métricas generales -->
                     <div class="stat-card">
                         <div class="stat-icon">📋</div>
                         <div class="stat-content">
@@ -216,25 +217,27 @@
                             <p>Puntuación Promedio (0-10)</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    
+                    <!-- Fila 2: Sentimientos -->
+                    <div class="stat-card sentiment-positive">
                         <div class="stat-icon">😊</div>
                         <div class="stat-content">
                             <h3 id="positivePercent">0%</h3>
                             <p>Sentimientos Positivos</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card sentiment-neutral">
+                        <div class="stat-icon">😐</div>
+                        <div class="stat-content">
+                            <h3 id="neutralPercent">0%</h3>
+                            <p>Sentimiento Neutral</p>
+                        </div>
+                    </div>
+                    <div class="stat-card sentiment-negative">
                         <div class="stat-icon">😞</div>
                         <div class="stat-content">
                             <h3 id="negativePercent">0%</h3>
                             <p>Sentimientos Negativos</p>
-                        </div>
-                    </div>
-                    <div class="stat-card engine-indicator" style="display: none;">
-                        <div class="stat-icon" id="engineIcon">🤖</div>
-                        <div class="stat-content">
-                            <h3 id="usedEngine">Natural.js</h3>
-                            <p>Motor Utilizado</p>
                         </div>
                     </div>
                 </div>

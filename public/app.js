@@ -305,17 +305,22 @@ function displayResults(data) {
     const percentages = data.statistics?.percentages || {
         'Muy Positivo': 0,
         'Positivo': 0,
-        'Muy Negativo': 0,
-        'Negativo': 0
+        'Neutral': 0,
+        'Negativo': 0,
+        'Muy Negativo': 0
     };
     
     const positivePercent = parseFloat(percentages['Muy Positivo'] || 0) + 
                           parseFloat(percentages['Positivo'] || 0);
+    const neutralPercent = parseFloat(percentages['Neutral'] || 0);
     const negativePercent = parseFloat(percentages['Muy Negativo'] || 0) + 
                           parseFloat(percentages['Negativo'] || 0);
     
     const posElement = document.getElementById('positivePercent');
     if (posElement) posElement.textContent = positivePercent.toFixed(1) + '%';
+    
+    const neuElement = document.getElementById('neutralPercent');
+    if (neuElement) neuElement.textContent = neutralPercent.toFixed(1) + '%';
     
     const negElement = document.getElementById('negativePercent');
     if (negElement) negElement.textContent = negativePercent.toFixed(1) + '%';
@@ -377,7 +382,16 @@ function displayResults(data) {
 
 // Crear gráfico de distribución de sentimientos
 function createSentimentChart(statistics) {
-    const ctx = document.getElementById('sentimentChart').getContext('2d');
+    if (!statistics || !statistics.classifications) {
+        console.warn('No hay datos de clasificaciones para el gráfico de sentimientos');
+        return;
+    }
+    
+    const ctx = document.getElementById('sentimentChart')?.getContext('2d');
+    if (!ctx) {
+        console.warn('No se encontró el canvas sentimentChart');
+        return;
+    }
     
     // Destruir gráfico anterior completamente si existe
     if (sentimentChart) {
@@ -442,7 +456,16 @@ function createSentimentChart(statistics) {
 
 // Crear gráfico de categorías (barras)
 function createCategoryChart(statistics) {
-    const ctx = document.getElementById('categoryChart').getContext('2d');
+    if (!statistics || !statistics.percentages) {
+        console.warn('No hay datos de porcentajes para el gráfico de categorías');
+        return;
+    }
+    
+    const ctx = document.getElementById('categoryChart')?.getContext('2d');
+    if (!ctx) {
+        console.warn('No se encontró el canvas categoryChart');
+        return;
+    }
     
     // Destruir gráfico anterior completamente si existe
     if (categoryChart) {
@@ -835,14 +858,28 @@ function calculateFilteredStats(results) {
     let totalScore = 0;
     let scoreCount = 0;
 
+    // Función auxiliar para obtener clasificación si no existe
+    function getClassification(score) {
+        if (score >= 3) return 'Muy Positivo';
+        if (score >= 1) return 'Positivo';
+        if (score > -1 && score < 1) return 'Neutral';
+        if (score >= -3) return 'Negativo';
+        return 'Muy Negativo';
+    }
+    
     // Solo contar registros con análisis de texto (como en el servidor)
     results.forEach(result => {
         if (result.sentiment && result.sentiment.details && result.sentiment.details.length > 0) {
-            if (result.sentiment.classification) {
-                classifications[result.sentiment.classification]++;
+            // Usar classification del servidor o calcularla si no existe
+            const score = result.sentiment.perColumnAvgScore ?? result.sentiment.score ?? 0;
+            const classification = result.sentiment.classification || getClassification(score);
+            
+            if (classification) {
+                classifications[classification]++;
             }
-            if (typeof result.sentiment.score === 'number') {
-                totalScore += result.sentiment.score;
+            
+            if (typeof score === 'number') {
+                totalScore += score;
                 scoreCount++;
             }
         }
@@ -904,11 +941,15 @@ function updateStatsCards(results, stats) {
     
     const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 
                           parseFloat(stats.percentages['Positivo'] || 0);
+    const neutralPercent = parseFloat(stats.percentages['Neutral'] || 0);
     const negativePercent = parseFloat(stats.percentages['Muy Negativo'] || 0) + 
                           parseFloat(stats.percentages['Negativo'] || 0);
     
     const posElement = document.getElementById('positivePercent');
     if (posElement) posElement.textContent = positivePercent.toFixed(1) + '%';
+    
+    const neuElement = document.getElementById('neutralPercent');
+    if (neuElement) neuElement.textContent = neutralPercent.toFixed(1) + '%';
     
     const negElement = document.getElementById('negativePercent');
     if (negElement) negElement.textContent = negativePercent.toFixed(1) + '%';
