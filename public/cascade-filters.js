@@ -19,9 +19,21 @@ function initCascadeFilters(filterOptions, results) {
     // Actualizar los demás filtros basados en carrera
     updateDependentFilters();
     
-    // Agregar event listeners
+    // Agregar event listeners a TODOS los filtros
     document.getElementById('filterCarrera').addEventListener('change', onCarreraChange);
     document.getElementById('filterMateria').addEventListener('change', onMateriaChange);
+    document.getElementById('filterModalidad').addEventListener('change', onFilterChange);
+    document.getElementById('filterSede').addEventListener('change', onFilterChange);
+    document.getElementById('filterDocente').addEventListener('change', onFilterChange);
+}
+
+// Función genérica cuando cambia cualquier filtro
+function onFilterChange() {
+    updateDependentFilters();
+    
+    if (typeof filterResults === 'function') {
+        filterResults();
+    }
 }
 
 // Poblar filtro de carrera (no depende de nada)
@@ -40,14 +52,9 @@ function populateCarreraFilter() {
     }
 }
 
-// Cuando cambia Carrera, actualizar Materia, Modalidad, Sede, Docente
+// Cuando cambia Carrera, actualizar opciones disponibles (sin resetear otros filtros)
 function onCarreraChange() {
-    // Resetear todos los filtros dependientes cuando cambia carrera
-    document.getElementById('filterMateria').value = '';
-    document.getElementById('filterModalidad').value = '';
-    document.getElementById('filterSede').value = '';
-    document.getElementById('filterDocente').value = '';
-    
+    // NO resetear otros filtros - permitir combinaciones libres
     updateDependentFilters();
     
     // Aplicar filtros automáticamente si existe la función
@@ -56,13 +63,9 @@ function onCarreraChange() {
     }
 }
 
-// Cuando cambia Materia, actualizar Modalidad, Sede y Docente
+// Cuando cambia Materia, actualizar opciones disponibles (sin resetear otros filtros)
 function onMateriaChange() {
-    // Resetear modalidad, sede y docente cuando cambia materia
-    document.getElementById('filterModalidad').value = '';
-    document.getElementById('filterSede').value = '';
-    document.getElementById('filterDocente').value = '';
-    
+    // NO resetear otros filtros - permitir combinaciones libres
     updateDependentFilters();
     
     // Aplicar filtros automáticamente si existe la función
@@ -75,8 +78,11 @@ function onMateriaChange() {
 function updateDependentFilters() {
     const selectedCarrera = document.getElementById('filterCarrera').value;
     const selectedMateria = document.getElementById('filterMateria').value;
+    const selectedModalidad = document.getElementById('filterModalidad').value;
+    const selectedSede = document.getElementById('filterSede').value;
+    const selectedDocente = document.getElementById('filterDocente').value;
     
-    // Filtrar resultados según selecciones actuales
+    // Aplicar TODOS los filtros seleccionados para determinar opciones disponibles
     let filteredData = allResults.slice();
     
     if (selectedCarrera) {
@@ -84,18 +90,29 @@ function updateDependentFilters() {
             matchesValue(row, ['CARRERA'], selectedCarrera)
         );
     }
-    
-    // Actualizar opciones de Materia basadas en Carrera
-    updateMateriaFilter(filteredData);
-    
-    // Si hay materia seleccionada, filtrar más
     if (selectedMateria) {
         filteredData = filteredData.filter(row => 
             matchesValue(row, ['MATERIA'], selectedMateria)
         );
     }
+    if (selectedModalidad) {
+        filteredData = filteredData.filter(row => 
+            matchesValue(row, ['MODALIDAD'], selectedModalidad)
+        );
+    }
+    if (selectedSede) {
+        filteredData = filteredData.filter(row => 
+            matchesValue(row, ['SEDE'], selectedSede)
+        );
+    }
+    if (selectedDocente) {
+        filteredData = filteredData.filter(row => 
+            matchesValue(row, ['DOCENTE'], selectedDocente)
+        );
+    }
     
-    // Actualizar Modalidad, Sede y Docente basados en Carrera + Materia
+    // Actualizar todas las opciones basadas en la combinación de filtros
+    updateMateriaFilter(filteredData);
     updateModalidadFilter(filteredData);
     updateSedeFilter(filteredData);
     updateDocenteFilter(filteredData);
@@ -109,7 +126,7 @@ function updateMateriaFilter(filteredData) {
     // Extraer materias únicas de los datos filtrados
     const materias = new Set();
     filteredData.forEach(row => {
-        const materia = row['MATERIA'] || row.MATERIA;
+        const materia = row.originalData?.MATERIA || row['MATERIA'] || row.MATERIA;
         if (materia && materia.toString().trim()) {
             materias.add(materia.toString().trim());
         }
@@ -140,7 +157,7 @@ function updateModalidadFilter(filteredData) {
     // Extraer modalidades únicas de los datos filtrados
     const modalidades = new Set();
     filteredData.forEach(row => {
-        const modalidad = row['MODALIDAD'] || row.MODALIDAD;
+        const modalidad = row.originalData?.MODALIDAD || row['MODALIDAD'] || row.MODALIDAD;
         if (modalidad && modalidad.toString().trim()) {
             modalidades.add(modalidad.toString().trim());
         }
@@ -171,7 +188,7 @@ function updateSedeFilter(filteredData) {
     // Extraer sedes únicas de los datos filtrados
     const sedes = new Set();
     filteredData.forEach(row => {
-        const sede = row['SEDE'] || row.SEDE;
+        const sede = row.originalData?.SEDE || row['SEDE'] || row.SEDE;
         if (sede && sede.toString().trim()) {
             sedes.add(sede.toString().trim());
         }
@@ -202,7 +219,7 @@ function updateDocenteFilter(filteredData) {
     // Extraer docentes únicos de los datos filtrados
     const docentes = new Set();
     filteredData.forEach(row => {
-        const docente = row['DOCENTE'] || row.DOCENTE;
+        const docente = row.originalData?.DOCENTE || row['DOCENTE'] || row.DOCENTE;
         if (docente && docente.toString().trim()) {
             docentes.add(docente.toString().trim());
         }
@@ -228,7 +245,8 @@ function updateDocenteFilter(filteredData) {
 // Función auxiliar para verificar coincidencia (la misma que en app.js)
 function matchesValue(row, possibleKeys, targetValue) {
     for (const key of possibleKeys) {
-        if (row[key] && row[key].toString().trim() === targetValue) {
+        const value = row.originalData?.[key] || row[key];
+        if (value && value.toString().trim() === targetValue) {
             return true;
         }
     }

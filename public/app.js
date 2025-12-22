@@ -687,7 +687,8 @@ function displayNumericMetrics(results, filterOptions) {
         // Obtener valores y extraer números si tienen formato "1. Opción"
         const values = results
             .map(row => {
-                let val = row[column];
+                // Buscar en numericMetrics, originalData o directamente
+                let val = row.numericMetrics?.[column] || row.originalData?.[column] || row[column];
                 if (typeof val === 'string') {
                     // Extraer número si tiene formato "1. Texto" o "5. Opción"
                     const match = val.match(/^(\d+)\s*[.\-:)]/);
@@ -812,19 +813,29 @@ function filterResults() {
 
     // Filtros avanzados
     if (carrera) {
-        filteredResults = filteredResults.filter(result => result.CARRERA === carrera);
+        filteredResults = filteredResults.filter(result => 
+            (result.originalData?.CARRERA || result.CARRERA) === carrera
+        );
     }
     if (materia) {
-        filteredResults = filteredResults.filter(result => result.MATERIA === materia);
+        filteredResults = filteredResults.filter(result => 
+            (result.originalData?.MATERIA || result.MATERIA) === materia
+        );
     }
     if (modalidad) {
-        filteredResults = filteredResults.filter(result => result.MODALIDAD === modalidad);
+        filteredResults = filteredResults.filter(result => 
+            (result.originalData?.MODALIDAD || result.MODALIDAD) === modalidad
+        );
     }
     if (sede) {
-        filteredResults = filteredResults.filter(result => result.SEDE === sede);
+        filteredResults = filteredResults.filter(result => 
+            (result.originalData?.SEDE || result.SEDE) === sede
+        );
     }
     if (docente) {
-        filteredResults = filteredResults.filter(result => result.DOCENTE === docente);
+        filteredResults = filteredResults.filter(result => 
+            (result.originalData?.DOCENTE || result.DOCENTE) === docente
+        );
     }
 
     // Recalcular métricas con resultados filtrados
