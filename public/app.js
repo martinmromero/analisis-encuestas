@@ -860,10 +860,10 @@ function calculateFilteredStats(results) {
 
     // Función auxiliar para obtener clasificación si no existe
     function getClassification(score) {
-        if (score >= 3) return 'Muy Positivo';
-        if (score >= 1) return 'Positivo';
-        if (score > -1 && score < 1) return 'Neutral';
-        if (score >= -3) return 'Negativo';
+        if (score >= 8) return 'Muy Positivo';
+        if (score >= 6) return 'Positivo';
+        if (score >= 4 && score < 6) return 'Neutral';
+        if (score >= 2) return 'Negativo';
         return 'Muy Negativo';
     }
     
@@ -891,17 +891,13 @@ function calculateFilteredStats(results) {
         percentages[key] = total > 0 ? ((classifications[key] / total) * 100).toFixed(1) : '0.0';
     });
 
-    const rawAverage = scoreCount > 0 ? totalScore / scoreCount : 0;
-    
-    // Normalizar igual que el servidor: de escala raw a 0-10
-    // Usa la misma fórmula que calculateStats() en server.js
-    const normalizedAverage = rawAverage + 5;
+    // Los perColumnAvgScore ya están normalizados a 0-10 por el servidor
+    const averageScore = scoreCount > 0 ? totalScore / scoreCount : 5; // 5 = neutral
 
     return {
         classifications,
         percentages,
-        averageScore: parseFloat(normalizedAverage.toFixed(2)), // Normalizado 0-10
-        rawScore: parseFloat(rawAverage.toFixed(2)), // Raw score
+        averageScore: parseFloat(averageScore.toFixed(2)), // Escala 0-10
         totalResults: scoreCount
     };
 }

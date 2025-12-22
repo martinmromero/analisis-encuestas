@@ -320,8 +320,11 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length 
         : 0.5;
 
-  // Promedio por columna (score ahora raw -5..+5, neutral = 0)
-  const perColumnAvgScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0; // 0 = neutral
+  // Suma valores relativos y convierte a escala 0..10
+  // overallScore es suma de valores relativos (pueden ser +/- del neutral)
+  // Promediamos y sumamos 5 para llevar a escala 0..10
+  const avgRelativeScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
+  const perColumnAvgScore = avgRelativeScore + 5; // Convertir a escala 0-10
 
       return {
         id: index + 1,
@@ -329,7 +332,7 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         numericMetrics: numericValues, // Incluir métricas numéricas
         sentiment: {
           overallScore: overallScore, // suma total (puede exceder rango por múltiples columnas)
-          perColumnAvgScore: parseFloat(perColumnAvgScore.toFixed(2)), // score promedio -5..+5
+          perColumnAvgScore: parseFloat(perColumnAvgScore.toFixed(2)), // score 0..10 (5=neutral)
           overallComparative: overallComparative,
           classification: getClassification(perColumnAvgScore, averageConfidence),
           confidence: Math.round(averageConfidence * 100) / 100,
@@ -689,16 +692,14 @@ function analyzeTextEnhanced(text) {
 
   const totalWords = tokens.length;
   const confidence = totalWords > 0 ? Math.min(1, matchedCount / totalWords) : 0;
-  const classification = getClassification(rawScore, confidence);
   const comparative = totalWords > 0 ? rawScore / totalWords : 0;
 
   return {
-    score: rawScore,
+    score: rawScore, // Score RELATIVO (valores +/- del neutral)
     comparative: Math.round(comparative * 100) / 100,
     positive: positives.slice(0,5),
     negative: negatives.slice(0,5),
     confidence: Math.round(confidence * 100) / 100,
-    classification,
     hasNegation,
     intensity: 1,
     matched: matchedCount,
@@ -731,17 +732,17 @@ function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 // Función para clasificar sentimiento mejorada
 function getClassification(score, confidence = 0.5) {
-  // Score esperado: -5 .. +5
+  // Score esperado: 0 .. 10
   // Umbrales fijos (independientes de confidence para estabilidad):
-  // >= +3 Muy Positivo
-  // >= +1 Positivo
-  // > -1 y < +1 Neutral
-  // >= -3 Negativo
-  // < -3 Muy Negativo
-  if (score >= 3) return 'Muy Positivo';
-  if (score >= 1) return 'Positivo';
-  if (score > -1 && score < 1) return 'Neutral';
-  if (score >= -3) return 'Negativo';
+  // >= 8 Muy Positivo
+  // >= 6 Positivo
+  // >= 4 y < 6 Neutral
+  // >= 2 Negativo
+  // < 2 Muy Negativo
+  if (score >= 8) return 'Muy Positivo';
+  if (score >= 6) return 'Positivo';
+  if (score >= 4 && score < 6) return 'Neutral';
+  if (score >= 2) return 'Negativo';
   return 'Muy Negativo';
 }
 
@@ -969,14 +970,10 @@ function calculateStats(results) {
     if (result.sentiment && result.sentiment.details && result.sentiment.details.length > 0) {
       const avgScore = typeof result.sentiment.perColumnAvgScore === 'number'
         ? result.sentiment.perColumnAvgScore
-        : 0; // Neutral en nueva escala raw -5..+5
+        : 5; // Neutral en escala 0..10 = 5
 
-      // Clasificación usando mismos umbrales raw
-      let classification = 'Neutral';
-      if (avgScore >= 3) classification = 'Muy Positivo';
-      else if (avgScore >= 1) classification = 'Positivo';
-      else if (avgScore <= -3) classification = 'Muy Negativo';
-      else if (avgScore <= -1) classification = 'Negativo';
+      // Usar la función getClassification con umbrales correctos 0..10
+      const classification = result.sentiment.classification || getClassification(avgScore);
 
       classifications[classification]++;
       totalScore += avgScore;
@@ -985,20 +982,16 @@ function calculateStats(results) {
     }
   });
 
-  const averageScore = validResults > 0 ? totalScore / validResults : 0;
+  const averageScore = validResults > 0 ? totalScore / validResults : 5; // 5 = neutral
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   const totalResults = validResults > 0 ? validResults : 1; // Evitar división por cero
   
-  // Normalizar score de escala -5..+5 a 0..10
-  // Si averageScore = -5 → normalizedScore = 0
-  // Si averageScore = 0 → normalizedScore = 5
-  // Si averageScore = +5 → normalizedScore = 10
-  const normalizedScore = averageScore + 5;
+  // Score ya está en escala 0..10, no requiere normalización
 
   return {
     classifications: classifications,
-    averageScore: parseFloat(normalizedScore.toFixed(2)), // Promedio 0..10 (normalizado)
-    rawScore: parseFloat(averageScore.toFixed(2)), // Score original -5..+5
+    averageScore: parseFloat(averageScore.toFixed(2)), // Promedio 0..10
+    rawScore: parseFloat(averageScore.toFixed(2)), // Score 0..10
     averageComparative: parseFloat(averageComparative.toFixed(4)),
     totalResults: validResults, // Total de respuestas procesadas
     percentages: {
