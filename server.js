@@ -990,7 +990,10 @@ function calculateStats(results) {
   const totalResults = validResults > 0 ? validResults : 1; // Evitar división por cero
   
   // Normalizar score de escala -5..+5 a 0..10
-  const normalizedScore = ((averageScore + 5) / 10) * 10;
+  // Si averageScore = -5 → normalizedScore = 0
+  // Si averageScore = 0 → normalizedScore = 5
+  // Si averageScore = +5 → normalizedScore = 10
+  const normalizedScore = averageScore + 5;
 
   return {
     classifications: classifications,

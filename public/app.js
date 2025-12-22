@@ -891,12 +891,17 @@ function calculateFilteredStats(results) {
         percentages[key] = total > 0 ? ((classifications[key] / total) * 100).toFixed(1) : '0.0';
     });
 
-    const averageScore = scoreCount > 0 ? totalScore / scoreCount : 0;
+    const rawAverage = scoreCount > 0 ? totalScore / scoreCount : 0;
+    
+    // Normalizar igual que el servidor: de escala raw a 0-10
+    // Usa la misma fórmula que calculateStats() en server.js
+    const normalizedAverage = rawAverage + 5;
 
     return {
         classifications,
         percentages,
-        averageScore, // Escala raw -5..+5
+        averageScore: parseFloat(normalizedAverage.toFixed(2)), // Normalizado 0-10
+        rawScore: parseFloat(rawAverage.toFixed(2)), // Raw score
         totalResults: scoreCount
     };
 }
@@ -914,8 +919,9 @@ function updateStatsCards(results, stats) {
     const quantElement = document.getElementById('quantitativeResponses');
     if (quantElement) quantElement.textContent = qualitativeCount;
     
-    // Normalizar score de -5..+5 a 0..10 (mismo cálculo que en el servidor)
-    const normalizedScore = ((stats.averageScore + 5) / 10) * 10;
+    // El score ya viene calculado del servidor o de calculateFilteredStats
+    // Para mantener consistencia, usamos el mismo valor sin normalizar
+    const scoreValue = stats.averageScore;
     
     // Aplicar clase de color según el score normalizado
     const scoreElement = document.getElementById('averageScore');
@@ -926,17 +932,17 @@ function updateStatsCards(results, stats) {
             // Remover clases previas
             scoreCard.classList.remove('score-high', 'score-medium', 'score-low');
             
-            // Aplicar nueva clase según valor
-            if (normalizedScore >= 8) {
+            // Aplicar nueva clase según valor (el servidor ya normaliza a 0-10)
+            if (scoreValue >= 8) {
                 scoreCard.classList.add('score-high');
-            } else if (normalizedScore >= 6) {
+            } else if (scoreValue >= 6) {
                 scoreCard.classList.add('score-medium');
             } else {
                 scoreCard.classList.add('score-low');
             }
         }
         
-        scoreElement.textContent = normalizedScore.toFixed(2);
+        scoreElement.textContent = scoreValue.toFixed(2);
     }
     
     const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 
