@@ -108,6 +108,11 @@
                         </div>
                         
                         <div class="button-group">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <select id="quickConfigSelect" style="flex: 1; padding: 12px; border: 2px solid #4a90e2; border-radius: 8px; font-size: 14px; background: white; cursor: pointer;">
+                                    <option value="">⚙️ Seleccionar configuración de columnas...</option>
+                                </select>
+                            </div>
                             <button type="submit" class="analyze-btn">
                                 <span class="btn-icon">🔍</span>
                                 Analizar Encuesta
@@ -129,46 +134,54 @@
             <!-- Configuración de Columnas - SEGUNDO -->
             <section class="column-config-section">
                 <div class="config-card">
-                    <h2>⚙️ 2. Configuración de Columnas</h2>
-                    <p class="config-description">Define qué columnas son de identificación, numéricas (cuantitativas) o de texto libre (cualitativas)</p>
+                    <h2 style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="document.getElementById('columnConfigContent').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('columnConfigContent').classList.contains('hidden') ? '▶' : '▼';">
+                        <span class="toggle-icon">▶</span>
+                        ⚙️ 2. Configuración de Columnas
+                    </h2>
                     
-                    <div class="config-controls" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
-                        <!-- Mitad izquierda: Selector de configuración -->
-                        <div class="config-selector" style="display: flex; flex-direction: column; gap: 10px;">
-                            <label for="savedConfigsSelect">📋 Configuraciones Guardadas:</label>
-                            <select id="savedConfigsSelect" style="width: 100%; padding: 10px; font-size: 1em;">
-                                <option value="">-- Seleccionar configuración --</option>
-                            </select>
+                    <!-- Contenido colapsable -->
+                    <div id="columnConfigContent" class="hidden">
+                        <p class="config-description">Define qué columnas son de identificación, numéricas (cuantitativas) o de texto libre (cualitativas)</p>
+                        
+                        <div class="config-controls" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+                            <!-- Mitad izquierda: Selector de configuración -->
+                            <div class="config-selector" style="display: flex; flex-direction: column; gap: 10px;">
+                                <label for="savedConfigsSelect">📋 Configuraciones Guardadas:</label>
+                                <select id="savedConfigsSelect" style="width: 100%; padding: 10px; font-size: 1em;">
+                                    <option value="">-- Seleccionar configuración --</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Mitad derecha: Botones -->
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="deleteConfigBtn" class="btn-danger" style="flex: 1; min-width: 140px;">🗑️ Eliminar</button>
+                                <button id="showConfigModalBtn" class="btn-primary" style="flex: 1 1 100%; min-width: 200px;">✏️ Configurar Columnas</button>
+                            </div>
                         </div>
                         
-                        <!-- Mitad derecha: Botones -->
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button id="deleteConfigBtn" class="btn-danger" style="flex: 1; min-width: 140px;">🗑️ Eliminar</button>
-                            <button id="showConfigModalBtn" class="btn-primary" style="flex: 1 1 100%; min-width: 200px;">✏️ Configurar Columnas</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Configuración actual con detalle colapsable -->
-                    <div id="currentConfigPreview" class="config-preview hidden" style="margin-top: 20px;">
-                        <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="document.getElementById('configDetails').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('configDetails').classList.contains('hidden') ? '▶' : '▼';">
-                            <span class="toggle-icon">▶</span>
-                            📊 Configuración Actual: <span id="currentConfigName">Default</span>
-                        </h3>
-                        <div id="configDetails" class="config-columns hidden">
-                            <div class="column-type-preview">
-                                <h4>🏷️ Identificación (<span id="previewIdCount">0</span>)</h4>
-                                <div id="previewIdColumns" class="column-pills"></div>
-                            </div>
-                            <div class="column-type-preview">
-                                <h4>📊 Numéricas (<span id="previewNumCount">0</span>)</h4>
-                                <div id="previewNumColumns" class="column-pills"></div>
-                            </div>
-                            <div class="column-type-preview">
-                                <h4>💬 Cualitativas (<span id="previewTextCount">0</span>)</h4>
-                                <div id="previewTextColumns" class="column-pills"></div>
+                        <!-- Configuración actual con detalle colapsable -->
+                        <div id="currentConfigPreview" class="config-preview hidden" style="margin-top: 20px;">
+                            <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="document.getElementById('configDetails').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('configDetails').classList.contains('hidden') ? '▶' : '▼';">
+                                <span class="toggle-icon">▶</span>
+                                📊 Configuración Actual: <span id="currentConfigName">Default</span>
+                            </h3>
+                            <div id="configDetails" class="config-columns hidden">
+                                <div class="column-type-preview">
+                                    <h4>🏷️ Identificación (<span id="previewIdCount">0</span>)</h4>
+                                    <div id="previewIdColumns" class="column-pills"></div>
+                                </div>
+                                <div class="column-type-preview">
+                                    <h4>📊 Numéricas (<span id="previewNumCount">0</span>)</h4>
+                                    <div id="previewNumColumns" class="column-pills"></div>
+                                </div>
+                                <div class="column-type-preview">
+                                    <h4>💬 Cualitativas (<span id="previewTextCount">0</span>)</h4>
+                                    <div id="previewTextColumns" class="column-pills"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <!-- Fin contenido colapsable -->
                 </div>
             </section>
 

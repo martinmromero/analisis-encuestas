@@ -184,6 +184,54 @@ function shouldAnalyzeColumn(columnName, value, customConfig = null) {
   return false;
 }
 
+// Función para contar cuántas filas tienen respuestas cualitativas (texto libre)
+// Una fila cuenta como 1 aunque tenga múltiples columnas de texto libre respondidas
+function countQualitativeResponses(jsonData, customConfig = null) {
+  const config = customConfig || COLUMN_CONFIG;
+  const minLength = config.analisis?.longitudMinimaTextoLibre || 10;
+  
+  console.log('📊 countQualitativeResponses - Config:', config.name || 'DEFAULT');
+  console.log('📊 Columnas texto libre:', config.textoLibre);
+  console.log('📊 Longitud mínima:', minLength);
+  console.log('📊 Total filas a revisar:', jsonData.length);
+  
+  let count = 0;
+  const matchedColumns = new Set();
+  
+  for (const row of jsonData) {
+    let hasQualitativeText = false;
+    
+    // Revisar cada columna definida como texto libre en la configuración
+    for (const pattern of config.textoLibre) {
+      // Buscar columnas que coincidan con el patrón
+      for (const [columnName, value] of Object.entries(row)) {
+        if (columnName.includes(pattern) || pattern.includes(columnName)) {
+          matchedColumns.add(columnName);
+          // Verificar si tiene texto significativo
+          if (typeof value === 'string' && value.trim().length > minLength) {
+            const trimmed = value.trim();
+            // Asegurar que no sea solo un número - si isNaN es true, NO es un número, entonces SÍ es texto
+            if (isNaN(trimmed)) {
+              hasQualitativeText = true;
+              break;
+            }
+          }
+        }
+      }
+      if (hasQualitativeText) break;
+    }
+    
+    if (hasQualitativeText) {
+      count++;
+    }
+  }
+  
+  console.log('📊 Columnas encontradas:', Array.from(matchedColumns));
+  console.log('📊 Filas con texto cualitativo:', count);
+  
+  return count;
+}
+
 // Helper reutilizable: obtiene columnas de texto que se deben analizar para sentimiento.
 // Retorna arreglo de objetos { column, text }
 function getSentimentColumns(row, customConfig = null) {
@@ -241,6 +289,17 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       return res.status(400).json({ error: 'No se subió ningún archivo' });
     }
 
+    // Parsear configuración personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
+
     // Leer archivo Excel/CSV
     const workbook = XLSX.readFile(req.file.path, { 
       raw: false,
@@ -278,7 +337,7 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       const columnNames = [];
       
       Object.entries(row).forEach(([columnName, value]) => {
-        if (shouldAnalyzeColumn(columnName, value)) {
+        if (shouldAnalyzeColumn(columnName, value, customConfig)) {
           textFields.push(value);
           columnNames.push(columnName);
         }
@@ -342,16 +401,14 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       };
     });
 
-    // Estadísticas generales
-    const stats = calculateStats(results);
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    
+    // Estadísticas generales (usar quantitativeResponses como base)
+    const stats = calculateStats(results, quantitativeResponses);
     
     // Extraer valores únicos para filtros
-    const filterOptions = extractFilterOptions(jsonData);
-    
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = results.filter(row => {
-      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
-    }).length;
+    const filterOptions = extractFilterOptions(jsonData, customConfig);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -495,9 +552,7 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     const filterOptions = extractFilterOptions(jsonData, customConfig);
     
     // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = results.filter(row => {
-      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
-    }).length;
+    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -526,6 +581,17 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     }
 
     console.log(`⚖️ Analizando con ambos motores (Natural.js + NLP.js)...`);
+
+    // Parsear configuración personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
 
     // Leer archivo Excel/CSV
     const workbook = XLSX.readFile(req.file.path, { 
@@ -564,7 +630,7 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
       if (i % 500 === 0 && i > 0) {
         console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
       }
-      const sentimentColumns = getSentimentColumns(row);
+      const sentimentColumns = getSentimentColumns(row, customConfig);
       let dualAnalysis = { natural: [], nlpjs: [], consensus: [] };
       let overallScore = 0;
       let overallComparative = 0;
@@ -623,15 +689,14 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
 
     console.log(`✅ Análisis dual completado`);
 
-    const stats = calculateStats(results);
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    
+    // Estadísticas generales (usar quantitativeResponses como base)
+    const stats = calculateStats(results, quantitativeResponses);
     
     // Extraer valores únicos para filtros
-    const filterOptions = extractFilterOptions(jsonData);
-    
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = results.filter(row => {
-      return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
-    }).length;
+    const filterOptions = extractFilterOptions(jsonData, customConfig);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -953,7 +1018,7 @@ function extractFilterOptions(data, customConfig = null) {
 }
 
 // Función para calcular estadísticas
-function calculateStats(results) {
+function calculateStats(results, qualitativeCount = null) {
   const classifications = {
     'Muy Positivo': 0,
     'Positivo': 0,
@@ -982,9 +1047,11 @@ function calculateStats(results) {
     }
   });
 
-  const averageScore = validResults > 0 ? totalScore / validResults : 5; // 5 = neutral
-  const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
-  const totalResults = validResults > 0 ? validResults : 1; // Evitar división por cero
+  // Usar qualitativeCount si se provee, sino usar validResults
+  const baseCount = qualitativeCount !== null ? qualitativeCount : validResults;
+  const averageScore = baseCount > 0 ? totalScore / baseCount : 5; // 5 = neutral
+  const averageComparative = baseCount > 0 ? totalComparative / baseCount : 0;
+  const totalResults = baseCount > 0 ? baseCount : 1; // Evitar división por cero
   
   // Score ya está en escala 0..10, no requiere normalización
 
@@ -993,7 +1060,7 @@ function calculateStats(results) {
     averageScore: parseFloat(averageScore.toFixed(2)), // Promedio 0..10
     rawScore: parseFloat(averageScore.toFixed(2)), // Score 0..10
     averageComparative: parseFloat(averageComparative.toFixed(4)),
-    totalResults: validResults, // Total de respuestas procesadas
+    totalResults: baseCount, // Total de respuestas cualitativas
     percentages: {
       'Muy Positivo': parseFloat((classifications['Muy Positivo'] / totalResults * 100).toFixed(1)),
       'Positivo': parseFloat((classifications['Positivo'] / totalResults * 100).toFixed(1)),

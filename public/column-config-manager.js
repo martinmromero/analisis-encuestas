@@ -56,6 +56,26 @@ function initializeEventListeners() {
         savedConfigsSelect.addEventListener('change', () => {
             if (savedConfigsSelect.value !== '') {
                 loadSelectedConfig();
+                // Sincronizar con dropdown rápido
+                const quickSelect = document.getElementById('quickConfigSelect');
+                if (quickSelect) {
+                    quickSelect.value = savedConfigsSelect.value;
+                }
+            }
+        });
+    }
+    
+    // Sincronizar dropdown rápido con el principal
+    const quickConfigSelect = document.getElementById('quickConfigSelect');
+    if (quickConfigSelect) {
+        quickConfigSelect.addEventListener('change', () => {
+            if (quickConfigSelect.value !== '') {
+                // Actualizar dropdown principal
+                if (savedConfigsSelect) {
+                    savedConfigsSelect.value = quickConfigSelect.value;
+                }
+                // Cargar la configuración
+                loadSelectedConfig();
             }
         });
     }
@@ -444,12 +464,33 @@ async function loadSavedConfigs() {
         const select = document.getElementById('savedConfigsSelect');
         if (select) {
             select.innerHTML = '<option value="">-- Seleccionar configuración --</option>';
+            let luciaIndex = -1;
             savedConfigs.forEach((config, index) => {
                 const option = document.createElement('option');
                 option.value = index;
                 option.textContent = `${config.name} (${config.identificacion.length + config.numericas.length + config.textoLibre.length} columnas)`;
                 select.appendChild(option);
+                
+                // Buscar configuración "Lucia" (case-insensitive)
+                if (config.name.toLowerCase() === 'lucia') {
+                    luciaIndex = index;
+                }
             });
+            
+            // También poblar el dropdown rápido
+            const quickSelect = document.getElementById('quickConfigSelect');
+            if (quickSelect) {
+                quickSelect.innerHTML = '<option value="">⚙️ Seleccionar configuración de columnas...</option>';
+                savedConfigs.forEach((config, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${config.name} (${config.textoLibre.length} cols texto libre)`;
+                    quickSelect.appendChild(option);
+                });
+            }
+            
+            // NO auto-seleccionar ninguna configuración por defecto
+            console.log('✅ Configuraciones cargadas. Por favor selecciona una configuración antes de analizar.');
         }
     } catch (error) {
         console.error('Error cargando configuraciones:', error);
