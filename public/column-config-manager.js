@@ -61,6 +61,8 @@ function initializeEventListeners() {
                 if (quickSelect) {
                     quickSelect.value = savedConfigsSelect.value;
                 }
+                // Habilitar botón de análisis
+                enableAnalyzeButton();
             }
         });
     }
@@ -76,6 +78,11 @@ function initializeEventListeners() {
                 }
                 // Cargar la configuración
                 loadSelectedConfig();
+                // Habilitar botón de análisis
+                enableAnalyzeButton();
+            } else {
+                // Deshabilitar botón si se deselecciona
+                disableAnalyzeButton();
             }
         });
     }
@@ -130,14 +137,20 @@ async function detectColumnsFromFile(file) {
             detectedColumns = data.columns;
             console.log('📋 Columnas detectadas del nuevo archivo:', detectedColumns);
             
-            // RESETEAR configuración para archivo nuevo
-            currentColumnConfig = {
-                name: 'Nueva Configuración',
-                identificacion: [],
-                numericas: [],
-                textoLibre: [],
-                escalas: {}
-            };
+            // NO RESETEAR configuración - mantener la seleccionada por el usuario
+            // Solo resetear si no hay ninguna configuración cargada
+            if (!currentColumnConfig || !currentColumnConfig.name || currentColumnConfig.name === 'Default') {
+                currentColumnConfig = {
+                    name: '',
+                    identificacion: [],
+                    numericas: [],
+                    textoLibre: [],
+                    escalas: {}
+                };
+                console.log('⚠️ No hay configuración seleccionada. Por favor selecciona una.');
+            } else {
+                console.log(`✅ Manteniendo configuración: ${currentColumnConfig.name}`);
+            }
             
             // Analizar metadata de columnas (escalas, tipos)
             await analyzeColumnMetadata(file);
@@ -705,6 +718,37 @@ function saveScaleConfig() {
     populateColumnLists();
     updateConfigPreview();
     closeScaleConfigModal();
+}
+
+// Funciones para habilitar/deshabilitar el botón de análisis
+function enableAnalyzeButton() {
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const analyzeBtnText = document.getElementById('analyzeBtnText');
+    
+    if (analyzeBtn) {
+        analyzeBtn.disabled = false;
+        analyzeBtn.style.opacity = '1';
+        analyzeBtn.style.cursor = 'pointer';
+    }
+    
+    if (analyzeBtnText) {
+        analyzeBtnText.textContent = 'Analizar Encuesta';
+    }
+}
+
+function disableAnalyzeButton() {
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const analyzeBtnText = document.getElementById('analyzeBtnText');
+    
+    if (analyzeBtn) {
+        analyzeBtn.disabled = true;
+        analyzeBtn.style.opacity = '0.5';
+        analyzeBtn.style.cursor = 'not-allowed';
+    }
+    
+    if (analyzeBtnText) {
+        analyzeBtnText.textContent = 'Selecciona una configuración primero';
+    }
 }
 
 // Hacer disponible globalmente

@@ -69,10 +69,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners para navegación entre secciones
     console.log('🔧 Agregando event listeners para navegación...');
     const analysisTab = document.getElementById('analysisTab');
+    const columnConfigTab = document.getElementById('columnConfigTab');
     const dictionaryTab = document.getElementById('dictionaryTab');
     const comparisonTab = document.getElementById('comparisonTab');
     
     if (!analysisTab) console.error('❌ analysisTab no encontrado');
+    if (!columnConfigTab) console.error('❌ columnConfigTab no encontrado');
     if (!dictionaryTab) console.error('❌ dictionaryTab no encontrado');
     if (!comparisonTab) console.error('❌ comparisonTab no encontrado');
     
@@ -80,6 +82,13 @@ document.addEventListener('DOMContentLoaded', function() {
         analysisTab.addEventListener('click', () => {
             console.log('👆 Click en analysisTab');
             showSection('analysis');
+        });
+    }
+    
+    if (columnConfigTab) {
+        columnConfigTab.addEventListener('click', () => {
+            console.log('👆 Click en columnConfigTab');
+            showSection('columnConfig');
         });
     }
     
@@ -181,6 +190,12 @@ async function analyzeFile() {
     // Obtener configuración de columnas actual
     const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
     
+    // Esta validación ya no es necesaria porque el botón está deshabilitado
+    // pero la dejamos por seguridad
+    if (!columnConfig || !columnConfig.name) {
+        return; // El botón debería estar deshabilitado
+    }
+    
     // Obtener motor seleccionado
     const selectedEngine = document.querySelector('input[name="analysisEngine"]:checked').value;
     console.log('Motor seleccionado:', selectedEngine);
@@ -189,10 +204,8 @@ async function analyzeFile() {
     const formData = new FormData();
     formData.append('excelFile', file);
     
-    // Agregar configuración de columnas si existe
-    if (columnConfig) {
-        formData.append('columnConfig', JSON.stringify(columnConfig));
-    }
+    // Agregar configuración de columnas
+    formData.append('columnConfig', JSON.stringify(columnConfig));
 
     try {
         // Limpiar análisis anterior para liberar memoria
@@ -1112,6 +1125,7 @@ function showSection(sectionName) {
     
     // Verificar que las secciones existen
     const analysisSection = document.getElementById('analysisSection');
+    const columnConfigSection = document.getElementById('columnConfigSection');
     const dictionarySection = document.getElementById('dictionarySection');
     const comparisonSection = document.getElementById('comparisonSection');
     const resultsSection = document.getElementById('results');
@@ -1122,11 +1136,13 @@ function showSection(sectionName) {
     const detailedResultsTable = document.getElementById('detailedResultsTable');
     
     if (!analysisSection) console.error('❌ analysisSection no encontrada');
+    if (!columnConfigSection) console.error('❌ columnConfigSection no encontrada');
     if (!dictionarySection) console.error('❌ dictionarySection no encontrada');
     if (!comparisonSection) console.error('❌ comparisonSection no encontrada');
     
     // Ocultar todas las secciones
     if (analysisSection) analysisSection.classList.add('hidden');
+    if (columnConfigSection) columnConfigSection.classList.add('hidden');
     if (dictionarySection) dictionarySection.classList.add('hidden');
     if (comparisonSection) comparisonSection.classList.add('hidden');
     
@@ -1143,6 +1159,16 @@ function showSection(sectionName) {
             if (numericMetricsContainer) numericMetricsContainer.style.display = '';
             if (detailedResultsTable) detailedResultsTable.style.display = '';
             console.log('✅ Sección de análisis mostrada');
+        }
+    } else if (sectionName === 'columnConfig') {
+        if (columnConfigSection) {
+            columnConfigSection.classList.remove('hidden');
+            document.getElementById('columnConfigTab')?.classList.add('active');
+            // Ocultar gráficos, métricas y tabla
+            if (chartsContainer) chartsContainer.style.display = 'none';
+            if (numericMetricsContainer) numericMetricsContainer.style.display = 'none';
+            if (detailedResultsTable) detailedResultsTable.style.display = 'none';
+            console.log('✅ Sección de configuración de columnas mostrada');
         }
     } else if (sectionName === 'dictionary') {
         if (dictionarySection) {
