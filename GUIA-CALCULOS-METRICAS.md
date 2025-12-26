@@ -159,9 +159,9 @@ function shouldAnalyzeColumn(columnName, value, customConfig) {
 
 ### 2. Análisis de Sentimientos - Diccionario v4
 
-**Sistema de puntuación:**
+**Sistema de puntuación RAW (Score Relativo):**
 ```
-Escala: -5 (muy negativo) a +5 (muy positivo)
+Escala RAW: Valores relativos sin límite fijo (-∞ a +∞)
 
 Ejemplos del diccionario:
   "excelente"   → +5
@@ -171,6 +171,30 @@ Ejemplos del diccionario:
   "pésimo"      → -5
   "dudoso"      → -3
   "confuso"     → -2
+```
+
+**⚠️ IMPORTANTE: Normalización a Escala 0-10**
+
+El análisis genera primero un **score RAW** (relativo, puede ser muy negativo o muy positivo), 
+luego se **normaliza a escala 0-10** para clasificación y visualización:
+
+```javascript
+// Paso 1: Obtener score RAW del análisis
+const rawScore = analyzeTextEnhanced(text).score;  // Puede ser cualquier valor
+
+// Paso 2: Promediar scores de múltiples columnas
+const avgRelativeScore = overallScore / sentimentResults.length;
+
+// Paso 3: NORMALIZAR a escala 0-10
+const clampedScore = Math.max(-10, Math.min(10, avgRelativeScore));  // Limitar [-10, 10]
+const perColumnAvgScore = (clampedScore + 10) / 2;  // Mapear a [0, 10]
+
+// Resultado:
+// -10 → 0  (Muy Negativo)
+// -5  → 2.5
+//  0  → 5  (Neutral)
+// +5  → 7.5
+// +10 → 10 (Muy Positivo)
 ```
 
 **Proceso de análisis paso a paso:**
@@ -283,34 +307,61 @@ matchRatio = 1/18 = 0.0556
 confidence = 0.0556 * 0.8 = 0.0444 = 4.44%
 ```
 
-#### Paso 4: Clasificación final
+#### Paso 4: Normalización y Clasificación
+
 ```javascript
-function getClassification(score, confidence) {
-  // Umbrales fijos en escala -5 a +5
-  if (score >= 3)  return 'Muy Positivo';
-  if (score >= 1)  return 'Positivo';
-  if (score > -1 && score < 1) return 'Neutral';
-  if (score >= -3) return 'Negativo';
-  return 'Muy Negativo';
+// Normalización a escala 0-10 (aplicada en el servidor)
+function normalizeScore(avgRelativeScore) {
+  const clampedScore = Math.max(-10, Math.min(10, avgRelativeScore));
+  let perColumnAvgScore = (clampedScore + 10) / 2;
+  
+  // Protección contra valores negativos
+  if (perColumnAvgScore < 0) {
+    console.error(`Score negativo detectado: ${perColumnAvgScore}`);
+    perColumnAvgScore = 0;
+  }
+  
+  return perColumnAvgScore;
 }
 
-// Ejemplo:
-score = 0
-classification = 'Neutral'
+// Clasificación basada en escala 0-10
+function getClassification(score, confidence) {
+  // Umbrales en escala 0-10
+  if (score >= 8)  return 'Muy Positivo';
+  if (score >= 6)  return 'Positivo';
+  if (score >= 4 && score < 6) return 'Neutral';
+  if (score >= 2)  return 'Negativo';
+  return 'Muy Negativo';  // score < 2
+}
+
+// Ejemplo con score RAW muy negativo:
+rawScore = -11.5  (múltiples palabras muy negativas)
+clampedScore = -10  (limitado al mínimo)
+normalizedScore = (-10 + 10) / 2 = 0
+classification = 'Muy Negativo'
+
+// Ejemplo con score RAW positivo:
+rawScore = +7.2
+clampedScore = +7.2  (dentro del rango)
+normalizedScore = (7.2 + 10) / 2 = 8.6
+classification = 'Muy Positivo'
 ```
 
 ### 3. Cálculo de Intensidad
 
-**Fórmula:**
+**Fórmula actualizada para escala 0-10:**
 ```javascript
-// Intensidad como porcentaje de la escala máxima
-const maxScore = 5;  // Escala -5 a +5
-const intensity = Math.abs(score / maxScore) * 100;
+// Intensidad como desviación del neutral (5.0)
+const neutralScore = 5.0;
+const maxDeviation = 5.0;  // Distancia máxima desde neutral
+const intensity = Math.abs(score - neutralScore) / maxDeviation * 100;
 
-// Ejemplo:
-score = +4  →  intensity = (4/5) * 100 = 80%
-score = -3  →  intensity = (3/5) * 100 = 60%
-score = 0   →  intensity = 0%
+// Ejemplos:
+score = 10  →  intensity = |10-5|/5 * 100 = 100% (máximo positivo)
+score = 8.6 →  intensity = |8.6-5|/5 * 100 = 72%
+score = 5   →  intensity = |5-5|/5 * 100 = 0% (neutral)
+score = 2.5 →  intensity = |2.5-5|/5 * 100 = 50%
+score = 0   →  intensity = |0-5|/5 * 100 = 100% (máximo negativo)
 ```
 
 ### 4. Ejemplo Completo Real
@@ -331,9 +382,10 @@ score = 0   →  intensity = 0%
   text: "La forma de enseñar de ambas profesoras no es dinámica...",
   
   // Análisis de sentimientos
-  score: -1.5,                    // Puntuación calculada
+  rawScore: -2,                   // Puntuación RAW calculada
+  score: 4.0,                     // Score NORMALIZADO (0-10)
   comparative: -0.0347,           // Score / total palabras
-  classification: "Negativo",     // Clasificación según umbrales
+  classification: "Neutral",      // Clasificación según umbrales 0-10
   confidence: 0.09,               // 9% de confianza
   
   // Palabras detectadas
@@ -342,8 +394,9 @@ score = 0   →  intensity = 0%
              "lamentablemente", "mal"],        // -3, -3 = -12
   
   // Cálculo final
-  rawScore: +10 - 12 = -2,
-  intensity: Math.abs(-2/5) * 100 = 40%,
+  rawScoreTotal: +10 - 12 = -2,
+  normalizedScore: (-2 + 10) / 2 = 4.0,  // Escala 0-10
+  intensity: |4.0-5|/5 * 100 = 20%,
   
   // Metadata
   engine: "Natural.js Enhanced",
@@ -356,15 +409,48 @@ score = 0   →  intensity = 0%
 **Presentación en UI:**
 ```html
 <div class="sentiment-detail">
-  <div class="sentiment-badge negative">Negativo</div>
-  <div class="sentiment-score">-1.50</div>
-  <div class="sentiment-intensity">40%</div>
+  <div class="sentiment-badge neutral">Neutral</div>
+  <div class="sentiment-score">4.00</div>  <!-- Escala 0-10 -->
+  <div class="sentiment-intensity">20%</div>
   <div class="sentiment-words">
     <span class="positive">buena, bien, hermosa</span>
     <span class="negative">no es dinámica, no saben desarrollarla, mal</span>
   </div>
 </div>
 ```
+
+---
+
+## 🔄 Normalización en Todos los Motores
+
+**Todos los motores de análisis aplican la misma normalización:**
+
+### Motor 1: Natural.js Enhanced (predeterminado)
+```javascript
+// Análisis → Score RAW → Normalización
+const rawScore = analyzeTextEnhanced(text).score;
+const avgRelativeScore = overallScore / sentimentResults.length;
+const clampedScore = Math.max(-10, Math.min(10, avgRelativeScore));
+const perColumnAvgScore = (clampedScore + 10) / 2;
+```
+
+### Motor 2: Multi-Motor (Natural + VADER + TextBlob)
+```javascript
+// Promedio de múltiples motores → Normalización
+const averageScore = overallScore / sentimentResults.length;
+const clampedScore = Math.max(-10, Math.min(10, averageScore));
+const normalizedScore = (clampedScore + 10) / 2;
+```
+
+### Motor 3: Análisis Dual (Natural + NLP.js)
+```javascript
+// Análisis dual → Score RAW → Normalización
+const averageScore = overallScore / analysisCount;
+const clampedScore = Math.max(-10, Math.min(10, averageScore));
+const normalizedScore = (clampedScore + 10) / 2;
+```
+
+**Garantía:** Todos los motores retornan `perColumnAvgScore` en escala **0-10**.
 
 ---
 
@@ -394,14 +480,15 @@ function calculateStats(results) {
         result.sentiment.details && 
         result.sentiment.details.length > 0) {
       
-      const avgScore = result.sentiment.perColumnAvgScore;
+      const avgScore = result.sentiment.perColumnAvgScore;  // Ya normalizado 0-10
       
-      // Clasificar según umbrales
+      // Clasificar según umbrales en escala 0-10
       let classification = 'Neutral';
-      if (avgScore >= 3)  classification = 'Muy Positivo';
-      else if (avgScore >= 1)  classification = 'Positivo';
-      else if (avgScore <= -3) classification = 'Muy Negativo';
-      else if (avgScore <= -1) classification = 'Negativo';
+      if (avgScore >= 8)  classification = 'Muy Positivo';
+      else if (avgScore >= 6)  classification = 'Positivo';
+      else if (avgScore >= 4 && avgScore < 6) classification = 'Neutral';
+      else if (avgScore >= 2) classification = 'Negativo';
+      else classification = 'Muy Negativo';  // avgScore < 2
       
       classifications[classification]++;
       totalScore += avgScore;
@@ -410,8 +497,8 @@ function calculateStats(results) {
     }
   });
   
-  // Calcular promedios
-  const averageScore = validResults > 0 ? totalScore / validResults : 0;
+  // Calcular promedios (perColumnAvgScore ya está en 0-10)
+  const averageScore = validResults > 0 ? totalScore / validResults : 5;  // 5 = neutral
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   
   // Calcular porcentajes
@@ -427,7 +514,7 @@ function calculateStats(results) {
   return {
     classifications,     // Conteos absolutos
     percentages,         // Porcentajes
-    averageScore,        // Promedio -5 a +5
+    averageScore,        // Promedio en escala 0-10 (5 = neutral)
     averageComparative,  // Promedio normalizado
     totalResults: validResults
   };

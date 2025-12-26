@@ -1,42 +1,5 @@
 [
   {
-    "name": "FORMATO1",
-    "identificacion": [
-      "ID",
-      "CARRERA",
-      "MODALIDAD",
-      "SEDE",
-      "MATERIA",
-      "DOCENTE",
-      "COMISION"
-    ],
-    "numericas": [
-      "La asignatura cumple con lo expresado en el programa analítico ",
-      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada",
-      "El docente demostró dominio de los contenidos de la materia",
-      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.",
-      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.",
-      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.",
-      " Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes",
-      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.",
-      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.",
-      "El uso del aula virtual fue útil para mi experiencia en la cursada.",
-      "¿Cuánto considera que aprendió en esta materia?",
-      "¿Cómo evalúa a la materia en términos generales?",
-      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?"
-    ],
-    "textoLibre": [
-      "indique los motivos",
-      "comentarios",
-      "observaciones",
-      "sugerencias",
-      "Si su respuesta se ubica entre 1 y 6, por favor indique los motivos",
-      "Si su respuesta se ubica entre 1 y 6, por favor indique los motivos_1"
-    ],
-    "created": "2025-12-01T18:52:34.805Z",
-    "updated": "2025-12-01T18:52:34.806Z"
-  },
-  {
     "name": "enfermeria1",
     "identificacion": [
       "Respuesta",
@@ -215,147 +178,6 @@
     "updated": "2025-12-19T16:18:00.942Z"
   },
   {
-    "name": "Formato2",
-    "identificacion": [
-      "COMISION",
-      "ID",
-      "CARRERA",
-      "MODALIDAD",
-      "SEDE",
-      "MATERIA",
-      "DOCENTE",
-      "__EMPTY"
-    ],
-    "numericas": [
-      "La asignatura cumple con lo expresado en el programa analítico ",
-      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada",
-      "El docente demostró dominio de los contenidos de la materia",
-      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.",
-      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.",
-      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.",
-      " Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes",
-      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.",
-      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.",
-      "El uso del aula virtual fue útil para mi experiencia en la cursada.",
-      "¿Cuánto considera que aprendió en esta materia?",
-      "¿Cómo evalúa a la materia en términos generales?",
-      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?"
-    ],
-    "textoLibre": [
-      "¿Qué aspectos destacaría o considera que podrían mejorarse en relación con la materia?",
-      "¿Qué aspectos destacaría o considera que podrían mejorarse en relación con el desempeño del/de la docente?"
-    ],
-    "escalas": {
-      "ID": {
-        "type": "numeric",
-        "min": 28756,
-        "max": 28919,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "COMISION": {
-        "type": "numeric",
-        "min": 1,
-        "max": 551,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "La asignatura cumple con lo expresado en el programa analítico ": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "El docente demostró dominio de los contenidos de la materia": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      " Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "El uso del aula virtual fue útil para mi experiencia en la cursada.": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "¿Cuánto considera que aprendió en esta materia?": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "¿Cómo evalúa a la materia en términos generales?": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      },
-      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?": {
-        "type": "numeric",
-        "min": 1,
-        "max": 10,
-        "pattern": "pure-numeric",
-        "detected": true
-      }
-    },
-    "created": "2025-12-19T20:45:39.379Z",
-    "updated": "2025-12-19T20:45:39.379Z"
-  },
-  {
     "name": "Lucia",
     "identificacion": [
       "ID",
@@ -495,5 +317,42 @@
     },
     "created": "2025-12-22T14:12:14.087Z",
     "updated": "2025-12-22T14:12:14.087Z"
+  },
+  {
+    "name": "Config_2025-12-26",
+    "identificacion": [
+      "Respuesta",
+      "Enviado el:",
+      "Institución",
+      "Departamento",
+      "Curso",
+      "Grupo",
+      "ID",
+      "Nombre completo",
+      "Usuario"
+    ],
+    "numericas": [
+      "\r\nEn general, ¿cómo calificarías tu experiencia en el curso de apoyo al ingreso? (Usá una escala del 1 al 10, siendo 1 muy negativa y 10 muy positiva) ",
+      "¿Cómo calificarías la utilidad de los contenidos abordados en la asignatura \"Introducción a la Vida Universitaria\"? ",
+      "¿Consideras que los materiales de estudio (lecturas, actividades, recursos didácticos) fueron claros y accesibles para esta asignatura? ",
+      "¿La asignatura te ayudó a integrarte mejor en la vida universitaria, especialmente en cuanto a aspectos administrativos y el uso del campus virtual? ",
+      "¿Cómo evaluarías el rol de las docentes en el desarrollo de tu comprensión de los contenidos en la materia? ",
+      "¿Cómo calificarías la utilidad de los contenidos abordados en la asignatura \"Metodología para Optimizar el Aprendizaje\"? ",
+      "¿Consideras que los materiales de estudio (lecturas, actividades, recursos didácticos) fueron claros y accesibles para esta asignatura? _1",
+      "¿La asignatura te brindó herramientas útiles para mejorar tu capacidad de aprendizaje durante el curso y en tu futura carrera universitaria? ",
+      "¿Cómo evaluarías el rol del docente en las clases dictadas por Zoom? ",
+      "¿Cómo evaluarías el rol del docente en cuanto a las respuestas dadas en los foros de consultas?  ",
+      "¿Cómo calificarías la utilidad de los contenidos abordados en la asignatura específica de tu carrera? ",
+      "¿Consideras que los materiales de estudio (lecturas, actividades, recursos didácticos) fueron claros y accesibles para esta asignatura? _2",
+      "\r\n¿La asignatura específica de tu carrera te proporcionó un buen acercamiento a los contenidos de la misma y te preparó para el primer año? ",
+      "¿Cómo evaluarías el rol del docente en las clases dictadas por Zoom? _1",
+      "\r\n¿Cómo evaluarías el rol del docente en cuanto a las respuestas dadas en los foros de consultas?  ",
+      "¿Consideras que el campus virtual facilitó la accesibilidad al contenido del curso y que las actividades propuestas fueron útiles para tu aprendizaje? ",
+      "¿Qué aspectos del curso crees que podrían mejorar en futuras ediciones, tanto en la modalidad de cursada, cantidad de clases sincrónicas, materiales de estudio o cualquier otro aspecto que consideres relevante? Danos sugerencias. "
+    ],
+    "textoLibre": [],
+    "escalas": {},
+    "created": "2025-12-26T20:11:18.292Z",
+    "updated": "2025-12-26T20:11:18.292Z"
   }
 ]

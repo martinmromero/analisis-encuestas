@@ -381,9 +381,20 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
 
   // Suma valores relativos y convierte a escala 0..10
   // overallScore es suma de valores relativos (pueden ser +/- del neutral)
-  // Promediamos y sumamos 5 para llevar a escala 0..10
+  // Promediamos y limitamos el rango antes de normalizar
   const avgRelativeScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
-  const perColumnAvgScore = avgRelativeScore + 5; // Convertir a escala 0-10
+  
+  // Normalizar a escala 0-10 con límites para evitar valores fuera de rango
+  // Asumimos rango típico de -10 a +10 para rawScore, mapeamos a 0-10
+  const clampedScore = Math.max(-10, Math.min(10, avgRelativeScore)); // Limitar a [-10, 10]
+  let perColumnAvgScore = ((clampedScore + 10) / 2); // Mapear [-10,10] a [0,10]
+  
+  // FORZAR que NUNCA sea negativo
+  if (perColumnAvgScore < 0) {
+    console.error(`❌ SCORE NEGATIVO DETECTADO: ${perColumnAvgScore} | Raw: ${avgRelativeScore} | Clamped: ${clampedScore}`);
+    perColumnAvgScore = 0;
+  }
+  console.log(`✅ Score calculado - Raw: ${avgRelativeScore.toFixed(2)} → Normalized: ${perColumnAvgScore.toFixed(2)}`);
 
       return {
         id: index + 1,
@@ -527,13 +538,19 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
       }
       const averageScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
       const averageConfidence = sentimentResults.length > 0 ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length : 0.5;
+      
+      // Normalizar score a escala 0-10
+      const clampedScore = Math.max(-10, Math.min(10, averageScore));
+      let normalizedScore = ((clampedScore + 10) / 2);
+      if (normalizedScore < 0) normalizedScore = 0;
+      
       results.push({
         row: i + 1,
         ...row,
         numericMetrics: numericValues,
         sentiment: {
           score: parseFloat(averageScore.toFixed(2)),
-          perColumnAvgScore: parseFloat(averageScore.toFixed(2)),
+          perColumnAvgScore: parseFloat(normalizedScore.toFixed(2)),
           comparative: parseFloat((overallComparative || 0).toFixed(4)),
           overallComparative: parseFloat((overallComparative || 0).toFixed(4)),
           confidence: parseFloat(averageConfidence.toFixed(2)),
@@ -546,13 +563,14 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
 
     console.log(`✅ Análisis completado con ${engine}`);
 
-    const stats = calculateStats(results);
+    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
+    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    
+    // Estadísticas generales (usar quantitativeResponses como base)
+    const stats = calculateStats(results, quantitativeResponses);
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData, customConfig);
-    
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
 
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -670,12 +688,18 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
       }
       const averageScore = analysisCount > 0 ? overallScore / analysisCount : 0;
       const averageComparative = analysisCount > 0 ? overallComparative / analysisCount : 0;
+      
+      // Normalizar score a escala 0-10
+      const clampedScore = Math.max(-10, Math.min(10, averageScore));
+      let normalizedScore = ((clampedScore + 10) / 2);
+      if (normalizedScore < 0) normalizedScore = 0;
+      
       results.push({
         row: i + 1,
         ...row,
         sentiment: {
           score: parseFloat(averageScore.toFixed(2)),
-          perColumnAvgScore: parseFloat(averageScore.toFixed(2)),
+          perColumnAvgScore: parseFloat(normalizedScore.toFixed(2)),
           comparative: parseFloat(averageComparative.toFixed(4)),
           overallComparative: parseFloat(averageComparative.toFixed(4)),
           confidence: sentimentColumns.length > 0 ? 0.8 : 0.0,
@@ -1047,11 +1071,23 @@ function calculateStats(results, qualitativeCount = null) {
     }
   });
 
-  // Usar qualitativeCount si se provee, sino usar validResults
+  // Calcular promedio sobre validResults (filas que tienen análisis)
+  // qualitativeCount se usa solo para los porcentajes de clasificación
+  const averageScore = validResults > 0 ? totalScore / validResults : 5; // 5 = neutral
+  const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
+  
+  // Usar qualitativeCount para los porcentajes (base total de respuestas cualitativas)
   const baseCount = qualitativeCount !== null ? qualitativeCount : validResults;
-  const averageScore = baseCount > 0 ? totalScore / baseCount : 5; // 5 = neutral
-  const averageComparative = baseCount > 0 ? totalComparative / baseCount : 0;
   const totalResults = baseCount > 0 ? baseCount : 1; // Evitar división por cero
+  
+  // DEBUG: Mostrar qué se está usando
+  console.log('📊 calculateStats DEBUG:');
+  console.log(`  - validResults (filas con sentiment): ${validResults}`);
+  console.log(`  - qualitativeCount (base para %): ${qualitativeCount}`);
+  console.log(`  - totalScore acumulado: ${totalScore.toFixed(2)}`);
+  console.log(`  - averageScore (totalScore/${validResults}): ${averageScore.toFixed(2)}`);
+  console.log(`  - baseCount usado para %: ${baseCount}`);
+  console.log(`  - Clasificaciones: Positivo=${classifications['Muy Positivo']+classifications['Positivo']}, Negativo=${classifications['Muy Negativo']+classifications['Negativo']}, Neutral=${classifications['Neutral']}`);
   
   // Score ya está en escala 0..10, no requiere normalización
 
@@ -1109,33 +1145,97 @@ function convertToCSV(data) {
 
 // ============= FUNCIÓN DE EXPORTACIÓN AVANZADA XLSX =============
 
-async function generateAdvancedExcelReport(analysisResults, filename = 'reporte-sentiment-analysis.xlsx') {
+async function generateAdvancedExcelReport(analysisResults, customConfig = null, originalFilename = 'archivo.xlsx', statistics = null) {
   const workbook = new ExcelJS.Workbook();
   
-  // Hoja principal con datos detallados
-  const detailSheet = workbook.addWorksheet('Análisis Detallado');
+  console.log(`📊 Generando Excel con ${analysisResults.length} registros`);
   
-  // Configurar columnas con anchos adecuados
-  detailSheet.columns = [
-    { header: 'ID', key: 'id', width: 8 },
-    { header: 'Carrera', key: 'carrera', width: 25 },
-    { header: 'Materia', key: 'materia', width: 30 },
-    { header: 'Sede', key: 'sede', width: 20 },
-    { header: 'Docente', key: 'docente', width: 25 },
-    { header: 'Comentario Materia', key: 'comentario_materia', width: 50 },
-    { header: 'Comentario Docente', key: 'comentario_docente', width: 50 },
-    { header: 'Sentiment Materia (Natural.js)', key: 'sentiment_materia_natural', width: 18 },
-    { header: 'Score Materia (Natural.js)', key: 'score_materia_natural', width: 16 },
-    { header: 'Sentiment Materia (NLP.js)', key: 'sentiment_materia_nlp', width: 18 },
-    { header: 'Score Materia (NLP.js)', key: 'score_materia_nlp', width: 16 },
-    { header: 'Sentiment Docente (Natural.js)', key: 'sentiment_docente_natural', width: 18 },
-    { header: 'Score Docente (Natural.js)', key: 'score_docente_natural', width: 16 },
-    { header: 'Sentiment Docente (NLP.js)', key: 'sentiment_docente_nlp', width: 18 },
-    { header: 'Score Docente (NLP.js)', key: 'score_docente_nlp', width: 16 },
-    { header: 'Consenso Materia', key: 'consenso_materia', width: 15 },
-    { header: 'Consenso Docente', key: 'consenso_docente', width: 15 }
-  ];
+  if (analysisResults.length === 0) {
+    console.warn('⚠️ No hay resultados para generar Excel');
+    return workbook;
+  }
 
+  // ========== HOJA 0: PORTADA ==========
+  await createCoverSheet(workbook, analysisResults, customConfig, originalFilename, statistics);
+  
+  // ========== HOJA 1: DATOS DETALLADOS ==========
+  const detailSheet = workbook.addWorksheet('Datos Detallados');
+  
+  // Obtener todas las columnas originales del primer registro
+  const firstRow = analysisResults[0];
+  const originalColumns = Object.keys(firstRow).filter(key => 
+    key !== 'sentimentAnalysis' && 
+    key !== 'sentiment' && 
+    key !== 'comentario_materia' && 
+    key !== 'comentario_docente'
+  );
+  
+  console.log(`📋 Columnas originales detectadas: ${originalColumns.length}`);
+  
+  // DEBUG: Ver qué columnas tienen análisis en el primer registro
+  if (firstRow.sentimentAnalysis) {
+    console.log(`🔍 Columnas con análisis en primer registro:`, Object.keys(firstRow.sentimentAnalysis));
+  }
+  
+  // Identificar columnas de texto libre - usar las que realmente tienen análisis
+  let textColumns = [];
+  
+  // PRIORIDAD 1: Usar las columnas que realmente tienen análisis
+  // Recorrer todos los registros para encontrar todas las columnas analizadas
+  const analyzedColumns = new Set();
+  analysisResults.forEach(result => {
+    if (result.sentimentAnalysis) {
+      Object.keys(result.sentimentAnalysis).forEach(col => analyzedColumns.add(col));
+    }
+  });
+  
+  if (analyzedColumns.size > 0) {
+    textColumns = Array.from(analyzedColumns);
+    console.log(`📝 Columnas de texto detectadas desde sentimentAnalysis (${analyzedColumns.size}):`, textColumns);
+  } else if (customConfig && customConfig.columnas) {
+    // PRIORIDAD 2: Config personalizada
+    const textoLibreConfig = customConfig.columnas.find(c => c.tipo === 'textoLibre');
+    if (textoLibreConfig && textoLibreConfig.valores) {
+      textColumns = textoLibreConfig.valores;
+      console.log(`📝 Columnas de texto libre desde config: ${textColumns.join(', ')}`);
+    }
+  } else {
+    // PRIORIDAD 3: Auto-detectar (fallback)
+    textColumns = originalColumns.filter(col => {
+      const sampleValue = firstRow[col];
+      return sampleValue && typeof sampleValue === 'string' && sampleValue.length > 20;
+    });
+    console.log(`📝 Columnas de texto auto-detectadas: ${textColumns.join(', ')}`);
+  }
+
+  // Configurar columnas: originales + análisis de sentimientos
+  const excelColumns = [];
+  
+  // Agregar columnas originales
+  originalColumns.forEach(col => {
+    excelColumns.push({
+      header: col,
+      key: col,
+      width: col.length > 30 ? 50 : Math.max(col.length + 5, 15)
+    });
+  });
+  
+  // Agregar columnas de análisis para cada columna de texto
+  textColumns.forEach(col => {
+    excelColumns.push({
+      header: `${col} - Sentiment`,
+      key: `${col}_sentiment`,
+      width: 20
+    });
+    excelColumns.push({
+      header: `${col} - Score`,
+      key: `${col}_score`,
+      width: 12
+    });
+  });
+  
+  detailSheet.columns = excelColumns;
+  
   // Estilo del encabezado
   const headerRow = detailSheet.getRow(1);
   headerRow.eachCell(cell => {
@@ -1145,7 +1245,7 @@ async function generateAdvancedExcelReport(analysisResults, filename = 'reporte-
       fgColor: { argb: 'FF366092' }
     };
     cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
       top: { style: 'thin' },
       left: { style: 'thin' },
@@ -1153,78 +1253,704 @@ async function generateAdvancedExcelReport(analysisResults, filename = 'reporte-
       right: { style: 'thin' }
     };
   });
-
+  
   // Agregar datos
-  let rowIndex = 2;
   analysisResults.forEach((result, index) => {
-    const row = detailSheet.getRow(rowIndex);
+    const row = detailSheet.getRow(index + 2);
     
-    // Extraer campos del resultado
-    const carrera = result.carrera || extractField(result, ['carrera', 'programa', 'career']) || 'N/A';
-    const materia = result.materia || extractField(result, ['materia', 'asignatura', 'curso', 'subject']) || 'N/A';
-    const sede = result.sede || extractField(result, ['sede', 'campus', 'sucursal']) || 'N/A';
-    const docente = result.docente || extractField(result, ['docente', 'profesor', 'teacher', 'instructor']) || 'N/A';
-    const comentarioMateria = result.comentario_materia || extractField(result, ['comentario_materia', 'feedback_materia', 'opinion_materia']) || '';
-    const comentarioDocente = result.comentario_docente || extractField(result, ['comentario_docente', 'feedback_docente', 'opinion_docente']) || '';
-
-    // Datos básicos
-    row.getCell('id').value = index + 1;
-    row.getCell('carrera').value = carrera;
-    row.getCell('materia').value = materia;
-    row.getCell('sede').value = sede;
-    row.getCell('docente').value = docente;
-    row.getCell('comentario_materia').value = comentarioMateria;
-    row.getCell('comentario_docente').value = comentarioDocente;
-
-    // Análisis de sentimientos (si existe)
+    // Escribir columnas originales
+    originalColumns.forEach(col => {
+      row.getCell(col).value = result[col] || '';
+    });
+    
+    // Escribir análisis de sentimientos
     if (result.sentimentAnalysis) {
-      const analysis = result.sentimentAnalysis;
-      
-      // Análisis de materia
-      if (analysis.materia) {
-        row.getCell('sentiment_materia_natural').value = analysis.materia.natural?.classification || 'N/A';
-        row.getCell('score_materia_natural').value = analysis.materia.natural?.score || 0;
-        row.getCell('sentiment_materia_nlp').value = analysis.materia.nlpjs?.classification || 'N/A';
-        row.getCell('score_materia_nlp').value = analysis.materia.nlpjs?.score || 0;
-        row.getCell('consenso_materia').value = analysis.materia.consensus || 'N/A';
-      }
-      
-      // Análisis de docente
-      if (analysis.docente) {
-        row.getCell('sentiment_docente_natural').value = analysis.docente.natural?.classification || 'N/A';
-        row.getCell('score_docente_natural').value = analysis.docente.natural?.score || 0;
-        row.getCell('sentiment_docente_nlp').value = analysis.docente.nlpjs?.classification || 'N/A';
-        row.getCell('score_docente_nlp').value = analysis.docente.nlpjs?.score || 0;
-        row.getCell('consenso_docente').value = analysis.docente.consensus || 'N/A';
-      }
+      textColumns.forEach(col => {
+        const colAnalysis = result.sentimentAnalysis[col];
+        if (colAnalysis) {
+          const sentiment = colAnalysis.consensus || colAnalysis.classification || 'N/A';
+          const score = colAnalysis.score || (colAnalysis.natural && colAnalysis.natural.score) || 0;
+          
+          const sentimentCell = row.getCell(`${col}_sentiment`);
+          const scoreCell = row.getCell(`${col}_score`);
+          
+          sentimentCell.value = sentiment;
+          scoreCell.value = typeof score === 'number' ? score : 0;
+          
+          // Aplicar color según sentiment
+          if (typeof sentiment === 'string') {
+            if (sentiment.toLowerCase().includes('positiv')) {
+              sentimentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E8' } };
+              sentimentCell.font = { color: { argb: 'FF2E7D2E' }, bold: true };
+            } else if (sentiment.toLowerCase().includes('negativ')) {
+              sentimentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E8' } };
+              sentimentCell.font = { color: { argb: 'FFC53030' }, bold: true };
+            } else if (sentiment.toLowerCase().includes('neutral')) {
+              sentimentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3E2' } };
+              sentimentCell.font = { color: { argb: 'FF8B5A00' }, bold: true };
+            }
+          }
+        }
+      });
     }
-
-    // Aplicar colores según sentiment
-    applySentimentColors(row, 'consenso_materia');
-    applySentimentColors(row, 'consenso_docente');
-    
-    rowIndex++;
   });
-
+  
   // Aplicar filtros automáticos
   detailSheet.autoFilter = {
     from: 'A1',
-    to: detailSheet.lastColumn.letter + detailSheet.lastRow.number
+    to: detailSheet.lastColumn.letter + '1'
   };
+  
+  console.log('✅ Hoja "Datos Detallados" creada');
 
-  // Hoja de resumen por carrera
-  const summarySheet = workbook.addWorksheet('Resumen por Carrera');
-  await createSummarySheet(summarySheet, analysisResults);
+  // ========== HOJAS DE RESUMEN ==========
+  const groupFields = ['carrera', 'docente', 'materia', 'sede', 'modalidad'];
   
-  // Hoja de resumen por docente
-  const docenteSheet = workbook.addWorksheet('Resumen por Docente');
-  await createDocenteSummarySheet(docenteSheet, analysisResults);
-  
-  // Hoja de gráficos
-  const chartsSheet = workbook.addWorksheet('Gráficos');
-  await createChartsSheet(chartsSheet, analysisResults);
+  for (const field of groupFields) {
+    // Verificar si existe este campo en los datos
+    const hasField = originalColumns.some(col => 
+      col.toLowerCase() === field || 
+      col.toLowerCase().includes(field)
+    );
+    
+    if (hasField || field === 'carrera') { // Siempre crear carrera aunque no exista
+      const sheetName = `Resumen por ${field.charAt(0).toUpperCase() + field.slice(1)}`;
+      const summarySheet = workbook.addWorksheet(sheetName);
+      await createDynamicSummarySheet(summarySheet, analysisResults, field, textColumns, customConfig);
+      console.log(`✅ Hoja "${sheetName}" creada`);
+    }
+  }
 
   return workbook;
+}
+
+// Función para crear la hoja de portada
+async function createCoverSheet(workbook, data, customConfig, originalFilename, statistics = null) {
+  const sheet = workbook.addWorksheet('Portada', { views: [{ showGridLines: false }] });
+  
+  // Ajustar anchos de columnas
+  sheet.columns = [
+    { width: 3 },
+    { width: 25 },
+    { width: 30 },
+    { width: 20 },
+    { width: 20 },
+    { width: 3 }
+  ];
+  
+  let currentRow = 2;
+  
+  // ===== TÍTULO PRINCIPAL =====
+  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  const titleCell = sheet.getCell(`B${currentRow}`);
+  titleCell.value = 'REPORTE DE ANÁLISIS DE ENCUESTAS';
+  titleCell.font = { size: 18, bold: true, color: { argb: 'FF2C5282' } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  currentRow += 2;
+  
+  // ===== INFORMACIÓN DEL ARCHIVO =====
+  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  const infoHeaderCell = sheet.getCell(`B${currentRow}`);
+  infoHeaderCell.value = 'INFORMACIÓN DEL ANÁLISIS';
+  infoHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  infoHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366092' } };
+  infoHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  // Archivo de origen
+  const fileRow = currentRow;
+  sheet.getCell(`B${fileRow}`).value = 'Archivo de Origen:';
+  sheet.getCell(`B${fileRow}`).font = { bold: true };
+  sheet.mergeCells(`C${fileRow}:E${fileRow}`);
+  sheet.getCell(`C${fileRow}`).value = originalFilename;
+  currentRow++;
+  
+  // Extraer información única del dataset
+  const carreras = [...new Set(data.map(d => d.CARRERA || d.carrera || 'N/A').filter(c => c && c !== ''))];
+  const materias = [...new Set(data.map(d => d.MATERIA || d.materia || 'N/A').filter(m => m && m !== ''))];
+  const sedes = [...new Set(data.map(d => d.SEDE || d.sede || 'N/A').filter(s => s && s !== ''))];
+  const modalidades = [...new Set(data.map(d => d.MODALIDAD || d.modalidad || 'N/A').filter(m => m && m !== ''))];
+  
+  // Carreras
+  sheet.getCell(`B${currentRow}`).value = 'Carreras:';
+  sheet.getCell(`B${currentRow}`).font = { bold: true };
+  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.getCell(`C${currentRow}`).value = carreras.length > 3 ? `${carreras.length} carreras diferentes` : carreras.join(', ');
+  sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
+  currentRow++;
+  
+  // Materias
+  sheet.getCell(`B${currentRow}`).value = 'Materias:';
+  sheet.getCell(`B${currentRow}`).font = { bold: true };
+  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.getCell(`C${currentRow}`).value = materias.length > 3 ? `${materias.length} materias diferentes` : materias.join(', ');
+  sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
+  currentRow++;
+  
+  // Sedes
+  sheet.getCell(`B${currentRow}`).value = 'Sedes:';
+  sheet.getCell(`B${currentRow}`).font = { bold: true };
+  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.getCell(`C${currentRow}`).value = sedes.join(', ');
+  currentRow++;
+  
+  // Modalidades
+  sheet.getCell(`B${currentRow}`).value = 'Modalidades:';
+  sheet.getCell(`B${currentRow}`).font = { bold: true };
+  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.getCell(`C${currentRow}`).value = modalidades.join(', ');
+  currentRow += 2;
+  
+  // ===== ANÁLISIS CUALITATIVO =====
+  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  const qualHeaderCell = sheet.getCell(`B${currentRow}`);
+  qualHeaderCell.value = 'ANÁLISIS CUALITATIVO (SENTIMIENTOS)';
+  qualHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  qualHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2D3748' } };
+  qualHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  // USAR ESTADÍSTICAS PRECALCULADAS (ya vienen de calculateStats)
+  let totalQualitativeRows, avgScore, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
+  
+  if (statistics) {
+    // Usar las estadísticas que ya calculó la app
+    totalQualitativeRows = statistics.totalResults;
+    avgScore = typeof statistics.averageScore === 'number' ? statistics.averageScore.toFixed(2) : statistics.averageScore;
+    
+    // Parsear porcentajes y sumar correctamente
+    const pctMuyPositivo = parseFloat(statistics.percentages['Muy Positivo'] || 0);
+    const pctPositivo = parseFloat(statistics.percentages['Positivo'] || 0);
+    const pctNeutral = parseFloat(statistics.percentages['Neutral'] || 0);
+    const pctNegativo = parseFloat(statistics.percentages['Negativo'] || 0);
+    const pctMuyNegativo = parseFloat(statistics.percentages['Muy Negativo'] || 0);
+    
+    pctPositivos = (pctMuyPositivo + pctPositivo).toFixed(1);
+    pctNegativos = (pctNegativo + pctMuyNegativo).toFixed(1);
+    pctNeutrales = pctNeutral.toFixed(1);
+    
+    // Calcular conteos absolutos desde los porcentajes
+    positivos = Math.round(totalQualitativeRows * parseFloat(pctPositivos) / 100);
+    negativos = Math.round(totalQualitativeRows * parseFloat(pctNegativos) / 100);
+    neutrales = Math.round(totalQualitativeRows * parseFloat(pctNeutrales) / 100);
+    
+    console.log('📊 Portada Excel - Usando estadísticas precalculadas:', {
+      total: totalQualitativeRows,
+      score: avgScore,
+      positivos: `${positivos} (${pctPositivos}%)`,
+      neutrales: `${neutrales} (${pctNeutrales}%)`, 
+      negativos: `${negativos} (${pctNegativos}%)`
+    });
+  } else {
+    // Fallback si no se pasaron estadísticas
+    console.warn('⚠️ No se recibieron estadísticas precalculadas');
+    totalQualitativeRows = 0;
+    avgScore = '0.00';
+    pctPositivos = '0.0';
+    pctNegativos = '0.0';
+    pctNeutrales = '0.0';
+    positivos = 0;
+    negativos = 0;
+    neutrales = 0;
+  }
+  
+  // Boxes estilo web - fila 1
+  const boxRow1 = currentRow;
+  currentRow++;
+  
+  // Box 1: Total Respuestas Cualitativas
+  sheet.getCell(`B${boxRow1}`).value = 'Total Respuestas';
+  sheet.getCell(`B${boxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`B${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`B${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${boxRow1 + 1}`).value = totalQualitativeRows;
+  sheet.getCell(`B${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
+  sheet.getCell(`B${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`B${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getRow(boxRow1).height = 20;
+  sheet.getRow(boxRow1 + 1).height = 35;
+  
+  // Box 2: Score Promedio
+  sheet.getCell(`C${boxRow1}`).value = 'Score Promedio';
+  sheet.getCell(`C${boxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`C${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`C${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${boxRow1 + 1}`).value = parseFloat(avgScore);
+  sheet.getCell(`C${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
+  sheet.getCell(`C${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${boxRow1 + 1}`).numFmt = '0.00';
+  sheet.getCell(`C${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`C${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  currentRow += 2;
+  
+  // Boxes estilo web - fila 2
+  const boxRow2 = currentRow;
+  currentRow++;
+  
+  // Box 3: Positivos
+  sheet.getCell(`B${boxRow2}`).value = 'Positivos';
+  sheet.getCell(`B${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`B${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF48BB78' } };
+  sheet.getCell(`B${boxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${boxRow2 + 1}`).value = `${positivos} (${pctPositivos}%)`;
+  sheet.getCell(`B${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF22543D' } };
+  sheet.getCell(`B${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6F6D5' } };
+  sheet.getCell(`B${boxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${boxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`B${boxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getRow(boxRow2).height = 20;
+  sheet.getRow(boxRow2 + 1).height = 35;
+  
+  // Box 4: Negativos
+  sheet.getCell(`C${boxRow2}`).value = 'Negativos';
+  sheet.getCell(`C${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`C${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF56565' } };
+  sheet.getCell(`C${boxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${boxRow2 + 1}`).value = `${negativos} (${pctNegativos}%)`;
+  sheet.getCell(`C${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF742A2A' } };
+  sheet.getCell(`C${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7D7' } };
+  sheet.getCell(`C${boxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${boxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`C${boxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  // Box 5: Neutrales
+  sheet.getCell(`D${boxRow2}`).value = 'Neutrales';
+  sheet.getCell(`D${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`D${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFED8936' } };
+  sheet.getCell(`D${boxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${boxRow2 + 1}`).value = `${neutrales} (${pctNeutrales}%)`;
+  sheet.getCell(`D${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF7C2D12' } };
+  sheet.getCell(`D${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEEBC8' } };
+  sheet.getCell(`D${boxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${boxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`D${boxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  currentRow += 3;
+  
+  // ===== ANÁLISIS CUANTITATIVO =====
+  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  const quantHeaderCell = sheet.getCell(`B${currentRow}`);
+  quantHeaderCell.value = 'ANÁLISIS CUANTITATIVO (PROMEDIOS)';
+  quantHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  quantHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C5282' } };
+  quantHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  // Calcular promedios de campos numéricos
+  const firstItem = data[0];
+  const numericFields = Object.keys(firstItem).filter(key => {
+    const value = firstItem[key];
+    return !isNaN(value) && value !== '' && value !== null && 
+           key !== 'ID' && !key.toLowerCase().includes('comision') &&
+           key !== 'sentimentAnalysis';
+  });
+  
+  // Calcular estadísticas numéricas
+  const numericStats = {};
+  numericFields.forEach(field => {
+    const values = data.map(d => parseFloat(d[field])).filter(v => !isNaN(v));
+    if (values.length > 0) {
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      numericStats[field] = {
+        avg: avg.toFixed(2),
+        count: values.length,
+        min: Math.min(...values),
+        max: Math.max(...values)
+      };
+    }
+  });
+  
+  // Calcular promedio general
+  const allNumericValues = Object.values(numericStats).map(s => parseFloat(s.avg));
+  const generalAvg = allNumericValues.length > 0 
+    ? (allNumericValues.reduce((a, b) => a + b, 0) / allNumericValues.length).toFixed(2)
+    : 0;
+  
+  // Boxes cuantitativos - fila 1
+  const quantBoxRow1 = currentRow;
+  currentRow++;
+  
+  // Box 1: Total Preguntas
+  sheet.getCell(`B${quantBoxRow1}`).value = 'Total Preguntas';
+  sheet.getCell(`B${quantBoxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`B${quantBoxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`B${quantBoxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${quantBoxRow1 + 1}`).value = numericFields.length;
+  sheet.getCell(`B${quantBoxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2C5282' } };
+  sheet.getCell(`B${quantBoxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`B${quantBoxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getRow(quantBoxRow1).height = 20;
+  sheet.getRow(quantBoxRow1 + 1).height = 35;
+  
+  // Box 2: Promedio General
+  sheet.getCell(`C${quantBoxRow1}`).value = 'Promedio General';
+  sheet.getCell(`C${quantBoxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`C${quantBoxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`C${quantBoxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${quantBoxRow1 + 1}`).value = parseFloat(generalAvg);
+  sheet.getCell(`C${quantBoxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2C5282' } };
+  sheet.getCell(`C${quantBoxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${quantBoxRow1 + 1}`).numFmt = '0.00';
+  sheet.getCell(`C${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`C${quantBoxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  // Box 3: Total Respuestas
+  sheet.getCell(`D${quantBoxRow1}`).value = 'Total Respuestas';
+  sheet.getCell(`D${quantBoxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`D${quantBoxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`D${quantBoxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${quantBoxRow1 + 1}`).value = data.length;
+  sheet.getCell(`D${quantBoxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2C5282' } };
+  sheet.getCell(`D${quantBoxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`D${quantBoxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  currentRow += 2;
+  
+  // Boxes con rangos de satisfacción
+  const quantBoxRow2 = currentRow;
+  currentRow++;
+  
+  // Contar respuestas por rango (asumiendo escala 1-10)
+  let rango8_10 = 0;
+  let rango6_7 = 0;
+  let rango1_5 = 0;
+  
+  Object.values(numericStats).forEach(stat => {
+    const avg = parseFloat(stat.avg);
+    if (avg >= 8) rango8_10++;
+    else if (avg >= 6) rango6_7++;
+    else rango1_5++;
+  });
+  
+  // Box Alta Satisfacción (8-10)
+  sheet.getCell(`B${quantBoxRow2}`).value = 'Alta (8-10)';
+  sheet.getCell(`B${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`B${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF38A169' } };
+  sheet.getCell(`B${quantBoxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${quantBoxRow2 + 1}`).value = rango8_10;
+  sheet.getCell(`B${quantBoxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF22543D' } };
+  sheet.getCell(`B${quantBoxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6F6D5' } };
+  sheet.getCell(`B${quantBoxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`B${quantBoxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`B${quantBoxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getRow(quantBoxRow2).height = 20;
+  sheet.getRow(quantBoxRow2 + 1).height = 35;
+  
+  // Box Media Satisfacción (6-7)
+  sheet.getCell(`C${quantBoxRow2}`).value = 'Media (6-7)';
+  sheet.getCell(`C${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`C${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDD6B20' } };
+  sheet.getCell(`C${quantBoxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${quantBoxRow2 + 1}`).value = rango6_7;
+  sheet.getCell(`C${quantBoxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF7C2D12' } };
+  sheet.getCell(`C${quantBoxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEEBC8' } };
+  sheet.getCell(`C${quantBoxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`C${quantBoxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`C${quantBoxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  // Box Baja Satisfacción (1-5)
+  sheet.getCell(`D${quantBoxRow2}`).value = 'Baja (1-5)';
+  sheet.getCell(`D${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`D${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE53E3E' } };
+  sheet.getCell(`D${quantBoxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${quantBoxRow2 + 1}`).value = rango1_5;
+  sheet.getCell(`D${quantBoxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF742A2A' } };
+  sheet.getCell(`D${quantBoxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7D7' } };
+  sheet.getCell(`D${quantBoxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${quantBoxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`D${quantBoxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  console.log('✅ Hoja "Portada" creada');
+}
+
+// Función dinámica para crear hojas de resumen
+async function createDynamicSummarySheet(sheet, data, groupField, textColumns, customConfig = null) {
+  console.log(`📊 Creando resumen por ${groupField}, textColumns:`, textColumns);
+  
+  // Encontrar la columna real que coincide con el campo de agrupación
+  const firstRow = data[0] || {};
+  const allColumns = Object.keys(firstRow).filter(key => 
+    key !== 'sentimentAnalysis' && 
+    key !== 'sentiment'
+  );
+  const actualField = allColumns.find(col => 
+    col.toLowerCase() === groupField.toLowerCase() || 
+    col.toLowerCase().includes(groupField.toLowerCase())
+  );
+  
+  console.log(`🔍 Campo de agrupación "${groupField}" mapeado a columna: "${actualField}"`);
+  
+  if (!actualField && groupField !== 'carrera') {
+    console.warn(`⚠️ Campo "${groupField}" no encontrado en los datos`);
+    return;
+  }
+  
+  // Identificar columnas numéricas (cuantitativas) desde config o auto-detectar
+  let numericColumns = [];
+  if (customConfig && customConfig.columnas) {
+    const numericConfig = customConfig.columnas.find(c => c.tipo === 'numerica');
+    if (numericConfig && numericConfig.valores) {
+      numericColumns = numericConfig.valores;
+    }
+  }
+  
+  // Auto-detectar columnas numéricas si no hay config
+  if (numericColumns.length === 0) {
+    numericColumns = allColumns.filter(col => {
+      const value = firstRow[col];
+      return !isNaN(value) && value !== '' && value !== null && 
+             col !== 'ID' && 
+             !col.toLowerCase().includes('comision') &&
+             col !== actualField; // Excluir el campo de agrupación
+    });
+  }
+  
+  console.log(`📊 Columnas numéricas detectadas (${numericColumns.length}):`, numericColumns.slice(0, 3));
+  
+  // Configurar columnas del resumen
+  const summaryColumns = [
+    { header: groupField.charAt(0).toUpperCase() + groupField.slice(1), key: 'group', width: 35 },
+    { header: 'Total Registros', key: 'total', width: 16 },
+    { header: 'Total con Análisis', key: 'totalAnalysis', width: 18 }
+  ];
+  
+  // Agregar columnas para promedios de campos numéricos
+  numericColumns.forEach(col => {
+    summaryColumns.push({
+      header: `${col} - Promedio`,
+      key: `${col}_avg`,
+      width: Math.min(col.length + 15, 50)
+    });
+  });
+  
+  // Agregar columnas para cada campo de texto analizado
+  textColumns.forEach(col => {
+    summaryColumns.push(
+      { header: `${col} - Positivos`, key: `${col}_pos`, width: 14 },
+      { header: `${col} - Negativos`, key: `${col}_neg`, width: 14 },
+      { header: `${col} - Neutrales`, key: `${col}_neu`, width: 14 },
+      { header: `${col} - Score Prom`, key: `${col}_avg`, width: 16 },
+      { header: `${col} - % Positivo`, key: `${col}_pct_pos`, width: 14 }
+    );
+  });
+  
+  sheet.columns = summaryColumns;
+  
+  // Estilo del encabezado
+  const headerRow = sheet.getRow(1);
+  headerRow.eachCell(cell => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF366092' }
+    };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+  });
+  
+  // Agrupar datos
+  const groups = {};
+  
+  data.forEach((item, index) => {
+    const groupValue = actualField ? (item[actualField] || 'Sin Clasificar') : 'Sin Clasificar';
+    
+    if (!groups[groupValue]) {
+      groups[groupValue] = {
+        total: 0,
+        totalAnalysis: 0,
+        numericStats: {},
+        textStats: {}
+      };
+      
+      // Inicializar stats por cada columna numérica
+      numericColumns.forEach(col => {
+        groups[groupValue].numericStats[col] = {
+          values: [],
+          sum: 0,
+          count: 0
+        };
+      });
+      
+      // Inicializar stats por cada columna de texto
+      textColumns.forEach(col => {
+        groups[groupValue].textStats[col] = {
+          positivos: 0,
+          negativos: 0,
+          neutrales: 0,
+          scores: []
+        };
+      });
+    }
+    
+    groups[groupValue].total++;
+    
+    // Procesar valores numéricos
+    numericColumns.forEach(col => {
+      const value = parseFloat(item[col]);
+      if (!isNaN(value)) {
+        groups[groupValue].numericStats[col].values.push(value);
+        groups[groupValue].numericStats[col].sum += value;
+        groups[groupValue].numericStats[col].count++;
+      }
+    });
+    
+    // Procesar análisis de sentimientos
+    if (item.sentimentAnalysis) {
+      groups[groupValue].totalAnalysis++;
+      
+      textColumns.forEach(col => {
+        const analysis = item.sentimentAnalysis[col];
+        if (analysis) {
+          const sentiment = analysis.consensus || analysis.classification || '';
+          const score = analysis.score || (analysis.natural && analysis.natural.score) || 0;
+          
+          const stats = groups[groupValue].textStats[col];
+          
+          if (typeof sentiment === 'string') {
+            if (sentiment.toLowerCase().includes('positiv')) {
+              stats.positivos++;
+            } else if (sentiment.toLowerCase().includes('negativ')) {
+              stats.negativos++;
+            } else if (sentiment.toLowerCase().includes('neutral')) {
+              stats.neutrales++;
+            }
+          }
+          
+          if (typeof score === 'number' && score > 0) {
+            stats.scores.push(score);
+          }
+        } else {
+          // DEBUG: Si no encuentra análisis para esta columna
+          if (index < 3) { // Solo primeras 3 filas para no saturar
+            console.log(`⚠️ No se encontró análisis para columna "${col}" en registro ${index}. Claves disponibles:`, Object.keys(item.sentimentAnalysis));
+          }
+        }
+      });
+    }
+  });
+  
+  console.log(`📊 Grupos procesados para ${groupField}:`, Object.keys(groups).length);
+  
+  // Escribir datos
+  let rowIndex = 2;
+  Object.keys(groups).sort().forEach(groupValue => {
+    const stats = groups[groupValue];
+    const row = sheet.getRow(rowIndex);
+    
+    row.getCell('group').value = groupValue;
+    row.getCell('total').value = stats.total;
+    row.getCell('totalAnalysis').value = stats.totalAnalysis;
+    
+    // Escribir promedios de columnas numéricas
+    numericColumns.forEach(col => {
+      const numStat = stats.numericStats[col];
+      const avg = numStat.count > 0 ? (numStat.sum / numStat.count).toFixed(2) : 0;
+      row.getCell(`${col}_avg`).value = parseFloat(avg);
+    });
+    
+    // Escribir stats por cada columna de texto
+    textColumns.forEach(col => {
+      const textStat = stats.textStats[col];
+      const totalAnalyzed = textStat.positivos + textStat.negativos + textStat.neutrales;
+      const avgScore = textStat.scores.length > 0 
+        ? (textStat.scores.reduce((a, b) => a + b, 0) / textStat.scores.length).toFixed(2)
+        : 0;
+      const pctPositive = totalAnalyzed > 0 
+        ? ((textStat.positivos / totalAnalyzed) * 100).toFixed(1) + '%'
+        : '0%';
+      
+      row.getCell(`${col}_pos`).value = textStat.positivos;
+      row.getCell(`${col}_neg`).value = textStat.negativos;
+      row.getCell(`${col}_neu`).value = textStat.neutrales;
+      row.getCell(`${col}_avg`).value = parseFloat(avgScore);
+      row.getCell(`${col}_pct_pos`).value = pctPositive;
+      
+      // Aplicar formato condicional al score promedio
+      const scoreCell = row.getCell(`${col}_avg`);
+      const scoreValue = parseFloat(avgScore);
+      if (scoreValue >= 6) {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E8' } };
+        scoreCell.font = { color: { argb: 'FF2E7D2E' }, bold: true };
+      } else if (scoreValue < 4) {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE8E8' } };
+        scoreCell.font = { color: { argb: 'FFC53030' }, bold: true };
+      } else {
+        scoreCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3E2' } };
+        scoreCell.font = { color: { argb: 'FF8B5A00' }, bold: true };
+      }
+    });
+    
+    rowIndex++;
+  });
+  
+  // Agregar fila de totales
+  const totalRow = sheet.getRow(rowIndex + 1);
+  totalRow.getCell('group').value = 'TOTAL GENERAL';
+  totalRow.getCell('group').font = { bold: true };
+  
+  const grandTotal = Object.values(groups).reduce((sum, g) => sum + g.total, 0);
+  const grandTotalAnalysis = Object.values(groups).reduce((sum, g) => sum + g.totalAnalysis, 0);
+  
+  totalRow.getCell('total').value = grandTotal;
+  totalRow.getCell('totalAnalysis').value = grandTotalAnalysis;
+  
+  // Totales de columnas numéricas
+  numericColumns.forEach(col => {
+    const allValues = Object.values(groups).flatMap(g => g.numericStats[col].values);
+    const globalAvg = allValues.length > 0 
+      ? (allValues.reduce((a, b) => a + b, 0) / allValues.length).toFixed(2)
+      : 0;
+    totalRow.getCell(`${col}_avg`).value = parseFloat(globalAvg);
+  });
+  
+  // Totales de columnas de texto
+  textColumns.forEach(col => {
+    const totalPos = Object.values(groups).reduce((sum, g) => sum + g.textStats[col].positivos, 0);
+    const totalNeg = Object.values(groups).reduce((sum, g) => sum + g.textStats[col].negativos, 0);
+    const totalNeu = Object.values(groups).reduce((sum, g) => sum + g.textStats[col].neutrales, 0);
+    const allScores = Object.values(groups).flatMap(g => g.textStats[col].scores);
+    const globalAvg = allScores.length > 0 
+      ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(2)
+      : 0;
+    const totalAnalyzed = totalPos + totalNeg + totalNeu;
+    const globalPctPos = totalAnalyzed > 0 
+      ? ((totalPos / totalAnalyzed) * 100).toFixed(1) + '%'
+      : '0%';
+    
+    totalRow.getCell(`${col}_pos`).value = totalPos;
+    totalRow.getCell(`${col}_neg`).value = totalNeg;
+    totalRow.getCell(`${col}_neu`).value = totalNeu;
+    totalRow.getCell(`${col}_avg`).value = parseFloat(globalAvg);
+    totalRow.getCell(`${col}_pct_pos`).value = globalPctPos;
+  });
+  
+  totalRow.eachCell(cell => {
+    cell.font = { bold: true };
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+  });
+  
+  // Aplicar filtros automáticos
+  sheet.autoFilter = {
+    from: 'A1',
+    to: sheet.lastColumn.letter + '1'
+  };
 }
 
 // Función auxiliar para extraer campos dinámicamente
@@ -1424,124 +2150,168 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
 
     console.log('📊 Generando reporte avanzado...');
 
-    // Procesar el archivo como lo hacemos normalmente
+    // Parsear configuración personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
+    
+    // RECIBIR ESTADÍSTICAS PRECALCULADAS DEL FRONTEND
+    let statisticsFromApp = null;
+    if (req.body.statistics) {
+      try {
+        statisticsFromApp = JSON.parse(req.body.statistics);
+        console.log('📊 ✅ Estadísticas recibidas del frontend (valores de la app):', {
+          total: statisticsFromApp.totalResults,
+          avgScore: statisticsFromApp.averageScore,
+          percentages: statisticsFromApp.percentages
+        });
+      } catch (e) {
+        console.error('❌ Error parseando statistics:', e);
+      }
+    }
+    
+    // RECIBIR ÍNDICES FILTRADOS SI EXISTEN
+    let filteredIndices = null;
+    if (req.body.filteredIndices) {
+      try {
+        filteredIndices = JSON.parse(req.body.filteredIndices);
+        console.log(`🔍 Filtros aplicados: exportando ${filteredIndices.length} filas específicas`);
+      } catch (e) {
+        console.error('❌ Error parseando filteredIndices:', e);
+      }
+    }
+
+    let processedResults = [];
+    let originalFilename = req.file.originalname || 'reporte.xlsx';
+    
+    // Procesar archivo Excel
     const workbook = XLSX.readFile(req.file.path, { 
       raw: false,
-      FS: ';' // Soportar CSV con separador punto y coma
+      FS: ';'
     });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+    let jsonData = XLSX.utils.sheet_to_json(worksheet, {
       raw: false,
       defval: ''
     });
     
     console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
-    if (jsonData.length > 0) {
-      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
-    }
 
     if (jsonData.length === 0) {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
     }
 
-    // Aplicar límite de filas
+    // APLICAR FILTRO SI EXISTE
+    if (filteredIndices && filteredIndices.length > 0) {
+      const originalLength = jsonData.length;
+      jsonData = jsonData.filter((row, index) => filteredIndices.includes(index));
+      console.log(`✂️ Filtrado aplicado: ${jsonData.length} de ${originalLength} filas`);
+    }
+
     const MAX_ROWS = 5000;
     if (jsonData.length > MAX_ROWS) {
       console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
       jsonData.splice(MAX_ROWS);
     }
 
-    // Procesar cada fila con análisis de sentimientos
-    const processedResults = [];
     console.log(`🔄 Procesando ${jsonData.length} registros...`);
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
       
-      // Progreso cada 500 registros
-      if (i % 500 === 0) {
+      if (i % 500 === 0 && i > 0) {
         console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
       }
 
       const result = { ...row };
-      
-      // Identificar comentarios de materia y docente
-      const sentimentColumns = getSentimentColumns(row); // Filtrar columnas de texto libre válidas
+      const sentimentColumns = getSentimentColumns(row, customConfig);
 
       if (sentimentColumns.length > 0) {
         result.sentimentAnalysis = {};
         
-        // Intentar identificar comentarios específicos
-        const materiaField = sentimentColumns.find(c => 
-          c.column.toLowerCase().includes('materia') || 
-          c.column.toLowerCase().includes('asignatura') || 
-          c.column.toLowerCase().includes('curso')
-        );
-        
-        const docenteField = sentimentColumns.find(c => 
-          c.column.toLowerCase().includes('docente') || 
-          c.column.toLowerCase().includes('profesor') || 
-          c.column.toLowerCase().includes('teacher')
-        );
-
-        // Analizar comentario de materia
-        if (materiaField && materiaField.text) {
-          const materiaText = materiaField.text;
-          result.comentario_materia = materiaText;
+        for (const colInfo of sentimentColumns) {
+          const columnName = colInfo.column;
+          const text = colInfo.text;
           
-          const [naturalResult, nlpResult] = await Promise.all([
-            Promise.resolve(analyzeTextEnhanced(materiaText)),
-            analyzeWithNLPjs(materiaText)
-          ]);
-
-          result.sentimentAnalysis.materia = {
-            natural: naturalResult,
-            nlpjs: nlpResult,
-            consensus: determineConsensus(naturalResult, nlpResult)
-          };
-        }
-
-        // Analizar comentario de docente
-        if (docenteField && docenteField.text) {
-          const docenteText = docenteField.text;
-          result.comentario_docente = docenteText;
-          
-          const [naturalResult, nlpResult] = await Promise.all([
-            Promise.resolve(analyzeTextEnhanced(docenteText)),
-            analyzeWithNLPjs(docenteText)
-          ]);
-
-          result.sentimentAnalysis.docente = {
-            natural: naturalResult,
-            nlpjs: nlpResult,
-            consensus: determineConsensus(naturalResult, nlpResult)
-          };
-        }
-
-        // Si no se identificaron campos específicos, analizar el primer campo de texto
-        if (!materiaField && !docenteField && sentimentColumns.length > 0) {
-          const mainText = sentimentColumns[0].text;
-          const [naturalResult, nlpResult] = await Promise.all([
-            Promise.resolve(analyzeTextEnhanced(mainText)),
-            analyzeWithNLPjs(mainText)
-          ]);
-
-          result.sentimentAnalysis.general = {
-            natural: naturalResult,
-            nlpjs: nlpResult,
-            consensus: determineConsensus(naturalResult, nlpResult)
-          };
+          if (text && text.trim().length > 0) {
+            const analysis = analyzeTextEnhanced(text);
+            
+            result.sentimentAnalysis[columnName] = {
+              classification: analysis.classification,
+              score: analysis.score,
+              consensus: analysis.classification
+            };
+          }
         }
       }
 
       processedResults.push(result);
     }
+    
+    // Limpiar archivo temporal
+    fs.unlinkSync(req.file.path);
 
+    
     console.log('📝 Generando archivo Excel avanzado...');
     
-    // Generar el reporte en Excel
-    const excelWorkbook = await generateAdvancedExcelReport(processedResults);
+    // USAR ESTADÍSTICAS QUE VIENEN DEL FRONTEND (ya calculadas correctamente)
+    let statistics;
+    
+    if (statisticsFromApp) {
+      // Usar las estadísticas que envió el frontend (filtradas o completas)
+      console.log('✅ Usando estadísticas del frontend');
+      statistics = statisticsFromApp;
+      
+      console.log('📊 Estadísticas para portada:', {
+        total: statistics.totalResults,
+        avgScore: statistics.averageScore,
+        positivos: (parseFloat(statistics.percentages['Muy Positivo'] || 0) + parseFloat(statistics.percentages['Positivo'] || 0)).toFixed(1) + '%',
+        neutrales: statistics.percentages['Neutral'] + '%',
+        negativos: (parseFloat(statistics.percentages['Negativo'] || 0) + parseFloat(statistics.percentages['Muy Negativo'] || 0)).toFixed(1) + '%'
+      });
+    } else {
+      // Fallback: calcular estadísticas en el backend
+      console.log('⚠️ Calculando estadísticas en el backend (fallback)');
+      
+      const resultsForStats = processedResults.map((item, index) => {
+        if (item.sentimentAnalysis && Object.keys(item.sentimentAnalysis).length > 0) {
+          const scores = Object.values(item.sentimentAnalysis).map(a => a.score || 0).filter(s => s > 0);
+          const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+          const classification = getClassification(avgScore);
+          
+          return {
+            row: index + 1,
+            sentiment: {
+              perColumnAvgScore: avgScore,
+              classification: classification,
+              details: [{ score: avgScore }]
+            }
+          };
+        }
+        return null;
+      }).filter(r => r !== null);
+      
+      const qualitativeCount = countQualitativeResponses(jsonData, customConfig);
+      statistics = calculateStats(resultsForStats, qualitativeCount);
+    }
+    
+    console.log('📊 Estadísticas finales para portada:', {
+      total: statistics.totalResults,
+      avgScore: statistics.averageScore,
+      positivos: statistics.percentages['Muy Positivo'] + statistics.percentages['Positivo'],
+      neutrales: statistics.percentages['Neutral'],
+      negativos: statistics.percentages['Negativo'] + statistics.percentages['Muy Negativo']
+    });
+    
+    // Generar el reporte en Excel con las estadísticas
+    const excelWorkbook = await generateAdvancedExcelReport(processedResults, customConfig, originalFilename, statistics);
     
     // Guardar archivo temporal
     const outputPath = path.join(__dirname, 'uploads', `reporte-avanzado-${Date.now()}.xlsx`);

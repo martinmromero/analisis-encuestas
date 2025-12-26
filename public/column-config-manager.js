@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeEventListeners() {
     const showModalBtn = document.getElementById('showConfigModalBtn');
+    const newConfigBtn = document.getElementById('newConfigBtn');
     const closeModalBtn = document.getElementById('closeConfigModal');
     const applyConfigBtn = document.getElementById('applyConfigBtn');
     const cancelConfigBtn = document.getElementById('cancelConfigBtn');
@@ -29,6 +30,7 @@ function initializeEventListeners() {
     
     // Modal de configuración de columnas
     if (showModalBtn) showModalBtn.addEventListener('click', () => openConfigModal());
+    if (newConfigBtn) newConfigBtn.addEventListener('click', () => createNewConfigFromFile());
     if (closeModalBtn) closeModalBtn.addEventListener('click', () => closeConfigModal());
     if (applyConfigBtn) applyConfigBtn.addEventListener('click', () => applyConfiguration());
     if (cancelConfigBtn) cancelConfigBtn.addEventListener('click', () => closeConfigModal());
@@ -137,6 +139,28 @@ async function detectColumnsFromFile(file) {
             detectedColumns = data.columns;
             console.log('📋 Columnas detectadas del nuevo archivo:', detectedColumns);
             
+            // Mostrar notificación sobre el archivo nuevo
+            const fileInfo = document.createElement('div');
+            fileInfo.style.cssText = 'background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: center;';
+            fileInfo.innerHTML = `
+                <strong>📁 Nuevo archivo detectado con ${detectedColumns.length} columnas</strong><br>
+                <span style="font-size: 0.9em; color: #666;">
+                    Haz click en "➕ Nueva Configuración" para crear una configuración automática,<br>
+                    o selecciona una configuración existente si el formato coincide.
+                </span>
+            `;
+            
+            // Insertar después del selector de configuraciones
+            const configSection = document.querySelector('.config-selector');
+            if (configSection && configSection.parentNode) {
+                // Eliminar notificación anterior si existe
+                const oldInfo = document.getElementById('newFileInfo');
+                if (oldInfo) oldInfo.remove();
+                
+                fileInfo.id = 'newFileInfo';
+                configSection.parentNode.insertBefore(fileInfo, configSection.nextSibling);
+            }
+            
             // NO RESETEAR configuración - mantener la seleccionada por el usuario
             // Solo resetear si no hay ninguna configuración cargada
             if (!currentColumnConfig || !currentColumnConfig.name || currentColumnConfig.name === 'Default') {
@@ -147,7 +171,7 @@ async function detectColumnsFromFile(file) {
                     textoLibre: [],
                     escalas: {}
                 };
-                console.log('⚠️ No hay configuración seleccionada. Por favor selecciona una.');
+                console.log('⚠️ No hay configuración seleccionada.');
             } else {
                 console.log(`✅ Manteniendo configuración: ${currentColumnConfig.name}`);
             }
@@ -182,6 +206,74 @@ async function analyzeColumnMetadata(file) {
     } catch (error) {
         console.error('Error analizando metadata:', error);
     }
+}
+
+// Crear nueva configuración desde archivo detectado
+function createNewConfigFromFile() {
+    if (detectedColumns.length === 0) {
+        alert('⚠️ Primero carga un archivo Excel/CSV para detectar las columnas.');
+        return;
+    }
+    
+    // Clasificación automática inteligente de columnas
+    const autoConfig = autoClassifyColumns(detectedColumns);
+    
+    // Crear nueva configuración vacía con columnas auto-clasificadas
+    currentColumnConfig = {
+        name: `Config_${new Date().toISOString().split('T')[0]}`,
+        identificacion: autoConfig.identificacion,
+        numericas: autoConfig.numericas,
+        textoLibre: autoConfig.textoLibre,
+        escalas: {}
+    };
+    
+    console.log('✨ Nueva configuración creada automáticamente:', currentColumnConfig);
+    
+    // Abrir modal para que el usuario pueda ajustar
+    openConfigModal();
+    
+    // Mostrar notificación
+    alert(`✅ Se creó una nueva configuración con ${detectedColumns.length} columnas detectadas.\n\n` +
+          `📋 Identificación: ${autoConfig.identificacion.length}\n` +
+          `📊 Numéricas: ${autoConfig.numericas.length}\n` +
+          `💬 Texto Libre: ${autoConfig.textoLibre.length}\n\n` +
+          `Puedes ajustar la clasificación arrastrando las columnas.`);
+}
+
+// Clasificar automáticamente columnas según nombre/contenido
+function autoClassifyColumns(columns) {
+    const config = {
+        identificacion: [],
+        numericas: [],
+        textoLibre: []
+    };
+    
+    // Patrones para identificación
+    const idPatterns = /id|codigo|carrera|materia|docente|profesor|sede|modalidad|comision|turno|año|periodo|fecha/i;
+    
+    // Patrones para texto libre (preguntas abiertas)
+    const textPatterns = /comentario|observacion|sugerencia|motivo|porque|por que|descripcion|detalle|opinion|feedback|respuesta abierta|indique|explique/i;
+    
+    // Patrones para numéricas (escalas de evaluación)
+    const numericPatterns = /evalua|califica|puntua|escala|cumple|demost|considera|aprend|desempeño|desempen|satisfaccion|calidad|nota|promedio/i;
+    
+    columns.forEach(col => {
+        const colLower = col.toLowerCase();
+        
+        // Clasificar por patrones
+        if (idPatterns.test(colLower)) {
+            config.identificacion.push(col);
+        } else if (textPatterns.test(colLower)) {
+            config.textoLibre.push(col);
+        } else if (numericPatterns.test(colLower)) {
+            config.numericas.push(col);
+        } else {
+            // Por defecto, columnas desconocidas van a identificación
+            config.identificacion.push(col);
+        }
+    });
+    
+    return config;
 }
 
 // Abrir modal de configuración

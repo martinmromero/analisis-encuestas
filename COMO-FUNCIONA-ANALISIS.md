@@ -47,13 +47,28 @@ totalPalabras = cantidad total de palabras en el texto
 confianza = palabrasReconocidas / totalPalabras
 ```
 
-### 4. Clasificación Final
-Basada en el score acumulado:
-- **> 2**: Muy Positivo
-- **0 a 2**: Positivo  
-- **-2 a 0**: Negativo
-- **< -2**: Muy Negativo
-- **≈ 0**: Neutral
+### 4. Normalización a Escala 0-10
+```javascript
+// El score RAW (relativo) se normaliza a escala 0-10
+avgRelativeScore = overallScore / sentimentResults.length
+clampedScore = Math.max(-10, Math.min(10, avgRelativeScore))
+perColumnAvgScore = (clampedScore + 10) / 2
+
+// Ejemplos:
+// RAW -10 → Normalizado 0
+// RAW -5  → Normalizado 2.5
+// RAW  0  → Normalizado 5 (Neutral)
+// RAW +5  → Normalizado 7.5
+// RAW +10 → Normalizado 10
+```
+
+### 5. Clasificación Final
+Basada en el score normalizado (escala 0-10):
+- **≥ 8**: Muy Positivo
+- **≥ 6**: Positivo  
+- **≥ 4 y < 6**: Neutral
+- **≥ 2**: Negativo
+- **< 2**: Muy Negativo
 
 ## 🎯 Qué Hace el Sistema
 
@@ -87,7 +102,8 @@ aburrido,-2
 ```
 Texto: "Excelente profesor, muy didáctico y claro"
 Resultado: 
-  - Score: 0
+  - Score RAW: 0
+  - Score Normalizado: 5.0 (escala 0-10)
   - Clasificación: Neutral
   - Confianza: 0%
   - Razón: Ninguna palabra está en el diccionario
@@ -100,7 +116,8 @@ Resultado:
   - "terrible" → -5
   - "confuso" → -3
   - "aburrido" → -2
-  - Score: -10
+  - Score RAW: -10
+  - Score Normalizado: 0.0 (escala 0-10)
   - Clasificación: Muy Negativo
   - Confianza: 50% (3 de 6 palabras reconocidas)
 ```
@@ -111,8 +128,9 @@ Texto: "El profesor fue bueno pero la clase muy confusa"
 Resultado:
   - "bueno" → NO encontrado (0)
   - "confusa" → -3
-  - Score: -3
-  - Clasificación: Negativo
+  - Score RAW: -3
+  - Score Normalizado: 3.5 (escala 0-10)
+  - Clasificación: Neutral
   - Confianza: 12% (1 de 8 palabras)
 ```
 
@@ -207,6 +225,6 @@ malo,Negativo,-3
 
 ---
 
-**Versión**: 2.1.0  
-**Modo**: Diccionario Exclusivo (sin fallbacks)  
-**Última actualización**: Noviembre 2025
+**Versión**: 2.2.0  
+**Modo**: Diccionario Exclusivo con Normalización 0-10  
+**Última actualización**: Diciembre 26, 2025

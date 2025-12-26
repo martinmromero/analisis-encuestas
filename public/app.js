@@ -5,6 +5,7 @@ let categoryChart = null;
 let currentPage = 1;
 const ITEMS_PER_PAGE = 50; // Limitar a 50 resultados por página
 let filteredResults = [];
+let filteredStats = null; // Guardar estadísticas filtradas
 
 // Variables para gestión del diccionario
 let currentDictionary = [];
@@ -236,6 +237,8 @@ async function analyzeFile() {
 
         if (data.success) {
             currentResults = data;
+            // Guardar el nombre del archivo original
+            currentResults.originalFilename = file.name;
             displayResults(data);
         } else {
             throw new Error(data.error || 'Error procesando el archivo');
@@ -368,9 +371,16 @@ function displayResults(data) {
         }
     }
 
-    // Crear gráficos
+    // Crear gráficos con estadísticas del backend
     createSentimentChart(data.statistics);
     createCategoryChart(data.statistics);
+    
+    // RECALCULAR estadísticas usando la misma función que usa el filtrado
+    // para garantizar consistencia entre datos sin filtrar y filtrados
+    filteredStats = calculateFilteredStats(data.results);
+    
+    // Actualizar las tarjetas con las estadísticas recalculadas
+    updateStatsCards(data.results, filteredStats);
 
     // Calcular y mostrar métricas numéricas si hay filterOptions
     if (data.filterOptions) {
@@ -857,7 +867,7 @@ function filterResults() {
     }
 
     // Recalcular estadísticas con resultados filtrados
-    const filteredStats = calculateFilteredStats(filteredResults);
+    filteredStats = calculateFilteredStats(filteredResults);
     
     // Actualizar gráficos con nuevas estadísticas
     createSentimentChart(filteredStats);
@@ -894,15 +904,29 @@ function calculateFilteredStats(results) {
     // Solo contar registros con análisis de texto (como en el servidor)
     results.forEach(result => {
         if (result.sentiment && result.sentiment.details && result.sentiment.details.length > 0) {
-            // Usar classification del servidor o calcularla si no existe
-            const score = result.sentiment.perColumnAvgScore ?? result.sentiment.score ?? 0;
+            // SIEMPRE usar perColumnAvgScore que está normalizado a 0-10
+            // Si no existe, normalizarlo desde overallScore/analyzedColumns + 5
+            let score = result.sentiment.perColumnAvgScore;
+            
+            // Validar que perColumnAvgScore existe y es válido
+            if (typeof score !== 'number' || isNaN(score)) {
+                // Fallback: normalizar desde overallScore si es necesario
+                const rawAvg = result.sentiment.analyzedColumns > 0 
+                    ? result.sentiment.overallScore / result.sentiment.analyzedColumns 
+                    : 0;
+                // Normalizar con la misma fórmula del backend: mapear [-10,10] a [0,10]
+                const clampedScore = Math.max(-10, Math.min(10, rawAvg));
+                score = (clampedScore + 10) / 2;
+                console.warn('perColumnAvgScore faltante, recalculado:', score, 'para resultado', result.id);
+            }
+            
             const classification = result.sentiment.classification || getClassification(score);
             
             if (classification) {
                 classifications[classification]++;
             }
             
-            if (typeof score === 'number') {
+            if (typeof score === 'number' && !isNaN(score)) {
                 totalScore += score;
                 scoreCount++;
             }
@@ -1079,6 +1103,7 @@ function cleanupMemory() {
     // Limpiar datos grandes
     currentResults = null;
     filteredResults = [];
+    filteredStats = null;
     
     // Limpiar tabla
     const tbody = document.querySelector('#resultsTable tbody');
@@ -2015,11 +2040,26 @@ function displayComparisonResults(results, originalText) {
 // ============= FUNCIÓN DE REPORTE AVANZADO XLSX =============
 
 async function generateAdvancedReport() {
+    // Validar que haya resultados analizados
+    if (!currentResults || !currentResults.results) {
+        alert('⚠️ Por favor analiza el archivo primero antes de generar el reporte');
+        return;
+    }
+
     const fileInput = document.getElementById('excelFile');
     const file = fileInput.files[0];
     
     if (!file) {
-        alert('⚠️ Por favor selecciona un archivo Excel primero');
+        alert('⚠️ No se encontró el archivo original');
+        return;
+    }
+
+    // Obtener configuración de columnas actual
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
+    
+    // Validar que haya una configuración seleccionada
+    if (!columnConfig || !columnConfig.name) {
+        alert('⚠️ Por favor selecciona una configuración de columnas antes de generar el reporte.\n\nPuedes seleccionarla en:\n• El dropdown junto al botón "Analizar"\n• La pestaña "Configuración de Columnas"');
         return;
     }
 
@@ -2031,11 +2071,45 @@ async function generateAdvancedReport() {
         advancedBtn.disabled = true;
         advancedBtn.innerHTML = '<span class="btn-icon">⏳</span>Generando reporte...';
         loading.classList.remove('hidden');
-        loading.querySelector('p').textContent = 'Generando reporte avanzado XLSX con análisis de sentimientos...';
+        
+        // Determinar qué datos exportar
+        const dataToExport = filteredResults.length > 0 ? filteredResults : currentResults.results;
+        const isFiltered = filteredResults.length > 0;
+        
+        if (isFiltered) {
+            loading.querySelector('p').textContent = `Generando reporte con ${dataToExport.length} resultados filtrados...`;
+            console.log(`📊 Exportando ${dataToExport.length} resultados filtrados de ${currentResults.results.length} totales`);
+        } else {
+            loading.querySelector('p').textContent = 'Generando reporte avanzado XLSX con análisis de sentimientos...';
+            console.log(`📊 Exportando todos los ${dataToExport.length} resultados`);
+        }
 
-        // Crear FormData
+        // Crear FormData con archivo y filtros
         const formData = new FormData();
         formData.append('excelFile', file);
+        formData.append('columnConfig', JSON.stringify(columnConfig));
+        
+        // Si hay filtros, enviar los índices de las filas a incluir
+        if (isFiltered) {
+            const filteredIndices = dataToExport.map(item => item.row - 1); // row es 1-indexed
+            formData.append('filteredIndices', JSON.stringify(filteredIndices));
+            console.log(`📋 Enviando ${filteredIndices.length} índices filtrados`);
+            
+            // ENVIAR LAS ESTADÍSTICAS FILTRADAS que está viendo el usuario
+            if (filteredStats) {
+                console.log('📊 Enviando estadísticas FILTRADAS al Excel:', filteredStats);
+                formData.append('statistics', JSON.stringify(filteredStats));
+            }
+        } else {
+            // Sin filtros: enviar las estadísticas recalculadas (no las del backend)
+            if (filteredStats) {
+                console.log('📊 Enviando estadísticas RECALCULADAS (sin filtros) al Excel:', filteredStats);
+                formData.append('statistics', JSON.stringify(filteredStats));
+            } else if (currentResults && currentResults.statistics) {
+                console.log('📊 Fallback: enviando estadísticas del backend al Excel:', currentResults.statistics);
+                formData.append('statistics', JSON.stringify(currentResults.statistics));
+            }
+        }
 
         // Hacer petición al endpoint de reporte avanzado
         const response = await fetch('/api/generate-advanced-report', {
