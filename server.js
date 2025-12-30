@@ -1371,6 +1371,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   const materias = [...new Set(data.map(d => d.MATERIA || d.materia || 'N/A').filter(m => m && m !== ''))];
   const sedes = [...new Set(data.map(d => d.SEDE || d.sede || 'N/A').filter(s => s && s !== ''))];
   const modalidades = [...new Set(data.map(d => d.MODALIDAD || d.modalidad || 'N/A').filter(m => m && m !== ''))];
+  const docentes = [...new Set(data.map(d => d.DOCENTE || d.docente || 'N/A').filter(d => d && d !== ''))];
   
   // Carreras
   sheet.getCell(`B${currentRow}`).value = 'Carreras:';
@@ -1400,6 +1401,14 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`B${currentRow}`).font = { bold: true };
   sheet.mergeCells(`C${currentRow}:E${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = modalidades.join(', ');
+  currentRow++;
+  
+  // Docentes
+  sheet.getCell(`B${currentRow}`).value = 'Docentes:';
+  sheet.getCell(`B${currentRow}`).font = { bold: true };
+  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.getCell(`C${currentRow}`).value = docentes.length > 3 ? `${docentes.length} docentes diferentes` : docentes.join(', ');
+  sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
   currentRow += 2;
   
   // ===== ANÁLISIS CUALITATIVO =====
@@ -1473,8 +1482,8 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getRow(boxRow1).height = 20;
   sheet.getRow(boxRow1 + 1).height = 35;
   
-  // Box 2: Score Promedio
-  sheet.getCell(`C${boxRow1}`).value = 'Score Promedio';
+  // Box 2: Promedio General
+  sheet.getCell(`C${boxRow1}`).value = 'Promedio General';
   sheet.getCell(`C${boxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`C${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`C${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
@@ -1485,13 +1494,31 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`C${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
+  // Box 3: Total Preguntas (nuevo)
+  const qualitativeFields = Object.keys(data[0] || {}).filter(key => 
+    key !== 'CARRERA' && key !== 'MATERIA' && key !== 'SEDE' && key !== 'MODALIDAD' && key !== 'DOCENTE' &&
+    key !== 'carrera' && key !== 'materia' && key !== 'sede' && key !== 'modalidad' && key !== 'docente' &&
+    key !== 'sentimentAnalysis' && key !== 'sentiment' && 
+    typeof (data[0] || {})[key] === 'string'
+  );
+  
+  sheet.getCell(`D${boxRow1}`).value = 'Total Preguntas';
+  sheet.getCell(`D${boxRow1}`).font = { bold: true, size: 11 };
+  sheet.getCell(`D${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getCell(`D${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${boxRow1 + 1}`).value = qualitativeFields.length;
+  sheet.getCell(`D${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
+  sheet.getCell(`D${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  sheet.getCell(`D${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
   currentRow += 2;
   
   // Boxes estilo web - fila 2
   const boxRow2 = currentRow;
   currentRow++;
   
-  // Box 3: Positivos
+  // Box 3: Positivos (Verde)
   sheet.getCell(`B${boxRow2}`).value = 'Positivos';
   sheet.getCell(`B${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
   sheet.getCell(`B${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF48BB78' } };
@@ -1505,26 +1532,26 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getRow(boxRow2).height = 20;
   sheet.getRow(boxRow2 + 1).height = 35;
   
-  // Box 4: Negativos
-  sheet.getCell(`C${boxRow2}`).value = 'Negativos';
+  // Box 4: Neutrales (Amarillo)
+  sheet.getCell(`C${boxRow2}`).value = 'Neutrales';
   sheet.getCell(`C${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-  sheet.getCell(`C${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF56565' } };
+  sheet.getCell(`C${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFED8936' } };
   sheet.getCell(`C${boxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`C${boxRow2 + 1}`).value = `${negativos} (${pctNegativos}%)`;
-  sheet.getCell(`C${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF742A2A' } };
-  sheet.getCell(`C${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7D7' } };
+  sheet.getCell(`C${boxRow2 + 1}`).value = `${neutrales} (${pctNeutrales}%)`;
+  sheet.getCell(`C${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF7C2D12' } };
+  sheet.getCell(`C${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEEBC8' } };
   sheet.getCell(`C${boxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`C${boxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${boxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
-  // Box 5: Neutrales
-  sheet.getCell(`D${boxRow2}`).value = 'Neutrales';
+  // Box 5: Negativos (Rojo)
+  sheet.getCell(`D${boxRow2}`).value = 'Negativos';
   sheet.getCell(`D${boxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-  sheet.getCell(`D${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFED8936' } };
+  sheet.getCell(`D${boxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF56565' } };
   sheet.getCell(`D${boxRow2}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`D${boxRow2 + 1}`).value = `${neutrales} (${pctNeutrales}%)`;
-  sheet.getCell(`D${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF7C2D12' } };
-  sheet.getCell(`D${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEEBC8' } };
+  sheet.getCell(`D${boxRow2 + 1}`).value = `${negativos} (${pctNegativos}%)`;
+  sheet.getCell(`D${boxRow2 + 1}`).font = { bold: true, size: 16, color: { argb: 'FF742A2A' } };
+  sheet.getCell(`D${boxRow2 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7D7' } };
   sheet.getCell(`D${boxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`D${boxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`D${boxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -1575,12 +1602,12 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   const quantBoxRow1 = currentRow;
   currentRow++;
   
-  // Box 1: Total Preguntas
-  sheet.getCell(`B${quantBoxRow1}`).value = 'Total Preguntas';
+  // Box 1: Total Respuestas
+  sheet.getCell(`B${quantBoxRow1}`).value = 'Total Respuestas';
   sheet.getCell(`B${quantBoxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`B${quantBoxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`B${quantBoxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`B${quantBoxRow1 + 1}`).value = numericFields.length;
+  sheet.getCell(`B${quantBoxRow1 + 1}`).value = data.length;
   sheet.getCell(`B${quantBoxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2C5282' } };
   sheet.getCell(`B${quantBoxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`B${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -1600,12 +1627,12 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`C${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${quantBoxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
-  // Box 3: Total Respuestas
-  sheet.getCell(`D${quantBoxRow1}`).value = 'Total Respuestas';
+  // Box 3: Total Preguntas
+  sheet.getCell(`D${quantBoxRow1}`).value = 'Total Preguntas';
   sheet.getCell(`D${quantBoxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`D${quantBoxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`D${quantBoxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`D${quantBoxRow1 + 1}`).value = data.length;
+  sheet.getCell(`D${quantBoxRow1 + 1}`).value = numericFields.length;
   sheet.getCell(`D${quantBoxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2C5282' } };
   sheet.getCell(`D${quantBoxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`D${quantBoxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -1629,7 +1656,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
     else rango1_5++;
   });
   
-  // Box Alta Satisfacción (8-10)
+  // Box Alta Satisfacción (8-10) - Verde
   sheet.getCell(`B${quantBoxRow2}`).value = 'Alta (8-10)';
   sheet.getCell(`B${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
   sheet.getCell(`B${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF38A169' } };
@@ -1643,7 +1670,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getRow(quantBoxRow2).height = 20;
   sheet.getRow(quantBoxRow2 + 1).height = 35;
   
-  // Box Media Satisfacción (6-7)
+  // Box Media Satisfacción (6-7) - Amarillo
   sheet.getCell(`C${quantBoxRow2}`).value = 'Media (6-7)';
   sheet.getCell(`C${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
   sheet.getCell(`C${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDD6B20' } };
@@ -1655,7 +1682,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`C${quantBoxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${quantBoxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
-  // Box Baja Satisfacción (1-5)
+  // Box Baja Satisfacción (1-5) - Rojo
   sheet.getCell(`D${quantBoxRow2}`).value = 'Baja (1-5)';
   sheet.getCell(`D${quantBoxRow2}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
   sheet.getCell(`D${quantBoxRow2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE53E3E' } };
@@ -1666,6 +1693,83 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`D${quantBoxRow2 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`D${quantBoxRow2}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`D${quantBoxRow2 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  
+  currentRow += 3;
+  
+  // ===== DETALLE DE PREGUNTAS NUMÉRICAS =====
+  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  const numericDetailHeaderCell = sheet.getCell(`B${currentRow}`);
+  numericDetailHeaderCell.value = 'DETALLE POR PREGUNTA';
+  numericDetailHeaderCell.font = { size: 12, bold: true, color: { argb: 'FF2C5282' } };
+  numericDetailHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  numericDetailHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(currentRow).height = 20;
+  currentRow++;
+  
+  // Crear boxes para cada pregunta numérica (3 por fila)
+  const questionsPerRow = 3;
+  let questionIndex = 0;
+  const numericFieldsArray = Object.keys(numericStats);
+  
+  while (questionIndex < numericFieldsArray.length) {
+    const questionRow = currentRow;
+    currentRow++;
+    
+    // Procesar hasta 3 preguntas por fila
+    for (let col = 0; col < questionsPerRow && questionIndex < numericFieldsArray.length; col++) {
+      const field = numericFieldsArray[questionIndex];
+      const stat = numericStats[field];
+      const avg = parseFloat(stat.avg);
+      
+      // Determinar columna (B, C, D)
+      const colLetter = String.fromCharCode(66 + col); // B=66, C=67, D=68
+      
+      // Determinar color según el promedio
+      let headerColor, headerTextColor, valueColor, valueTextColor;
+      if (avg >= 8) {
+        // Verde
+        headerColor = 'FF38A169';
+        headerTextColor = 'FFFFFFFF';
+        valueColor = 'FFC6F6D5';
+        valueTextColor = 'FF22543D';
+      } else if (avg >= 6) {
+        // Amarillo
+        headerColor = 'FFDD6B20';
+        headerTextColor = 'FFFFFFFF';
+        valueColor = 'FFFEEBC8';
+        valueTextColor = 'FF7C2D12';
+      } else {
+        // Rojo
+        headerColor = 'FFE53E3E';
+        headerTextColor = 'FFFFFFFF';
+        valueColor = 'FFFED7D7';
+        valueTextColor = 'FF742A2A';
+      }
+      
+      // Header (nombre de la pregunta)
+      sheet.getCell(`${colLetter}${questionRow}`).value = field;
+      sheet.getCell(`${colLetter}${questionRow}`).font = { bold: true, size: 10, color: { argb: headerTextColor } };
+      sheet.getCell(`${colLetter}${questionRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } };
+      sheet.getCell(`${colLetter}${questionRow}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      sheet.getCell(`${colLetter}${questionRow}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+      
+      // Valor (promedio)
+      sheet.getCell(`${colLetter}${questionRow + 1}`).value = avg;
+      sheet.getCell(`${colLetter}${questionRow + 1}`).font = { bold: true, size: 18, color: { argb: valueTextColor } };
+      sheet.getCell(`${colLetter}${questionRow + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: valueColor } };
+      sheet.getCell(`${colLetter}${questionRow + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      sheet.getCell(`${colLetter}${questionRow + 1}`).numFmt = '0.00';
+      sheet.getCell(`${colLetter}${questionRow + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+      
+      questionIndex++;
+    }
+    
+    // Altura de las filas
+    sheet.getRow(questionRow).height = 30;
+    sheet.getRow(questionRow + 1).height = 35;
+    
+    currentRow += 2; // Saltar a la siguiente fila de boxes
+  }
   
   console.log('✅ Hoja "Portada" creada');
 }
