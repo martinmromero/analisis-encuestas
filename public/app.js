@@ -379,8 +379,14 @@ function displayResults(data) {
     currentPage = 1; // Resetear página
     displayResultsTable(filteredResults);
 
-    // Mostrar sección de resultados
+    // Mostrar sección de resultados y charts
     document.getElementById('results').classList.remove('hidden');
+    const chartsContainer = document.getElementById('chartsContainer');
+    if (chartsContainer) chartsContainer.classList.remove('hidden');
+    
+    // Mostrar sección de filtros
+    const filtersSection = document.getElementById('filtersSection');
+    if (filtersSection) filtersSection.classList.remove('hidden');
     
     // Scroll suave hacia los resultados
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
@@ -537,6 +543,11 @@ function createCategoryChart(statistics) {
         }
     });
 }
+
+// ===== FUNCIONES DE RESULTADOS DETALLADOS =====
+// NOTA: Estas funciones están disponibles para futuras versiones cuando se reactive la tabla detallada.
+// Incluyen: displayResultsTable(), filterResults(), paginación, búsqueda por texto y filtro por sentiment.
+// La sección está oculta en el HTML (#detailedResultsTable) pero las funciones se mantienen operativas.
 
 // Mostrar tabla de resultados con paginación
 function displayResultsTable(results) {

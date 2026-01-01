@@ -138,12 +138,66 @@
                 <p>Procesando archivo y analizando sentimientos...</p>
             </div>
 
+            <!-- Panel de Filtros (box separado) -->
+            <section id="filtersSection" class="filters-section hidden">
+                <div class="filters-panel" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px;">
+                    <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none; margin-top: 0;" onclick="document.getElementById('filtersContent').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('filtersContent').classList.contains('hidden') ? '▶' : '▼';">
+                        <span class="toggle-icon">▶</span>
+                        🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
+                    </h3>
+                    <div id="filtersContent" class="filters-grid hidden">
+                        <div class="filter-group">
+                            <label for="filterCarrera">Carrera:</label>
+                            <select id="filterCarrera" class="filter-select">
+                                <option value="">Todas las carreras</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterMateria">Materia:</label>
+                            <select id="filterMateria" class="filter-select">
+                                <option value="">Todas las materias</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterModalidad">Modalidad:</label>
+                            <select id="filterModalidad" class="filter-select">
+                                <option value="">Todas las modalidades</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterSede">Sede:</label>
+                            <select id="filterSede" class="filter-select">
+                                <option value="">Todas las sedes</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterDocente">Docente:</label>
+                            <select id="filterDocente" class="filter-select">
+                                <option value="">Todos los docentes</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFilters" class="filter-btn apply">
+                                <span>✓</span> Aplicar Filtros
+                            </button>
+                            <button id="clearFilters" class="filter-btn clear">
+                                <span>✕</span> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="filter-summary" id="filterSummary" style="display: none;">
+                        <span id="filterSummaryText"></span>
+                    </div>
+                </div>
+            </section>
+
             <!-- Sección de resultados -->
             <section id="results" class="results-section hidden">
                 <div class="results-header">
                     <h2>📈 Resultados del Análisis</h2>
-                     <h3>📊  Análisis cualitativo</h3>
                 </div>
+
+                <h3>📊  Análisis cualitativo</h3>
 
                 <!-- Estadísticas generales -->
                 <div class="stats-grid">
@@ -194,60 +248,8 @@
                     </div>
                 </div>
 
-                <!-- Panel de Filtros -->
-                <div class="filters-panel">
-                    <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none;" onclick="document.getElementById('filtersContent').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('filtersContent').classList.contains('hidden') ? '▶' : '▼';">
-                        <span class="toggle-icon">▶</span>
-                        🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
-                    </h3>
-                    <div id="filtersContent" class="filters-grid hidden">
-                        <div class="filter-group">
-                            <label for="filterCarrera">Carrera:</label>
-                            <select id="filterCarrera" class="filter-select">
-                                <option value="">Todas las carreras</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filterMateria">Materia:</label>
-                            <select id="filterMateria" class="filter-select">
-                                <option value="">Todas las materias</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filterModalidad">Modalidad:</label>
-                            <select id="filterModalidad" class="filter-select">
-                                <option value="">Todas las modalidades</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filterSede">Sede:</label>
-                            <select id="filterSede" class="filter-select">
-                                <option value="">Todas las sedes</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filterDocente">Docente:</label>
-                            <select id="filterDocente" class="filter-select">
-                                <option value="">Todos los docentes</option>
-                            </select>
-                        </div>
-                        <div class="filter-actions">
-                            <button id="applyFilters" class="filter-btn apply">
-                                <span>✓</span> Aplicar Filtros
-                            </button>
-                            <button id="clearFilters" class="filter-btn clear">
-                                <span>✕</span> Limpiar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="filter-summary" id="filterSummary" style="display: none;">
-                        <span id="filterSummaryText"></span>
-                    </div>
-                    </div>
-                </div>
-
                 <!-- Gráficos -->
-                <div class="charts-container" id="chartsContainer">
+                <div class="charts-container hidden" id="chartsContainer">
                     <div class="chart-wrapper">
                         <div class="chart-card">
                             <h3>Distribución de Sentimientos</h3>
@@ -275,7 +277,8 @@
                 </div>
 
                 <!-- Tabla de resultados detallados -->
-                <div class="table-container" id="detailedResultsTable">
+                <!-- NOTA: Sección oculta para futuras versiones. Funciones asociadas: displayResultsTable(), filterResults(), paginación -->
+                <div class="table-container hidden" id="detailedResultsTable">
                     <h3 onclick="const content = this.nextElementSibling; content.classList.toggle('hidden'); const icon = this.querySelector('.collapse-icon'); icon.textContent = content.classList.contains('hidden') ? '▶' : '▼';" style="cursor: pointer; user-select: none;"><span class="collapse-icon">▶</span> Resultados Detallados</h3>
                     <div class="hidden">
                     <div class="table-filters">
