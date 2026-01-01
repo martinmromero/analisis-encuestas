@@ -40,12 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
         analyzeFile();
     });
 
-    // Event listeners para exportación
-    console.log('📝 Configurando exportación...');
-    const exportCsvBtn = document.getElementById('exportCsv');
-    console.log('exportCsv:', exportCsvBtn ? '✓' : '✗');
-    if (exportCsvBtn) exportCsvBtn.addEventListener('click', () => exportResults('csv'));
-    
     // Event listener para reporte avanzado XLSX
     console.log('📊 Configurando reporte avanzado...');
     const advancedReportBtn = document.getElementById('advancedReportBtn');
@@ -56,17 +50,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Event listener para limpieza manual de memoria
-    console.log('🧹 Configurando limpieza de memoria...');
-    const cleanMemoryBtn = document.getElementById('cleanMemory');
-    console.log('cleanMemory:', cleanMemoryBtn ? '✓' : '✗');
-    if (cleanMemoryBtn) {
-        cleanMemoryBtn.addEventListener('click', () => {
-            cleanupMemory();
-            alert('✅ Memoria limpiada exitosamente');
-        });
-    }
-
     // Event listeners para navegación entre secciones
     console.log('🔧 Agregando event listeners para navegación...');
     const analysisTab = document.getElementById('analysisTab');
