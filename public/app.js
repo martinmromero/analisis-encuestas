@@ -784,7 +784,7 @@ function displayNumericMetrics(results, filterOptions) {
                 <div class="metric-card ${scoreClass}">
                     <h4>${metric.column}</h4>
                     <div class="metric-value">${metric.avg.toFixed(2)}</div>
-                    <div class="metric-label">Promedio (${metric.count} respuestas)</div>
+                    <div class="metric-label">Promedio sobre ${metric.count} respuestas</div>
                     ${scaleLabel}
                 </div>
             `;

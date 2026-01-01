@@ -1331,9 +1331,9 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   // Ajustar anchos de columnas
   sheet.columns = [
     { width: 3 },
-    { width: 25 },
-    { width: 30 },
-    { width: 20 },
+    { width: 45 },  // Aumentado para boxes de preguntas
+    { width: 45 },  // Aumentado para boxes de preguntas
+    { width: 45 },  // Aumentado para boxes de preguntas
     { width: 20 },
     { width: 3 }
   ];
@@ -1748,7 +1748,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
       
       // Header (nombre de la pregunta)
       sheet.getCell(`${colLetter}${questionRow}`).value = field;
-      sheet.getCell(`${colLetter}${questionRow}`).font = { bold: true, size: 10, color: { argb: headerTextColor } };
+      sheet.getCell(`${colLetter}${questionRow}`).font = { bold: true, size: 11, color: { argb: headerTextColor } };
       sheet.getCell(`${colLetter}${questionRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } };
       sheet.getCell(`${colLetter}${questionRow}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       sheet.getCell(`${colLetter}${questionRow}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -1761,14 +1761,22 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
       sheet.getCell(`${colLetter}${questionRow + 1}`).numFmt = '0.00';
       sheet.getCell(`${colLetter}${questionRow + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
       
+      // Label (info sobre respuestas)
+      sheet.getCell(`${colLetter}${questionRow + 2}`).value = `Promedio sobre ${stat.count} respuestas`;
+      sheet.getCell(`${colLetter}${questionRow + 2}`).font = { size: 9, color: { argb: valueTextColor } };
+      sheet.getCell(`${colLetter}${questionRow + 2}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: valueColor } };
+      sheet.getCell(`${colLetter}${questionRow + 2}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      sheet.getCell(`${colLetter}${questionRow + 2}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+      
       questionIndex++;
     }
     
-    // Altura de las filas
-    sheet.getRow(questionRow).height = 30;
+    // Altura de las filas (aumentada para que se vea todo el texto con wrapText)
+    sheet.getRow(questionRow).height = 70;  // Aumentado de 50 a 70 para textos largos
     sheet.getRow(questionRow + 1).height = 35;
+    sheet.getRow(questionRow + 2).height = 20;  // Nueva fila para label
     
-    currentRow += 2; // Saltar a la siguiente fila de boxes
+    currentRow += 3; // Saltar a la siguiente fila de boxes (ahora son 3 filas por box)
   }
   
   console.log('✅ Hoja "Portada" creada');
