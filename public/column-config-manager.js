@@ -774,10 +774,12 @@ function saveScaleConfig() {
     const minInput = document.getElementById('scaleMinInput');
     const maxInput = document.getElementById('scaleMaxInput');
     const directionSelect = document.getElementById('scaleDirectionSelect');
+    const applyToAllCheckbox = document.getElementById('applyToAllNumeric');
     
     const min = parseInt(minInput.value);
     const max = parseInt(maxInput.value);
     const direction = directionSelect.value;
+    const applyToAll = applyToAllCheckbox ? applyToAllCheckbox.checked : false;
     
     // Validar
     if (isNaN(min) || isNaN(max)) {
@@ -795,8 +797,8 @@ function saveScaleConfig() {
         currentColumnConfig.escalas = {};
     }
     
-    // Guardar escala con dirección
-    currentColumnConfig.escalas[columnName] = {
+    // Crear objeto de configuración de escala
+    const scaleConfig = {
         type: 'scale',
         min: min,
         max: max,
@@ -804,7 +806,23 @@ function saveScaleConfig() {
         manual: true
     };
     
-    console.log(`✅ Escala configurada para "${columnName}": ${min}-${max} (${direction})`);
+    // Si se seleccionó aplicar a todas las numéricas
+    if (applyToAll) {
+        const numericColumns = currentColumnConfig.numericas || [];
+        let appliedCount = 0;
+        
+        numericColumns.forEach(column => {
+            currentColumnConfig.escalas[column] = { ...scaleConfig };
+            appliedCount++;
+        });
+        
+        console.log(`✅ Escala ${min}-${max} (${direction}) aplicada a ${appliedCount} columnas numéricas`);
+        alert(`✅ Configuración aplicada a ${appliedCount} preguntas numéricas:\n\nEscala: ${min}-${max}\nDirección: ${direction === 'ascending' ? 'Ascendente' : 'Descendente'}`);
+    } else {
+        // Guardar solo para la columna actual
+        currentColumnConfig.escalas[columnName] = scaleConfig;
+        console.log(`✅ Escala configurada para "${columnName}": ${min}-${max} (${direction})`);
+    }
     
     // Actualizar vista
     populateColumnLists();
