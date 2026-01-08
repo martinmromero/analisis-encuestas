@@ -115,14 +115,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (testWord) testWord.addEventListener('click', testWordAnalysis);
     
     // Event listeners para gestión de archivos
-    const exportDictionaryBtn = document.getElementById('exportDictionary');
+    const exportDictionaryExcelBtn = document.getElementById('exportDictionaryExcel');
     const importDictionaryBtn = document.getElementById('importDictionary');
     const dictionaryFileInput = document.getElementById('dictionaryFileInput');
     const resetDictionaryBtn = document.getElementById('resetDictionary');
     const activeDictionarySelect = document.getElementById('activeDictionarySelect');
     const deleteDictionaryBtn = document.getElementById('deleteDictionary');
     
-    if (exportDictionaryBtn) exportDictionaryBtn.addEventListener('click', exportDictionary);
+    if (exportDictionaryExcelBtn) exportDictionaryExcelBtn.addEventListener('click', exportDictionaryToExcel);
     if (importDictionaryBtn) {
         importDictionaryBtn.addEventListener('click', () => {
             if (dictionaryFileInput) dictionaryFileInput.click();
@@ -1477,29 +1477,30 @@ async function testSingleWord(word) {
     }
 }
 
-// Exportar diccionario
-async function exportDictionary() {
+// Exportar diccionario a Excel
+async function exportDictionaryToExcel() {
     try {
-        const response = await fetch('/api/dictionary/export');
+        const response = await fetch('/api/dictionary/export-excel');
         
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'diccionario-personalizado.json';
+            a.download = 'diccionario-sentimientos.xlsx';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             
-            alert('✅ Diccionario exportado exitosamente');
+            alert('✅ Diccionario exportado a Excel exitosamente');
         } else {
-            throw new Error('Error exportando diccionario');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error exportando diccionario');
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error exportando diccionario: ' + error.message);
+        alert('Error exportando diccionario a Excel: ' + error.message);
     }
 }
 

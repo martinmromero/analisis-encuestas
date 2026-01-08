@@ -2719,7 +2719,120 @@ app.get('/api/dictionary/export-excel', async (req, res) => {
 // Importar diccionario personalizado
 // Importar diccionario (JSON o Excel)
 app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, res) => {
-  return res.status(403).json({ error: 'Importación deshabilitada: sólo se permite el diccionario v4' });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió ningún archivo' });
+    }
+
+    const dictionaryName = req.body.dictionaryName || 'Diccionario Importado';
+    const file = req.file;
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    let importedDict = {};
+    
+    // Procesar según el tipo de archivo
+    if (ext === '.json') {
+      // Importar desde JSON
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      const jsonData = JSON.parse(fileContent);
+      
+      // Detectar el formato del JSON
+      if (jsonData.dictionary) {
+        // Formato completo con metadata
+        importedDict = jsonData.dictionary;
+      } else if (jsonData.labels) {
+        // Formato de sentiment
+        importedDict = jsonData.labels;
+      } else {
+        // Formato simple: objeto de palabra -> puntuación
+        importedDict = jsonData;
+      }
+    } else if (ext === '.xlsx' || ext === '.xls') {
+      // Importar desde Excel
+      const workbook = XLSX.readFile(file.path);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(sheet);
+      
+      // Convertir a diccionario
+      data.forEach(row => {
+        const word = row['Palabra/Frase'] || row['palabra'] || row['Palabra'] || row['word'];
+        const score = parseFloat(row['Puntuación'] || row['puntuacion'] || row['score'] || row['Puntuacion']);
+        
+        if (word && !isNaN(score)) {
+          importedDict[word.toLowerCase()] = score;
+        }
+      });
+    } else {
+      // Limpiar archivo temporal
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: 'Formato de archivo no soportado. Use JSON o Excel (.xlsx, .xls)' });
+    }
+    
+    // Validar que se importaron palabras
+    if (Object.keys(importedDict).length === 0) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: 'El archivo no contiene palabras válidas' });
+    }
+    
+    // Crear el archivo del diccionario
+    const fileName = dictionaryName.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    
+    // Crear directorio si no existe
+    if (!fs.existsSync(dictionariesDir)) {
+      fs.mkdirSync(dictionariesDir, { recursive: true });
+    }
+    
+    // Guardar el diccionario
+    const dictionaryData = {
+      name: dictionaryName,
+      dictionary: importedDict,
+      wordCount: Object.keys(importedDict).length,
+      created: new Date().toISOString(),
+      imported: true
+    };
+    
+    const savePath = path.join(dictionariesDir, `${fileName}.json`);
+    fs.writeFileSync(savePath, JSON.stringify(dictionaryData, null, 2));
+    
+    // Limpiar archivo temporal
+    fs.unlinkSync(file.path);
+    
+    // Activar el diccionario automáticamente
+    sentiment = new Sentiment();
+    const dictCopy = JSON.parse(JSON.stringify(importedDict));
+    sentiment.registerLanguage('es', { labels: dictCopy });
+    currentLabels = dictCopy;
+    
+    activeDictionary = {
+      name: dictionaryName,
+      fileName: fileName,
+      wordCount: Object.keys(importedDict).length,
+      customWords: 0,
+      labels: currentLabels
+    };
+    
+    console.log(`✅ Diccionario "${dictionaryName}" importado y activado (${activeDictionary.wordCount} palabras)`);
+    
+    res.json({ 
+      success: true, 
+      message: `Diccionario "${dictionaryName}" importado exitosamente con ${activeDictionary.wordCount} palabras`,
+      dictionaryName: dictionaryName,
+      fileName: fileName,
+      wordCount: activeDictionary.wordCount
+    });
+    
+  } catch (error) {
+    console.error('Error importando diccionario:', error);
+    
+    // Limpiar archivo temporal en caso de error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ error: 'Error importando diccionario: ' + error.message });
+  }
 });
 
 // Obtener diccionario activo
