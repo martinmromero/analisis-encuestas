@@ -1577,14 +1577,47 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
            key !== 'sentimentAnalysis';
   });
   
-  // Calcular estadísticas numéricas
+// Función compartida para determinar color de score (DEBE coincidir con frontend)
+function getScoreColorClass(score, escalaConfig = null) {
+  // Si no hay configuración de escala o es estándar 1-10, usar score directo
+  if (!escalaConfig || (escalaConfig.min === 1 && escalaConfig.max === 10 && escalaConfig.direction !== 'descending')) {
+    // Usar score tal cual está (ya es 0-10 o 1-10)
+    if (score >= 8) return 'green';
+    if (score >= 6) return 'yellow';
+    return 'red';
+  }
+  
+  // Si hay escala personalizada, normalizar a 0-10
+  const range = escalaConfig.max - escalaConfig.min;
+  let normalizedScore = score;
+  
+  if (range > 0) {
+    normalizedScore = ((score - escalaConfig.min) / range) * 10;
+    
+    // Si es descendente, invertir
+    if (escalaConfig.direction === 'descending') {
+      normalizedScore = 10 - normalizedScore;
+    }
+  }
+  
+  if (normalizedScore >= 8) return 'green';
+  if (normalizedScore >= 6) return 'yellow';
+  return 'red';
+}
+
+// Calcular estadísticas numéricas (con normalización para colores)
   const numericStats = {};
   numericFields.forEach(field => {
     const values = data.map(d => parseFloat(d[field])).filter(v => !isNaN(v));
     if (values.length > 0) {
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      
+      // Obtener configuración de escala si existe
+      const escalaConfig = (customConfig && customConfig.escalas && customConfig.escalas[field]) || null;
+      
       numericStats[field] = {
-        avg: avg.toFixed(2),
+        avg: avg.toFixed(2),           // Valor original para mostrar
+        escalaConfig: escalaConfig,    // Configuración de escala para colores
         count: values.length,
         min: Math.min(...values),
         max: Math.max(...values)
@@ -1721,25 +1754,25 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
       const stat = numericStats[field];
       const avg = parseFloat(stat.avg);
       
+      // Usar función compartida para determinar color
+      const colorClass = getScoreColorClass(avg, stat.escalaConfig);
+      
       // Determinar columna (B, C, D)
       const colLetter = String.fromCharCode(66 + col); // B=66, C=67, D=68
       
-      // Determinar color según el promedio
+      // Mapear clase de color a colores Excel
       let headerColor, headerTextColor, valueColor, valueTextColor;
-      if (avg >= 8) {
-        // Verde
+      if (colorClass === 'green') {
         headerColor = 'FF38A169';
         headerTextColor = 'FFFFFFFF';
         valueColor = 'FFC6F6D5';
         valueTextColor = 'FF22543D';
-      } else if (avg >= 6) {
-        // Amarillo
+      } else if (colorClass === 'yellow') {
         headerColor = 'FFDD6B20';
         headerTextColor = 'FFFFFFFF';
         valueColor = 'FFFEEBC8';
         valueTextColor = 'FF7C2D12';
       } else {
-        // Rojo
         headerColor = 'FFE53E3E';
         headerTextColor = 'FFFFFFFF';
         valueColor = 'FFFED7D7';

@@ -678,6 +678,34 @@ function changePage(newPage) {
 }
 
 // Función para calcular y mostrar métricas numéricas
+// Función GLOBAL para determinar color de score (usada en sitio y debe coincidir con Excel)
+function getScoreColor(score, escalaConfig = null) {
+    // Si no hay configuración de escala o es estándar 1-10, usar score directo
+    if (!escalaConfig || (escalaConfig.min === 1 && escalaConfig.max === 10 && escalaConfig.direction !== 'descending')) {
+        // Usar score tal cual está (ya es 0-10 o 1-10)
+        if (score >= 8) return 'score-high';
+        if (score >= 6) return 'score-medium';
+        return 'score-low';
+    }
+    
+    // Si hay escala personalizada, normalizar a 0-10
+    const range = escalaConfig.max - escalaConfig.min;
+    let normalizedScore = score;
+    
+    if (range > 0) {
+        normalizedScore = ((score - escalaConfig.min) / range) * 10;
+        
+        // Si es descendente, invertir
+        if (escalaConfig.direction === 'descending') {
+            normalizedScore = 10 - normalizedScore;
+        }
+    }
+    
+    if (normalizedScore >= 8) return 'score-high';
+    if (normalizedScore >= 6) return 'score-medium';
+    return 'score-low';
+}
+
 function displayNumericMetrics(results, filterOptions) {
     const container = document.getElementById('numericMetricsContainer');
     if (!container) {
@@ -725,20 +753,14 @@ function displayNumericMetrics(results, filterOptions) {
             ? values.reduce((sum, val) => sum + val, 0) / values.length 
             : 0;
 
-        // Determinar escala real (de metadata o inferida de valores)
-        let escala = escalas[column];
-        if (!escala && values.length > 0) {
-            // Inferir escala de los valores presentes
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            escala = { min, max };
-        }
+        // Obtener configuración de escala (NO inferir, solo usar si está configurada)
+        const escala = escalas[column] || null;
 
         return { 
             column, 
             avg, 
             count: values.length,
-            escala: escala || { min: 1, max: 10 } // Default 1-10
+            escala: escala
         };
     });
 
@@ -748,29 +770,12 @@ function displayNumericMetrics(results, filterOptions) {
     const metricsGrid = document.getElementById('metricsGrid');
     if (metricsGrid) {
         metricsGrid.innerHTML = metrics.map(metric => {
-            // Normalizar score según la escala real y dirección (0-10)
-            const range = metric.escala.max - metric.escala.min;
-            let normalizedAvg;
+            // Usar función global para determinar color
+            const scoreClass = getScoreColor(metric.avg, metric.escala);
             
-            if (range > 0) {
-                // Calcular normalizado base (0-10)
-                normalizedAvg = ((metric.avg - metric.escala.min) / range) * 10;
-                
-                // Si la escala es descendente, invertir (5=malo, 1=bueno)
-                if (metric.escala.direction === 'descending') {
-                    normalizedAvg = 10 - normalizedAvg;
-                }
-            } else {
-                normalizedAvg = metric.avg;
-            }
+            const directionIcon = metric.escala?.direction === 'descending' ? '⬇️' : '⬆️';
             
-            const scoreClass = normalizedAvg >= 8 ? 'score-high' : 
-                              normalizedAvg >= 6 ? 'score-medium' : 'score-low';
-            
-            const directionIcon = metric.escala.direction === 'descending' ? '⬇️' : '⬆️';
-            const directionLabel = metric.escala.direction === 'descending' ? 'Descendente' : 'Ascendente';
-            
-            const scaleLabel = metric.escala.min !== 1 || metric.escala.max !== 10
+            const scaleLabel = metric.escala && (metric.escala.min !== 1 || metric.escala.max !== 10)
                 ? `<div class="scale-info" style="font-size: 0.85em; color: #666;">Escala: ${metric.escala.min}-${metric.escala.max} ${directionIcon}</div>`
                 : '';
             
