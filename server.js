@@ -323,8 +323,8 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
     }
 
-    // Limitar a 5000 filas para evitar problemas de memoria
-    const MAX_ROWS = 5000;
+    // Limitar a 25000 filas para evitar problemas de memoria
+    const MAX_ROWS = 25000;
     if (jsonData.length > MAX_ROWS) {
       console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
       jsonData.splice(MAX_ROWS);
@@ -483,7 +483,7 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     }
 
     // Aplicar límite de filas
-    const MAX_ROWS = 5000;
+    const MAX_ROWS = 25000;
     if (jsonData.length > MAX_ROWS) {
       console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
       jsonData.splice(MAX_ROWS);
@@ -633,7 +633,7 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     }
 
     // Aplicar límite de filas
-    const MAX_ROWS = 5000;
+    const MAX_ROWS = 25000;
     if (jsonData.length > MAX_ROWS) {
       console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
       jsonData.splice(MAX_ROWS);
@@ -1568,14 +1568,23 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getRow(currentRow).height = 25;
   currentRow++;
   
-  // Calcular promedios de campos numéricos
-  const firstItem = data[0];
-  const numericFields = Object.keys(firstItem).filter(key => {
-    const value = firstItem[key];
-    return !isNaN(value) && value !== '' && value !== null && 
-           key !== 'ID' && !key.toLowerCase().includes('comision') &&
-           key !== 'sentimentAnalysis';
-  });
+  // Obtener columnas numéricas desde la configuración (igual que frontend)
+  let numericFields = [];
+  const config = customConfig || COLUMN_CONFIG;
+  if (config && config.numericas && config.numericas.length > 0) {
+    numericFields = config.numericas;
+    console.log(`📊 Usando ${numericFields.length} columnas numéricas desde configuración para Excel`);
+  } else {
+    // Fallback: autodetectar solo si no hay configuración
+    const firstItem = data[0];
+    numericFields = Object.keys(firstItem).filter(key => {
+      const value = firstItem[key];
+      return !isNaN(value) && value !== '' && value !== null && 
+             key !== 'ID' && !key.toLowerCase().includes('comision') &&
+             key !== 'sentimentAnalysis';
+    });
+    console.log(`📊 Auto-detectadas ${numericFields.length} columnas numéricas para Excel (sin configuración)`);
+  }
   
 // Función compartida para determinar color de score (DEBE coincidir con frontend)
 function getScoreColorClass(score, escalaConfig = null) {
@@ -1608,7 +1617,7 @@ function getScoreColorClass(score, escalaConfig = null) {
 // Calcular estadísticas numéricas (con normalización para colores)
   const numericStats = {};
   numericFields.forEach(field => {
-    const values = data.map(d => parseFloat(d[field])).filter(v => !isNaN(v));
+    const values = data.map(d => parseFloat(d[field])).filter(v => !isNaN(v) && v > 0);
     if (values.length > 0) {
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
       
@@ -1622,6 +1631,8 @@ function getScoreColorClass(score, escalaConfig = null) {
         min: Math.min(...values),
         max: Math.max(...values)
       };
+    } else {
+      console.log(`⚠️ Campo "${field}" no tiene valores válidos (>0), se omitirá en el reporte`);
     }
   });
   
@@ -1837,16 +1848,22 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
     return;
   }
   
-  // Identificar columnas numéricas (cuantitativas) desde config o auto-detectar
+  // Identificar columnas numéricas desde configuración (igual que frontend)
   let numericColumns = [];
-  if (customConfig && customConfig.columnas) {
+  const config = customConfig || COLUMN_CONFIG;
+  
+  if (config && config.numericas && config.numericas.length > 0) {
+    numericColumns = config.numericas;
+    console.log(`📊 Usando ${numericColumns.length} columnas numéricas desde configuración`);
+  } else if (customConfig && customConfig.columnas) {
+    // Fallback: buscar en formato antiguo
     const numericConfig = customConfig.columnas.find(c => c.tipo === 'numerica');
     if (numericConfig && numericConfig.valores) {
       numericColumns = numericConfig.valores;
     }
   }
   
-  // Auto-detectar columnas numéricas si no hay config
+  // Auto-detectar columnas numéricas solo si no hay configuración
   if (numericColumns.length === 0) {
     numericColumns = allColumns.filter(col => {
       const value = firstRow[col];
@@ -1855,6 +1872,7 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
              !col.toLowerCase().includes('comision') &&
              col !== actualField; // Excluir el campo de agrupación
     });
+    console.log(`📊 Auto-detectadas ${numericColumns.length} columnas numéricas (sin configuración)`);
   }
   
   console.log(`📊 Columnas numéricas detectadas (${numericColumns.length}):`, numericColumns.slice(0, 3));
@@ -2360,7 +2378,7 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
       console.log(`✂️ Filtrado aplicado: ${jsonData.length} de ${originalLength} filas`);
     }
 
-    const MAX_ROWS = 5000;
+    const MAX_ROWS = 25000;
     if (jsonData.length > MAX_ROWS) {
       console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
       jsonData.splice(MAX_ROWS);

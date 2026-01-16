@@ -2390,6 +2390,12 @@ footer {
     border: 1px solid #81c784;
 }
 
+.column-pill-small.unassigned {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
 /* Modal de configuraci�n */
 .modal {
     position: fixed;

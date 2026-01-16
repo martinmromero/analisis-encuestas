@@ -4,6 +4,7 @@ let currentColumnConfig = {
     identificacion: [],
     numericas: [],
     textoLibre: [],
+    sinAsignar: [],
     escalas: {}
 };
 
@@ -114,7 +115,8 @@ async function loadDefaultConfig() {
             name: 'Default',
             identificacion: config.identificacion || [],
             numericas: config.numericas || [],
-            textoLibre: config.textoLibre || []
+            textoLibre: config.textoLibre || [],
+            sinAsignar: []
         };
         
         updateConfigPreview();
@@ -169,6 +171,7 @@ async function detectColumnsFromFile(file) {
                     identificacion: [],
                     numericas: [],
                     textoLibre: [],
+                    sinAsignar: [],
                     escalas: {}
                 };
                 console.log('⚠️ No hay configuración seleccionada.');
@@ -330,14 +333,38 @@ function populateColumnLists() {
         textList.appendChild(createColumnPill(col, 'textoLibre'));
     });
     
-    // Poblar "Sin Asignar" con columnas detectadas que NO estén asignadas
+    // Poblar "Sin Asignar" con columnas detectadas o guardadas
+    let unassigned = [];
+    
     if (detectedColumns.length > 0) {
-        console.log('📋 Mostrando columnas sin asignar del archivo actual');
-        detectedColumns.forEach(col => {
-            if (!assigned.has(col)) {
-                unassignedList.appendChild(createColumnPill(col, 'unassigned'));
-            }
+        // Si hay columnas detectadas del archivo actual, calcular dinámicamente
+        unassigned = detectedColumns.filter(col => !assigned.has(col));
+        console.log(`📋 Mostrando ${unassigned.length} columnas sin asignar de ${detectedColumns.length} columnas detectadas`);
+    } else if (currentColumnConfig.sinAsignar && currentColumnConfig.sinAsignar.length > 0) {
+        // Si no hay archivo, usar las columnas sin asignar guardadas
+        unassigned = currentColumnConfig.sinAsignar;
+        console.log(`📋 Mostrando ${unassigned.length} columnas sin asignar guardadas en la configuración`);
+    }
+    
+    if (unassigned.length > 0) {
+        unassigned.forEach(col => {
+            unassignedList.appendChild(createColumnPill(col, 'unassigned'));
         });
+        
+        // Actualizar mensaje descriptivo
+        const unassignedCategory = document.querySelector('.column-category.unassigned .category-desc');
+        if (unassignedCategory) {
+            unassignedCategory.textContent = `${unassigned.length} columna${unassigned.length !== 1 ? 's' : ''} sin clasificar`;
+        }
+    } else {
+        const unassignedCategory = document.querySelector('.column-category.unassigned .category-desc');
+        if (unassignedCategory) {
+            if (detectedColumns.length > 0) {
+                unassignedCategory.textContent = 'Todas las columnas están clasificadas ✓';
+            } else {
+                unassignedCategory.textContent = 'Carga un archivo Excel para detectar columnas';
+            }
+        }
     }
     
     // Actualizar nombre de configuración
@@ -523,7 +550,16 @@ function handleDrop(e) {
 
 // Aplicar configuración
 function applyConfiguration() {
-    detectedColumns = []; // Limpiar columnas detectadas
+    // Calcular y guardar columnas sin asignar en la configuración
+    if (detectedColumns.length > 0) {
+        const assigned = new Set([
+            ...currentColumnConfig.identificacion,
+            ...currentColumnConfig.numericas,
+            ...currentColumnConfig.textoLibre
+        ]);
+        currentColumnConfig.sinAsignar = detectedColumns.filter(col => !assigned.has(col));
+    }
+    
     updateConfigPreview();
     closeConfigModal();
     console.log('✅ Configuración aplicada:', currentColumnConfig);
@@ -537,6 +573,16 @@ async function saveConfiguration() {
     const configName = nameInput.value.trim() || 'Sin nombre';
     currentColumnConfig.name = configName;
     
+    // Calcular y guardar columnas sin asignar
+    if (detectedColumns.length > 0) {
+        const assigned = new Set([
+            ...currentColumnConfig.identificacion,
+            ...currentColumnConfig.numericas,
+            ...currentColumnConfig.textoLibre
+        ]);
+        currentColumnConfig.sinAsignar = detectedColumns.filter(col => !assigned.has(col));
+    }
+    
     try {
         const response = await fetch('/api/save-column-config', {
             method: 'POST',
@@ -546,7 +592,6 @@ async function saveConfiguration() {
         
         const result = await response.json();
         if (result.success) {
-            detectedColumns = []; // Limpiar columnas detectadas
             alert(`✅ Configuración "${configName}" guardada exitosamente`);
             await loadSavedConfigs();
         } else {
@@ -618,11 +663,22 @@ function loadSelectedConfig() {
     }
     
     // Cargar directamente sin confirmación
-    currentColumnConfig = { ...config };
-    detectedColumns = []; // Limpiar columnas detectadas al cargar configuración guardada
+    currentColumnConfig = { 
+        ...config,
+        sinAsignar: config.sinAsignar || [] // Asegurar que sinAsignar exista
+    };
+    
+    // Sincronizar detectedColumns con las columnas guardadas
+    const allColumns = [
+        ...currentColumnConfig.identificacion,
+        ...currentColumnConfig.numericas,
+        ...currentColumnConfig.textoLibre,
+        ...currentColumnConfig.sinAsignar
+    ];
+    detectedColumns = allColumns;
+    
     updateConfigPreview();
-    // NO abrir automáticamente el colapsable - solo actualizar el preview
-    console.log('✅ Configuración cargada:', currentColumnConfig.name);
+    console.log('✅ Configuración cargada:', currentColumnConfig.name, '- Columnas detectadas:', detectedColumns.length);
 }
 
 // Eliminar configuración seleccionada
@@ -667,9 +723,12 @@ function updateConfigPreview() {
     const idCount = document.getElementById('previewIdCount');
     const numCount = document.getElementById('previewNumCount');
     const textCount = document.getElementById('previewTextCount');
+    const unassignedCount = document.getElementById('previewUnassignedCount');
     const idColumns = document.getElementById('previewIdColumns');
     const numColumns = document.getElementById('previewNumColumns');
     const textColumns = document.getElementById('previewTextColumns');
+    const unassignedColumns = document.getElementById('previewUnassignedColumns');
+    const unassignedSection = document.getElementById('previewUnassignedSection');
     
     if (!preview) return;
     
@@ -701,6 +760,35 @@ function updateConfigPreview() {
         textColumns.innerHTML = currentColumnConfig.textoLibre.map(col => 
             `<span class="column-pill-small text">${col}</span>`
         ).join('');
+    }
+    
+    // Calcular y mostrar columnas sin asignar
+    let unassigned = [];
+    
+    if (detectedColumns.length > 0) {
+        // Si hay columnas detectadas del archivo actual, calcular sin asignar dinámicamente
+        const assigned = new Set([
+            ...currentColumnConfig.identificacion,
+            ...currentColumnConfig.numericas,
+            ...currentColumnConfig.textoLibre
+        ]);
+        unassigned = detectedColumns.filter(col => !assigned.has(col));
+    } else if (currentColumnConfig.sinAsignar && currentColumnConfig.sinAsignar.length > 0) {
+        // Si no hay archivo cargado, usar las columnas sin asignar guardadas en la config
+        unassigned = currentColumnConfig.sinAsignar;
+    }
+    
+    if (unassigned.length > 0) {
+        if (unassignedCount) unassignedCount.textContent = unassigned.length;
+        if (unassignedColumns) {
+            unassignedColumns.innerHTML = unassigned.map(col => 
+                `<span class="column-pill-small unassigned" style="background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B;">${col}</span>`
+            ).join('');
+        }
+        if (unassignedSection) unassignedSection.style.display = 'block';
+        console.log('⚠️ Columnas sin asignar:', unassigned.length);
+    } else {
+        if (unassignedSection) unassignedSection.style.display = 'none';
     }
 }
 
