@@ -3147,7 +3147,10 @@ app.post('/api/detect-columns', upload.single('excelFile'), (req, res) => {
 
     if (jsonData.length > 0) {
       const columns = Object.keys(jsonData[0]);
-      console.log('📋 Columnas detectadas:', columns);
+      console.log('📋 Columnas detectadas:', columns.length);
+      
+      // Analizar contenido de cada columna para clasificación inteligente
+      const columnAnalysis = analyzeColumnsContent(jsonData, columns);
       
       // Limpiar archivo temporal
       fs.unlinkSync(req.file.path);
@@ -3155,7 +3158,8 @@ app.post('/api/detect-columns', upload.single('excelFile'), (req, res) => {
       res.json({
         success: true,
         columns: columns,
-        totalRows: jsonData.length
+        totalRows: jsonData.length,
+        analysis: columnAnalysis  // Incluir análisis para clasificación automática
       });
     } else {
       fs.unlinkSync(req.file.path);
@@ -3167,6 +3171,187 @@ app.post('/api/detect-columns', upload.single('excelFile'), (req, res) => {
     res.status(500).json({ error: 'Error procesando archivo' });
   }
 });
+
+// Función para analizar el contenido de las columnas y sugerir tipo
+function analyzeColumnsContent(data, columns) {
+  const sampleSize = Math.min(100, data.length); // Analizar hasta 100 registros
+  const analysis = {};
+  
+  columns.forEach(columnName => {
+    const samples = data.slice(0, sampleSize).map(row => row[columnName]).filter(v => v !== null && v !== undefined && v !== '');
+    
+    if (samples.length === 0) {
+      analysis[columnName] = { type: 'identificacion', confidence: 'low', reason: 'Sin datos' };
+      return;
+    }
+    
+    // Calcular estadísticas básicas
+    const uniqueValues = new Set(samples.map(v => String(v).trim()));
+    const uniqueCount = uniqueValues.size;
+    const uniqueRatio = uniqueCount / samples.length;
+    const avgLength = samples.reduce((sum, v) => sum + String(v).length, 0) / samples.length;
+    
+    // Detectar si son valores numéricos
+    const numericSamples = samples.filter(v => {
+      const str = String(v).trim();
+      // Permitir números puros o formato "1. Texto"
+      return !isNaN(parseFloat(str)) || /^(\d+)\s*[.\-:)]\s*/.test(str);
+    });
+    const numericRatio = numericSamples.length / samples.length;
+    
+    // Detectar si son valores numéricos puros (sin texto adicional)
+    const pureNumericSamples = samples.filter(v => {
+      const str = String(v).trim();
+      return !isNaN(parseFloat(str)) && String(parseFloat(str)) === str;
+    });
+    const pureNumericRatio = pureNumericSamples.length / samples.length;
+    
+    // Detectar escalas numéricas
+    let scaleInfo = null;
+    
+    // Detectar formato "1. Opción", "5. Excelente"
+    const scalePattern = /^(\d+)\s*[.\-:)]\s*(.+)$/;
+    const scaleValues = [];
+    const scaleLabels = {};
+    
+    samples.forEach(sample => {
+      const match = String(sample).match(scalePattern);
+      if (match) {
+        const value = parseInt(match[1]);
+        const label = match[2].trim();
+        scaleValues.push(value);
+        scaleLabels[value] = label;
+      }
+    });
+    
+    if (scaleValues.length >= 2) {
+      const min = Math.min(...scaleValues);
+      const max = Math.max(...scaleValues);
+      scaleInfo = {
+        min: min,
+        max: max,
+        direction: 'ascending',
+        labels: scaleLabels,
+        pattern: 'labeled'
+      };
+    } else if (pureNumericRatio >= 0.7) {
+      // Escala numérica pura
+      const numValues = pureNumericSamples.map(v => parseFloat(String(v).trim()));
+      const min = Math.min(...numValues);
+      const max = Math.max(...numValues);
+      
+      if (max <= 10 && min >= 0) {
+        scaleInfo = {
+          min: Math.floor(min),
+          max: Math.ceil(max),
+          direction: 'ascending',
+          pattern: 'pure'
+        };
+      }
+    }
+    
+    // Patrones en el nombre de la columna
+    const colLower = columnName.toLowerCase();
+    const isIdPattern = /^(id|codigo|cod|numero|nro|num)$/i.test(colLower);
+    const isIdentityPattern = /carrera|materia|docente|profesor|sede|modalidad|comision|turno|año|periodo|fecha|campus|facultad|departamento/i.test(colLower);
+    const isNumericPattern = /evalua|califica|puntua|escala|cumple|demost|considera|aprend|desempeño|desempen|satisfaccion|calidad|nota|promedio|puntaje|score|rate|rating|puntos/i.test(colLower);
+    const isTextPattern = /comentario|observacion|sugerencia|motivo|porque|por que|descripcion|detalle|opinion|feedback|respuesta|indique|explique|mencione|describa/i.test(colLower);
+    
+    // Lógica de clasificación
+    let type = 'identificacion';
+    let confidence = 'medium';
+    let reason = '';
+    
+    // 1. Campos ID específicos
+    if (isIdPattern) {
+      type = 'identificacion';
+      confidence = 'high';
+      reason = 'Campo identificador';
+    }
+    // 2. Campos numéricos puros con escala limitada (1-10, 1-5, etc.)
+    else if (pureNumericRatio >= 0.9) {
+      const numValues = pureNumericSamples.map(v => parseFloat(String(v).trim()));
+      const min = Math.min(...numValues);
+      const max = Math.max(...numValues);
+      
+      // Si es escala 1-10, 1-5, 0-10, etc. → campo numérico de evaluación
+      if ((max <= 10 && min >= 0) || (max <= 5 && min >= 1) || isNumericPattern) {
+        type = 'numerica';
+        confidence = 'high';
+        reason = `Valores numéricos (${min}-${max}), escala de evaluación`;
+      } 
+      // Si tiene muchos valores únicos y no es patrón de evaluación → probablemente ID
+      else if (uniqueRatio > 0.8) {
+        type = 'identificacion';
+        confidence = 'high';
+        reason = 'Números únicos (probablemente IDs)';
+      }
+      // Valores numéricos con baja variabilidad → numérica
+      else {
+        type = 'numerica';
+        confidence = 'medium';
+        reason = 'Valores numéricos';
+      }
+    }
+    // 3. Formato "1. Opción", "5. Excelente" → numérica
+    else if (numericRatio >= 0.8 && !pureNumericRatio) {
+      const scalePattern = /^(\d+)\s*[.\-:)]\s*(.+)$/;
+      const hasScale = samples.some(v => scalePattern.test(String(v).trim()));
+      if (hasScale) {
+        type = 'numerica';
+        confidence = 'high';
+        reason = 'Escala con etiquetas (ej: "1. Opción")';
+      }
+    }
+    // 4. Texto largo → cualitativa
+    else if (avgLength > 50 || isTextPattern) {
+      type = 'textoLibre';
+      confidence = avgLength > 100 ? 'high' : 'medium';
+      reason = `Texto promedio ${Math.round(avgLength)} caracteres`;
+    }
+    // 5. Pocos valores únicos + patrón de identidad → identificación
+    else if (uniqueRatio < 0.3 || isIdentityPattern) {
+      type = 'identificacion';
+      confidence = 'high';
+      reason = `${uniqueCount} valores únicos de ${samples.length} (${Math.round(uniqueRatio * 100)}%)`;
+    }
+    // 6. Muchos valores únicos pero textos cortos → texto libre
+    else if (uniqueRatio > 0.7 && avgLength > 20) {
+      type = 'textoLibre';
+      confidence = 'medium';
+      reason = 'Alta variabilidad en respuestas';
+    }
+    // 7. Por defecto, identificación
+    else {
+      type = 'identificacion';
+      confidence = 'low';
+      reason = 'Clasificación por defecto';
+    }
+    
+    analysis[columnName] = {
+      type,
+      confidence,
+      reason,
+      stats: {
+        samples: samples.length,
+        unique: uniqueCount,
+        uniqueRatio: Math.round(uniqueRatio * 100),
+        avgLength: Math.round(avgLength),
+        numericRatio: Math.round(numericRatio * 100)
+      },
+      // Incluir información de escala si fue detectada
+      ...(scaleInfo && { scale: scaleInfo })
+    };
+  });
+  
+  console.log('🔍 Análisis de columnas completado:');
+  Object.entries(analysis).forEach(([col, info]) => {
+    const scaleStr = info.scale ? ` [${info.scale.min}-${info.scale.max}]` : '';
+    console.log(`  ${col}: ${info.type} (${info.confidence}) - ${info.reason}${scaleStr}`);
+  });
+  
+  return analysis;
+}
 
 // Analizar metadata de columnas (detectar escalas automáticamente)
 app.post('/api/analyze-column-metadata', upload.single('excelFile'), (req, res) => {

@@ -139,7 +139,22 @@ async function detectColumnsFromFile(file) {
         const data = await response.json();
         if (data.success) {
             detectedColumns = data.columns;
-            console.log('📋 Columnas detectadas del nuevo archivo:', detectedColumns);
+            
+            // Guardar análisis de columnas para clasificación inteligente
+            window.columnAnalysis = data.analysis || {};
+            
+            console.log('📋 Columnas detectadas del nuevo archivo:', detectedColumns.length);
+            if (data.analysis) {
+                const summary = {
+                    identificacion: 0,
+                    numerica: 0,
+                    textoLibre: 0
+                };
+                Object.values(data.analysis).forEach(a => {
+                    summary[a.type]++;
+                });
+                console.log('🔍 Clasificación automática sugerida:', summary);
+            }
             
             // Mostrar notificación sobre el archivo nuevo
             const fileInfo = document.createElement('div');
@@ -235,46 +250,109 @@ function createNewConfigFromFile() {
     // Abrir modal para que el usuario pueda ajustar
     openConfigModal();
     
-    // Mostrar notificación
-    alert(`✅ Se creó una nueva configuración con ${detectedColumns.length} columnas detectadas.\n\n` +
-          `📋 Identificación: ${autoConfig.identificacion.length}\n` +
-          `📊 Numéricas: ${autoConfig.numericas.length}\n` +
-          `💬 Texto Libre: ${autoConfig.textoLibre.length}\n\n` +
-          `Puedes ajustar la clasificación arrastrando las columnas.`);
+    // Mostrar notificación mejorada con detalles de la clasificación
+    const totalCols = detectedColumns.length;
+    const highConfidence = Object.values(window.columnAnalysis || {}).filter(a => a.confidence === 'high').length;
+    const mediumConfidence = Object.values(window.columnAnalysis || {}).filter(a => a.confidence === 'medium').length;
+    
+    let message = `✅ Configuración automática creada con ${totalCols} columnas detectadas:\n\n`;
+    message += `🏷️ Identificación: ${autoConfig.identificacion.length} columnas\n`;
+    message += `📊 Numéricas: ${autoConfig.numericas.length} columnas\n`;
+    message += `💬 Texto Libre: ${autoConfig.textoLibre.length} columnas\n\n`;
+    
+    if (highConfidence > 0 || mediumConfidence > 0) {
+        message += `🎯 Confianza de clasificación:\n`;
+        message += `  Alta: ${highConfidence} columnas ✓\n`;
+        if (mediumConfidence > 0) {
+            message += `  Media: ${mediumConfidence} columnas (revisar)\n`;
+        }
+        message += `\n`;
+    }
+    
+    message += `Puedes ajustar la clasificación arrastrando las columnas entre secciones.`;
+    
+    alert(message);
 }
 
-// Clasificar automáticamente columnas según nombre/contenido
+// Clasificar automáticamente columnas según análisis del servidor
 function autoClassifyColumns(columns) {
     const config = {
         identificacion: [],
         numericas: [],
-        textoLibre: []
+        textoLibre: [],
+        escalas: {} // Añadir escalas detectadas
     };
     
-    // Patrones para identificación
-    const idPatterns = /id|codigo|carrera|materia|docente|profesor|sede|modalidad|comision|turno|año|periodo|fecha/i;
+    // Si hay análisis del servidor, usarlo (más preciso)
+    const analysis = window.columnAnalysis || {};
     
-    // Patrones para texto libre (preguntas abiertas)
-    const textPatterns = /comentario|observacion|sugerencia|motivo|porque|por que|descripcion|detalle|opinion|feedback|respuesta abierta|indique|explique/i;
-    
-    // Patrones para numéricas (escalas de evaluación)
-    const numericPatterns = /evalua|califica|puntua|escala|cumple|demost|considera|aprend|desempeño|desempen|satisfaccion|calidad|nota|promedio/i;
-    
-    columns.forEach(col => {
-        const colLower = col.toLowerCase();
+    if (Object.keys(analysis).length > 0) {
+        console.log('🤖 Usando clasificación inteligente basada en análisis de contenido');
         
-        // Clasificar por patrones
-        if (idPatterns.test(colLower)) {
-            config.identificacion.push(col);
-        } else if (textPatterns.test(colLower)) {
-            config.textoLibre.push(col);
-        } else if (numericPatterns.test(colLower)) {
-            config.numericas.push(col);
-        } else {
-            // Por defecto, columnas desconocidas van a identificación
-            config.identificacion.push(col);
-        }
-    });
+        columns.forEach(col => {
+            const columnInfo = analysis[col];
+            if (columnInfo) {
+                // Usar el tipo sugerido por el análisis del servidor
+                if (columnInfo.type === 'numerica') {
+                    config.numericas.push(col);
+                    
+                    // Si detectó escala, configurarla automáticamente
+                    if (columnInfo.scale) {
+                        config.escalas[col] = {
+                            min: columnInfo.scale.min,
+                            max: columnInfo.scale.max,
+                            direction: columnInfo.scale.direction,
+                            labels: columnInfo.scale.labels || null
+                        };
+                        console.log(`  📏 ${col}: Escala detectada ${columnInfo.scale.min}-${columnInfo.scale.max}`);
+                    }
+                } else if (columnInfo.type === 'textoLibre') {
+                    config.textoLibre.push(col);
+                } else {
+                    config.identificacion.push(col);
+                }
+                
+                // Log para debug
+                if (columnInfo.confidence === 'high') {
+                    console.log(`  ✅ ${col} → ${columnInfo.type} (${columnInfo.reason})`);
+                } else {
+                    console.log(`  ⚠️ ${col} → ${columnInfo.type} (${columnInfo.reason})`);
+                }
+            } else {
+                // Fallback: clasificación por nombre
+                config.identificacion.push(col);
+            }
+        });
+    } else {
+        // Fallback: clasificación solo por patrones de nombre (método antiguo)
+        console.log('📝 Usando clasificación por nombre de columnas (fallback)');
+        
+        const idPatterns = /^(id|codigo|cod|numero|nro|num)$|carrera|materia|docente|profesor|sede|modalidad|comision|turno|año|periodo|fecha/i;
+        const textPatterns = /comentario|observacion|sugerencia|motivo|porque|por que|descripcion|detalle|opinion|feedback|respuesta abierta|indique|explique|mencione/i;
+        const numericPatterns = /evalua|califica|puntua|escala|cumple|demost|considera|aprend|desempeño|desempen|satisfaccion|calidad|nota|promedio|puntaje/i;
+        
+        columns.forEach(col => {
+            const colLower = col.toLowerCase();
+            
+            if (idPatterns.test(colLower)) {
+                config.identificacion.push(col);
+            } else if (textPatterns.test(colLower)) {
+                config.textoLibre.push(col);
+            } else if (numericPatterns.test(colLower)) {
+                config.numericas.push(col);
+            } else {
+                config.identificacion.push(col);
+            }
+        });
+    }
+    
+    console.log('📊 Resultado de clasificación automática:');
+    console.log(`  🏷️ Identificación: ${config.identificacion.length} columnas`);
+    console.log(`  📊 Numéricas: ${config.numericas.length} columnas`);
+    console.log(`  💬 Texto Libre: ${config.textoLibre.length} columnas`);
+    if (Object.keys(config.escalas).length > 0) {
+        console.log(`  📏 Escalas detectadas: ${Object.keys(config.escalas).length} columnas`);
+    }
     
     return config;
 }
@@ -380,9 +458,43 @@ function createColumnPill(columnName, category) {
     pill.dataset.column = columnName;
     pill.dataset.category = category;
     
+    // Agregar tooltip con información de análisis
+    const analysis = window.columnAnalysis?.[columnName];
+    if (analysis && analysis.stats) {
+        const stats = analysis.stats;
+        pill.title = `${columnName}\n` +
+                     `Tipo: ${analysis.type}\n` +
+                     `Razón: ${analysis.reason}\n` +
+                     `Valores únicos: ${stats.unique} de ${stats.samples} (${stats.uniqueRatio}%)\n` +
+                     `Longitud promedio: ${stats.avgLength} caracteres\n` +
+                     `Valores numéricos: ${stats.numericRatio}%`;
+    }
+    
     const label = document.createElement('span');
     label.className = 'column-label';
     label.textContent = columnName;
+    
+    // Agregar indicador de confianza si hay análisis disponible
+    if (analysis) {
+        const confidenceIcon = document.createElement('span');
+        confidenceIcon.className = 'confidence-indicator';
+        
+        if (analysis.confidence === 'high') {
+            confidenceIcon.textContent = ' ✓';
+            confidenceIcon.style.color = '#22c55e';
+            confidenceIcon.title = `Alta confianza: ${analysis.reason}`;
+        } else if (analysis.confidence === 'medium') {
+            confidenceIcon.textContent = ' ~';
+            confidenceIcon.style.color = '#f59e0b';
+            confidenceIcon.title = `Media confianza: ${analysis.reason} - Revisar clasificación`;
+        } else {
+            confidenceIcon.textContent = ' ?';
+            confidenceIcon.style.color = '#94a3b8';
+            confidenceIcon.title = `Baja confianza: ${analysis.reason} - Verificar clasificación`;
+        }
+        
+        label.appendChild(confidenceIcon);
+    }
     
     // Mostrar escala si existe
     if (currentColumnConfig.escalas && currentColumnConfig.escalas[columnName]) {
@@ -606,44 +718,53 @@ async function saveConfiguration() {
 // Cargar configuraciones guardadas
 async function loadSavedConfigs() {
     try {
+        console.log('🔄 Iniciando carga de configuraciones guardadas...');
         const response = await fetch('/api/saved-column-configs');
+        console.log('📡 Respuesta recibida:', response.status);
+        
         const data = await response.json();
+        console.log('📦 Datos recibidos:', data);
         
         savedConfigs = data.configs || [];
+        console.log(`📊 Configuraciones cargadas: ${savedConfigs.length}`);
         
         const select = document.getElementById('savedConfigsSelect');
+        const quickSelect = document.getElementById('quickConfigSelect');
+        
+        console.log('🔍 Elementos encontrados:', { 
+            select: !!select, 
+            quickSelect: !!quickSelect 
+        });
+        
         if (select) {
             select.innerHTML = '<option value="">-- Seleccionar configuración --</option>';
-            let luciaIndex = -1;
             savedConfigs.forEach((config, index) => {
                 const option = document.createElement('option');
                 option.value = index;
                 option.textContent = `${config.name} (${config.identificacion.length + config.numericas.length + config.textoLibre.length} columnas)`;
                 select.appendChild(option);
-                
-                // Buscar configuración "Lucia" (case-insensitive)
-                if (config.name.toLowerCase() === 'lucia') {
-                    luciaIndex = index;
-                }
             });
-            
-            // También poblar el dropdown rápido
-            const quickSelect = document.getElementById('quickConfigSelect');
-            if (quickSelect) {
-                quickSelect.innerHTML = '<option value="">⚙️ Seleccionar configuración de columnas...</option>';
-                savedConfigs.forEach((config, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = `${config.name} (${config.textoLibre.length} cols texto libre)`;
-                    quickSelect.appendChild(option);
-                });
-            }
-            
-            // NO auto-seleccionar ninguna configuración por defecto
-            console.log('✅ Configuraciones cargadas. Por favor selecciona una configuración antes de analizar.');
+            console.log(`✅ ${savedConfigs.length} configuraciones agregadas a savedConfigsSelect`);
+        } else {
+            console.warn('⚠️ savedConfigsSelect no encontrado');
         }
+        
+        if (quickSelect) {
+            quickSelect.innerHTML = '<option value="">⚙️ Seleccionar configuración de columnas...</option>';
+            savedConfigs.forEach((config, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${config.name} (${config.textoLibre.length} cols texto libre)`;
+                quickSelect.appendChild(option);
+            });
+            console.log(`✅ ${savedConfigs.length} configuraciones agregadas a quickConfigSelect`);
+        } else {
+            console.warn('⚠️ quickConfigSelect no encontrado');
+        }
+        
+        console.log('✅ Configuraciones cargadas completamente');
     } catch (error) {
-        console.error('Error cargando configuraciones:', error);
+        console.error('❌ Error cargando configuraciones:', error);
     }
 }
 
@@ -804,9 +925,15 @@ function openScaleConfigModal(columnName) {
     const minInput = document.getElementById('scaleMinInput');
     const maxInput = document.getElementById('scaleMaxInput');
     const directionSelect = document.getElementById('scaleDirectionSelect');
+    const autoDetectedBadge = document.getElementById('autoDetectedBadge');
     
     // Mostrar nombre de columna
     columnNameSpan.textContent = columnName;
+    
+    // Ocultar badge por defecto
+    if (autoDetectedBadge) {
+        autoDetectedBadge.classList.add('hidden');
+    }
     
     // Cargar valores actuales si existen
     const currentScale = currentColumnConfig.escalas?.[columnName];
@@ -815,9 +942,28 @@ function openScaleConfigModal(columnName) {
         maxInput.value = currentScale.max;
         directionSelect.value = currentScale.direction || 'ascending';
     } else {
-        minInput.value = '1';
-        maxInput.value = '5';
-        directionSelect.value = 'ascending';
+        // Intentar usar valores detectados automáticamente
+        const analysis = window.columnAnalysis || {};
+        const columnInfo = analysis[columnName];
+        
+        if (columnInfo?.scale) {
+            // Usar escala detectada automáticamente
+            minInput.value = columnInfo.scale.min;
+            maxInput.value = columnInfo.scale.max;
+            directionSelect.value = columnInfo.scale.direction || 'ascending';
+            
+            // Mostrar badge indicando detección automática
+            if (autoDetectedBadge) {
+                autoDetectedBadge.classList.remove('hidden');
+            }
+            
+            console.log(`📏 Usando escala detectada para "${columnName}": ${columnInfo.scale.min}-${columnInfo.scale.max}`);
+        } else {
+            // Valores por defecto
+            minInput.value = '1';
+            maxInput.value = '5';
+            directionSelect.value = 'ascending';
+        }
     }
     
     // Actualizar hint de dirección

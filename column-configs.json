@@ -481,5 +481,250 @@
     },
     "created": "2026-01-14T15:22:27.351Z",
     "updated": "2026-01-14T15:25:03.361Z"
+  },
+  {
+    "name": "Config_2026-01-19",
+    "identificacion": [
+      "LLAVE_MAESTRA",
+      "ID",
+      "CARRERA",
+      "MODALIDAD",
+      "SEDE",
+      "MATERIA",
+      "DOCENTE",
+      "COMISION"
+    ],
+    "numericas": [
+      "La asignatura cumple con lo expresado en el programa analítico",
+      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada",
+      "El docente demostró dominio de los contenidos de la materia",
+      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.",
+      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.",
+      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.",
+      "Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes",
+      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.",
+      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.",
+      "El uso del aula virtual fue útil para mi experiencia en la cursada.",
+      "¿Cuánto considera que aprendió en esta materia?",
+      "¿Cómo evalúa a la materia en términos generales?",
+      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?"
+    ],
+    "textoLibre": [
+      "¿Cómo describirías tu experiencia general en la materia y/o con el docente?"
+    ],
+    "escalas": {
+      "La asignatura cumple con lo expresado en el programa analítico": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El docente demostró dominio de los contenidos de la materia": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El uso del aula virtual fue útil para mi experiencia en la cursada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "¿Cuánto considera que aprendió en esta materia?": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "¿Cómo evalúa a la materia en términos generales?": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      }
+    },
+    "created": "2026-01-19T18:51:22.332Z",
+    "updated": "2026-01-19T18:52:30.652Z"
+  },
+  {
+    "name": "Config_2026-01-19 x",
+    "identificacion": [
+      "LLAVE_MAESTRA",
+      "ID",
+      "CARRERA",
+      "MODALIDAD",
+      "SEDE",
+      "MATERIA",
+      "DOCENTE",
+      "COMISION"
+    ],
+    "numericas": [
+      "La asignatura cumple con lo expresado en el programa analítico",
+      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada",
+      "El docente demostró dominio de los contenidos de la materia",
+      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.",
+      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.",
+      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.",
+      "Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes",
+      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.",
+      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.",
+      "El uso del aula virtual fue útil para mi experiencia en la cursada.",
+      "¿Cuánto considera que aprendió en esta materia?",
+      "¿Cómo evalúa a la materia en términos generales?",
+      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?"
+    ],
+    "textoLibre": [
+      "¿Cómo describirías tu experiencia general en la materia y/o con el docente?"
+    ],
+    "escalas": {
+      "La asignatura cumple con lo expresado en el programa analítico": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "La bibliografía propuesta en el programa fue trabajada y utilizada a lo largo de la cursada": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El docente demostró dominio de los contenidos de la materia": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Las explicaciones brindadas por el docente fueron claras y se presentaron de manera ordenada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Los contenidos trabajados en la materia se vinculan con situaciones reales o futuras de la práctica profesional.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Los recursos utilizados en clase -presentaciones, materiales, plataformas- facilitaron la comprensión de los contenidos.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Durante la clase, el docente propuso actividades que facilitan la comprensión y promovió la participación activa de los estudiantes": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El docente se mostró respetuoso y disponible para responder consultas y brindar orientación durante la cursada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "Las evaluaciones -parciales, recuperatorios, final- se ajustaron a los contenidos abordados durante la materia.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "El uso del aula virtual fue útil para mi experiencia en la cursada.": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "¿Cuánto considera que aprendió en esta materia?": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "¿Cómo evalúa a la materia en términos generales?": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      },
+      "¿Cómo evalúa el desempeño general del/la docente durante la cursada?": {
+        "type": "scale",
+        "min": 1,
+        "max": 10,
+        "direction": "ascending",
+        "manual": true
+      }
+    },
+    "created": "2026-01-19T19:22:28.852Z",
+    "updated": "2026-01-19T19:22:48.237Z"
   }
 ]
