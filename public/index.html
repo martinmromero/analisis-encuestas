@@ -423,41 +423,74 @@
                 <section class="training-panel">
                     <h2>🎯 Entrenar Modelo de Sentimientos</h2>
                     
-                    <div class="training-form">
-                        <div class="form-group">
-                            <label for="newWord">Palabra o Frase:</label>
-                            <input type="text" id="newWord" placeholder="Ej: excelente, muy bueno, no me gusta...">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="sentimentScore">Puntuación de Sentimiento:</label>
-                            <div class="score-input">
-                                <input type="range" id="sentimentScore" min="-5" max="5" value="0" step="0.5">
-                                <div class="score-display">
-                                    <span id="scoreValue">0</span>
-                                    <span id="scoreLabel">Neutral</span>
+                    <!-- Pestañas para cambiar entre diccionario y palabras ignoradas -->
+                    <div class="training-tabs">
+                        <button class="tab-button active" data-tab="dictionary">📖 Diccionario</button>
+                        <button class="tab-button" data-tab="ignored">🚫 Palabras Ignoradas</button>
+                    </div>
+
+                    <!-- Pestaña de Diccionario -->
+                    <div id="dictionaryContent" class="tab-content active">
+                        <div class="training-form">
+                            <div class="form-group">
+                                <label for="newWord">Palabra o Frase:</label>
+                                <input type="text" id="newWord" placeholder="Ej: excelente, muy bueno, no me gusta...">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sentimentScore">Puntuación de Sentimiento:</label>
+                                <div class="score-input">
+                                    <input type="range" id="sentimentScore" min="-5" max="5" value="0" step="0.5">
+                                    <div class="score-display">
+                                        <span id="scoreValue">0</span>
+                                        <span id="scoreLabel">Neutral</span>
+                                    </div>
+                                </div>
+                                <div class="score-guide">
+                                    <div class="score-item">-5 a -2: Muy Negativo</div>
+                                    <div class="score-item">-2 a 0: Negativo</div>
+                                    <div class="score-item">0: Neutral</div>
+                                    <div class="score-item">0 a 2: Positivo</div>
+                                    <div class="score-item">2 a 5: Muy Positivo</div>
                                 </div>
                             </div>
-                            <div class="score-guide">
-                                <div class="score-item">-5 a -2: Muy Negativo</div>
-                                <div class="score-item">-2 a 0: Negativo</div>
-                                <div class="score-item">0: Neutral</div>
-                                <div class="score-item">0 a 2: Positivo</div>
-                                <div class="score-item">2 a 5: Muy Positivo</div>
+
+                            <div class="form-buttons">
+                                <button id="addWord" class="add-btn">➕ Agregar al Diccionario</button>
+                                <button id="cancelEdit" type="button" class="test-btn hidden">✖️ Cancelar edición</button>
+                                <button id="testWord" class="test-btn">🧪 Probar Análisis</button>
                             </div>
                         </div>
 
-                        <div class="form-buttons">
-                            <button id="addWord" class="add-btn">➕ Agregar al Diccionario</button>
-                            <button id="cancelEdit" type="button" class="test-btn hidden">✖️ Cancelar edición</button>
-                            <button id="testWord" class="test-btn">🧪 Probar Análisis</button>
+                        <!-- Resultado de prueba -->
+                        <div id="testResult" class="test-result hidden">
+                            <h3>Resultado de Prueba:</h3>
+                            <div class="test-output"></div>
                         </div>
                     </div>
 
-                    <!-- Resultado de prueba -->
-                    <div id="testResult" class="test-result hidden">
-                        <h3>Resultado de Prueba:</h3>
-                        <div class="test-output"></div>
+                    <!-- Pestaña de Palabras Ignoradas -->
+                    <div id="ignoredContent" class="tab-content">
+                        <div class="ignored-info">
+                            <p><strong>ℹ️ Palabras Ignoradas:</strong> Estas palabras/frases no recibirán puntaje en el análisis cualitativo y serán excluidas de las estadísticas.</p>
+                        </div>
+
+                        <div class="training-form">
+                            <div class="form-group">
+                                <label for="newIgnoredPhrase">Palabra o Frase a Ignorar:</label>
+                                <input type="text" id="newIgnoredPhrase" placeholder='Ej: sin comentario, n/a, -, ...'>
+                            </div>
+
+                            <div class="form-buttons">
+                                <button id="addIgnored" class="add-btn">➕ Agregar a Ignoradas</button>
+                            </div>
+                        </div>
+
+                        <!-- Lista de palabras ignoradas -->
+                        <div class="ignored-list">
+                            <h3>📋 Lista de Palabras Ignoradas (<span id="ignoredCount">0</span>)</h3>
+                            <div id="ignoredPhrasesList" class="ignored-phrases-container"></div>
+                        </div>
                     </div>
                 </section>
 

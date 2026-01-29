@@ -1,0 +1,19 @@
+{
+  "name": "Palabras y Frases Ignoradas",
+  "description": "Lista de palabras/frases que no recibirán puntaje en el análisis cualitativo",
+  "phrases": [
+    "-",
+    ".",
+    "...",
+    "¿",
+    "?",
+    "sin comentario",
+    "sin comentarios",
+    "s/c",
+    "n/a",
+    "na",
+    "ninguno",
+    "ninguna",
+    "nada"
+  ]
+}

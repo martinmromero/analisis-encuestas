@@ -2713,3 +2713,122 @@ footer {
     margin: 5px 0;
     color: #666;
 }
+
+/* Pestañas para diccionario y palabras ignoradas */
+.training-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-button:hover {
+    color: #667eea;
+}
+
+.tab-button.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Información de palabras ignoradas */
+.ignored-info {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #fdcb6e;
+}
+
+.ignored-info p {
+    margin: 0;
+    color: #2d3436;
+    font-size: 0.95rem;
+}
+
+/* Lista de palabras ignoradas */
+.ignored-list {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.ignored-list h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.ignored-phrases-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.ignored-phrase-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 2px solid #e74c3c;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.ignored-phrase-item:hover {
+    background: #ffe5e5;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.2);
+}
+
+.ignored-phrase-text {
+    font-weight: 500;
+    color: #333;
+}
+
+.remove-ignored-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.remove-ignored-btn:hover {
+    background: #c0392b;
+}
+
+.ignored-phrases-container:empty::after {
+    content: "No hay palabras ignoradas. Agrega algunas usando el formulario arriba.";
+    color: #999;
+    font-style: italic;
+    display: block;
+    padding: 20px;
+    text-align: center;
+}

@@ -49,6 +49,68 @@ document.addEventListener('DOMContentLoaded', function() {
             generateAdvancedReport();
         });
     }
+
+    // ===== EVENT LISTENERS PARA PESTAÑAS DE DICCIONARIO =====
+    
+    // Gestión de pestañas (Diccionario / Palabras Ignoradas)
+    const tabButtons = document.querySelectorAll('.tab-button');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            
+            console.log('🔄 Cambiando a pestaña:', tabName);
+            
+            // Actualizar botones activos
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            // Obtener la sección de diccionario en el momento del click
+            const dictionarySection = document.getElementById('dictionarySection');
+            
+            // Mostrar contenido correspondiente - solo dentro de la sección de diccionario
+            if (dictionarySection) {
+                const tabContents = dictionarySection.querySelectorAll('.tab-content');
+                console.log('📋 Tabs encontrados:', tabContents.length);
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    console.log('❌ Removiendo active de:', content.id);
+                });
+            }
+            
+            const tabContent = tabName === 'dictionary' ? 
+                document.getElementById('dictionaryContent') : 
+                document.getElementById('ignoredContent');
+            
+            if (tabContent) {
+                tabContent.classList.add('active');
+                console.log('✅ Agregando active a:', tabContent.id);
+                
+                // Cargar palabras ignoradas si se cambió a esa pestaña
+                if (tabName === 'ignored') {
+                    loadIgnoredPhrases();
+                }
+            } else {
+                console.error('❌ No se encontró el tab:', tabName);
+            }
+        });
+    });
+    
+    // Event listener para agregar palabra ignorada
+    const addIgnoredBtn = document.getElementById('addIgnored');
+    if (addIgnoredBtn) {
+        addIgnoredBtn.addEventListener('click', addIgnoredPhrase);
+    }
+    
+    // Permitir agregar con Enter
+    const newIgnoredInput = document.getElementById('newIgnoredPhrase');
+    if (newIgnoredInput) {
+        newIgnoredInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addIgnoredPhrase();
+            }
+        });
+    }
     
     // Event listeners para navegación entre secciones
     console.log('🔧 Agregando event listeners para navegación...');
@@ -2182,4 +2244,157 @@ function getSentimentClass(score) {
     if (score > 1) return 'positive';
     if (score < -1) return 'negative';
     return 'neutral';
+}
+
+// ===== GESTIÓN DE PALABRAS IGNORADAS =====
+
+// Cargar palabras ignoradas
+async function loadIgnoredPhrases() {
+    try {
+        const response = await fetch('/api/ignored-phrases');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayIgnoredPhrases(data.phrases);
+            updateIgnoredCount(data.count);
+        }
+    } catch (error) {
+        console.error('Error cargando palabras ignoradas:', error);
+        showNotification('Error cargando palabras ignoradas', 'error');
+    }
+}
+
+// Mostrar palabras ignoradas
+function displayIgnoredPhrases(phrases) {
+    const container = document.getElementById('ignoredPhrasesList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (phrases.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay palabras ignoradas. Agrega algunas para filtrar comentarios vacíos o irrelevantes.</div>';
+        return;
+    }
+    
+    phrases.forEach(phrase => {
+        const item = document.createElement('div');
+        item.className = 'ignored-phrase-item';
+        item.innerHTML = `
+            <span class="ignored-phrase-text">${escapeHtml(phrase)}</span>
+            <button class="remove-ignored-btn" data-phrase="${escapeHtml(phrase)}" title="Eliminar">✖</button>
+        `;
+        
+        const removeBtn = item.querySelector('.remove-ignored-btn');
+        removeBtn.addEventListener('click', () => removeIgnoredPhrase(phrase));
+        
+        container.appendChild(item);
+    });
+}
+
+// Actualizar contador de palabras ignoradas
+function updateIgnoredCount(count) {
+    const countEl = document.getElementById('ignoredCount');
+    if (countEl) {
+        countEl.textContent = count;
+    }
+}
+
+// Agregar palabra ignorada
+async function addIgnoredPhrase() {
+    const input = document.getElementById('newIgnoredPhrase');
+    if (!input) return;
+    
+    const phrase = input.value.trim();
+    
+    if (!phrase) {
+        showNotification('Por favor ingresa una palabra o frase', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/ignored-phrases/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phrase })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Frase "${phrase}" agregada a la lista de ignoradas`, 'success');
+            input.value = '';
+            loadIgnoredPhrases(); // Recargar lista
+        } else {
+            showNotification(data.error || 'Error agregando frase', 'error');
+        }
+    } catch (error) {
+        console.error('Error agregando frase ignorada:', error);
+        showNotification('Error agregando frase a la lista', 'error');
+    }
+}
+
+// Eliminar palabra ignorada
+async function removeIgnoredPhrase(phrase) {
+    if (!confirm(`¿Eliminar "${phrase}" de la lista de ignoradas?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/ignored-phrases/remove/${encodeURIComponent(phrase)}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(`Frase "${phrase}" eliminada de la lista`, 'success');
+            loadIgnoredPhrases(); // Recargar lista
+        } else {
+            showNotification(data.error || 'Error eliminando frase', 'error');
+        }
+    } catch (error) {
+        console.error('Error eliminando frase ignorada:', error);
+        showNotification('Error eliminando frase', 'error');
+    }
+}
+
+// Función helper para escapar HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Función para mostrar notificaciones
+function showNotification(message, type = 'info') {
+    // Crear elemento de notificación
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#ffc107'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remover después de 3 segundos
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
 }

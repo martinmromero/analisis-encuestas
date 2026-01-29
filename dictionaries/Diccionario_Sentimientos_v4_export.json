@@ -402,5 +402,20 @@
     "barato": 1,
     "aceptable": 1,
     "está bien": 1
-  }
+  },
+  "ignored_phrases": [
+    "-",
+    ".",
+    "...",
+    "¿",
+    "?",
+    "sin comentario",
+    "sin comentarios",
+    "s/c",
+    "n/a",
+    "na",
+    "ninguno",
+    "ninguna",
+    "nada"
+  ]
 }

@@ -545,5 +545,20 @@
   },
   "wordCount": 541,
   "created": "2026-01-08T14:40:20.548Z",
-  "imported": true
+  "imported": true,
+  "ignored_phrases": [
+    "-",
+    ".",
+    "...",
+    "¿",
+    "?",
+    "sin comentario",
+    "sin comentarios",
+    "s/c",
+    "n/a",
+    "na",
+    "ninguno",
+    "ninguna",
+    "nada"
+  ]
 }

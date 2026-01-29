@@ -14,6 +14,71 @@ const COLUMN_CONFIG = require('./column-config');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Lista de palabras/frases que deben ser ignoradas en el análisis cualitativo
+// (no se les asigna puntaje alguno) - Cargada desde el diccionario activo
+let IGNORED_PHRASES = [];
+
+// Función para cargar palabras ignoradas desde el diccionario activo
+function loadIgnoredPhrases() {
+  try {
+    if (!activeDictionary.fileName) {
+      // Si no hay diccionario activo, usar valores por defecto
+      IGNORED_PHRASES = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
+      console.log(`🚫 Palabras ignoradas por defecto: ${IGNORED_PHRASES.length} frases`);
+      return;
+    }
+    
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      IGNORED_PHRASES = data.ignored_phrases || ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
+      console.log(`🚫 Palabras ignoradas cargadas del diccionario ${activeDictionary.name}: ${IGNORED_PHRASES.length} frases`);
+      
+      // Si no existía la propiedad, agregarla y guardar
+      if (!data.ignored_phrases) {
+        data.ignored_phrases = IGNORED_PHRASES;
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+        console.log(`💾 Agregada sección ignored_phrases al diccionario`);
+      }
+    } else {
+      IGNORED_PHRASES = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
+      console.log(`🚫 Palabras ignoradas por defecto: ${IGNORED_PHRASES.length} frases`);
+    }
+  } catch (error) {
+    console.error('❌ Error cargando palabras ignoradas:', error.message);
+    IGNORED_PHRASES = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
+  }
+}
+
+// Función para guardar palabras ignoradas en el diccionario activo
+function saveIgnoredPhrases() {
+  try {
+    if (!activeDictionary.fileName) {
+      console.error('❌ No hay diccionario activo para guardar palabras ignoradas');
+      return false;
+    }
+    
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error('❌ Archivo de diccionario no encontrado:', filePath);
+      return false;
+    }
+    
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    data.ignored_phrases = IGNORED_PHRASES;
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    console.log(`💾 Palabras ignoradas guardadas en ${activeDictionary.name}: ${IGNORED_PHRASES.length} frases`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error guardando palabras ignoradas:', error.message);
+    return false;
+  }
+}
+
 // Configuración de middleware
 app.use(cors());
 app.use(express.json({ charset: 'utf-8' }));
@@ -122,6 +187,9 @@ if (Object.keys(completeSpanishDict).length > 0) {
   sentiment.registerLanguage('es', { labels: dictCopy });
   currentLabels = dictCopy;
   console.log(`🚀 Diccionario v4 auto-activado al inicio (${activeDictionary.wordCount} palabras)`);
+  
+  // Cargar palabras ignoradas del diccionario activo
+  loadIgnoredPhrases();
 }
 
 // Permitir configurar la ruta del diccionario vía variable de entorno para soportar Docker/volúmenes
@@ -354,6 +422,11 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         // Análisis mejorado con preprocesamiento
         const enhancedAnalysis = analyzeTextEnhanced(text);
         
+        // Saltar entradas ignoradas (sin comentario, ".", etc.)
+        if (enhancedAnalysis.ignored) {
+          return; // No incluir en el análisis
+        }
+        
         // Limitar el texto para reducir memoria
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
         
@@ -515,6 +588,12 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
           default:
             analysis = analyzeTextEnhanced(text);
         }
+        
+        // Saltar entradas ignoradas (sin comentario, ".", etc.)
+        if (analysis.ignored) {
+          continue; // No incluir en el análisis
+        }
+        
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
         const safeScore = typeof analysis.score === 'number' ? analysis.score : 0;
         const safeComparative = typeof analysis.comparative === 'number' ? analysis.comparative : 0;
@@ -658,6 +737,12 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
           Promise.resolve(analyzeTextEnhanced(text)),
           analyzeWithNLPjs(text)
         ]);
+        
+        // Saltar entradas ignoradas (sin comentario, ".", etc.)
+        if (naturalResult.ignored) {
+          continue; // No incluir en el análisis
+        }
+        
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
         const consensus = determineConsensus(naturalResult, nlpResult);
         dualAnalysis.natural.push({
@@ -744,6 +829,33 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
 // Función de análisis de sentimientos (solo contenido del diccionario v4 activo)
 function analyzeTextEnhanced(text) {
   const normalizedText = removeAccents(text.toLowerCase().trim());
+  
+  // Filtrar palabras/frases que deben ser ignoradas
+  const shouldIgnore = IGNORED_PHRASES.some(phrase => {
+    const normalizedPhrase = removeAccents(phrase.toLowerCase().trim());
+    return normalizedText === normalizedPhrase || 
+           (normalizedPhrase.length === 1 && normalizedText === normalizedPhrase) ||
+           (normalizedText.length <= 3 && normalizedText === normalizedPhrase);
+  });
+  
+  if (shouldIgnore) {
+    // Retornar análisis neutral sin puntaje para textos ignorados
+    return {
+      score: 0,
+      comparative: 0,
+      positive: [],
+      negative: [],
+      confidence: 0,
+      hasNegation: false,
+      intensity: 0,
+      matched: 0,
+      totalWords: 0,
+      recognizedWords: 0,
+      phrases: [],
+      ignored: true // Marcar como ignorado
+    };
+  }
+  
   const tokens = normalizedText.split(/[^a-zA-Záéíóúüñ0-9]+/).filter(t => t.length > 0);
   const tokenSet = new Set(tokens);
   const hasNegation = negationWords.some(neg => normalizedText.includes(neg));
@@ -2406,6 +2518,11 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
           if (text && text.trim().length > 0) {
             const analysis = analyzeTextEnhanced(text);
             
+            // Saltar entradas ignoradas (sin comentario, ".", etc.)
+            if (analysis.ignored) {
+              continue; // No incluir en el análisis
+            }
+            
             result.sentimentAnalysis[columnName] = {
               classification: analysis.classification,
               score: analysis.score,
@@ -2601,12 +2718,127 @@ app.post('/api/dictionary/test', (req, res) => {
       success: true,
       text: text,
       analysis: analysis,
+      ignored: analysis.ignored || false, // Indicar si fue ignorado
+      message: analysis.ignored ? 'Texto ignorado (sin comentario, puntuación vacía, etc.)' : null,
       classification: getClassification(analysis.score, analysis.confidence)
     });
     
   } catch (error) {
     console.error('Error probando análisis:', error);
     res.status(500).json({ error: 'Error probando análisis' });
+  }
+});
+
+// ===== GESTIÓN DE PALABRAS IGNORADAS =====
+
+// Obtener lista de palabras ignoradas
+app.get('/api/ignored-phrases', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      phrases: IGNORED_PHRASES,
+      count: IGNORED_PHRASES.length
+    });
+  } catch (error) {
+    console.error('Error obteniendo palabras ignoradas:', error);
+    res.status(500).json({ error: 'Error obteniendo palabras ignoradas' });
+  }
+});
+
+// Agregar palabra/frase ignorada
+app.post('/api/ignored-phrases/add', (req, res) => {
+  try {
+    const { phrase } = req.body;
+    
+    if (!phrase || phrase.trim().length === 0) {
+      return res.status(400).json({ error: 'Frase es requerida' });
+    }
+    
+    const normalizedPhrase = phrase.trim().toLowerCase();
+    
+    // Verificar si ya existe
+    if (IGNORED_PHRASES.some(p => p.toLowerCase() === normalizedPhrase)) {
+      return res.status(400).json({ error: 'Esta frase ya está en la lista de ignoradas' });
+    }
+    
+    // Agregar a la lista
+    IGNORED_PHRASES.push(phrase.trim());
+    
+    // Guardar en archivo
+    if (saveIgnoredPhrases()) {
+      res.json({
+        success: true,
+        message: 'Frase agregada a la lista de ignoradas',
+        phrase: phrase.trim(),
+        totalPhrases: IGNORED_PHRASES.length
+      });
+    } else {
+      res.status(500).json({ error: 'Error guardando la frase' });
+    }
+  } catch (error) {
+    console.error('Error agregando frase ignorada:', error);
+    res.status(500).json({ error: 'Error agregando frase ignorada' });
+  }
+});
+
+// Eliminar palabra/frase ignorada
+app.delete('/api/ignored-phrases/remove/:phrase', (req, res) => {
+  try {
+    const phraseToRemove = decodeURIComponent(req.params.phrase);
+    
+    const initialLength = IGNORED_PHRASES.length;
+    IGNORED_PHRASES = IGNORED_PHRASES.filter(p => p !== phraseToRemove);
+    
+    if (IGNORED_PHRASES.length === initialLength) {
+      return res.status(404).json({ error: 'Frase no encontrada en la lista' });
+    }
+    
+    // Guardar en archivo
+    if (saveIgnoredPhrases()) {
+      res.json({
+        success: true,
+        message: 'Frase eliminada de la lista de ignoradas',
+        phrase: phraseToRemove,
+        totalPhrases: IGNORED_PHRASES.length
+      });
+    } else {
+      res.status(500).json({ error: 'Error guardando los cambios' });
+    }
+  } catch (error) {
+    console.error('Error eliminando frase ignorada:', error);
+    res.status(500).json({ error: 'Error eliminando frase ignorada' });
+  }
+});
+
+// Actualizar toda la lista de palabras ignoradas
+app.put('/api/ignored-phrases/update', (req, res) => {
+  try {
+    const { phrases } = req.body;
+    
+    if (!Array.isArray(phrases)) {
+      return res.status(400).json({ error: 'Se requiere un array de frases' });
+    }
+    
+    // Validar y limpiar frases
+    const cleanedPhrases = phrases
+      .map(p => String(p).trim())
+      .filter(p => p.length > 0);
+    
+    IGNORED_PHRASES = cleanedPhrases;
+    
+    // Guardar en archivo
+    if (saveIgnoredPhrases()) {
+      res.json({
+        success: true,
+        message: 'Lista de frases ignoradas actualizada',
+        totalPhrases: IGNORED_PHRASES.length
+      });
+    } else {
+      res.status(500).json({ error: 'Error guardando los cambios' });
+    }
+  } catch (error) {
+    console.error('Error actualizando palabras ignoradas:', error);
+    res.status(500).json({ error: 'Error actualizando palabras ignoradas' });
   }
 });
 
@@ -2620,20 +2852,25 @@ app.get('/api/dictionary/export', (req, res) => {
     const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
     let dictToExport = activeDictionary.labels || {};
     let dictName = activeDictionary.fileName || 'diccionario';
+    let ignoredPhrases = IGNORED_PHRASES;
+    
     if (fs.existsSync(filePath)) {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       dictToExport = data.dictionary || dictToExport;
+      ignoredPhrases = data.ignored_phrases || ignoredPhrases;
     }
     const exportData = {
       timestamp: new Date().toISOString(),
       version: '2.0',
       dictionaryName: activeDictionary.name,
       customDictionary: dictToExport,
+      ignoredPhrases: ignoredPhrases,
       stats: {
         totalWords: Object.keys(dictToExport).length,
         positiveWords: Object.values(dictToExport).filter(score => score > 0).length,
         negativeWords: Object.values(dictToExport).filter(score => score < 0).length,
-        neutralWords: Object.values(dictToExport).filter(score => score === 0).length
+        neutralWords: Object.values(dictToExport).filter(score => score === 0).length,
+        ignoredPhrasesCount: ignoredPhrases.length
       }
     };
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -2739,6 +2976,7 @@ app.get('/api/dictionary/export-excel', async (req, res) => {
       { metric: 'Palabras Neutrales', value: dictionaryData.filter(d => d.score === 0).length },
       { metric: 'Palabras del Sistema', value: dictionaryData.filter(d => d.origin === 'Sistema').length },
       { metric: 'Palabras Personalizadas', value: dictionaryData.filter(d => d.origin === 'Usuario').length },
+      { metric: 'Total Palabras Ignoradas', value: IGNORED_PHRASES.length },
       { metric: 'Fecha de Exportación', value: new Date().toLocaleString('es-AR') }
     ];
     
@@ -2751,6 +2989,49 @@ app.get('/api/dictionary/export-excel', async (req, res) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D2E' } };
       cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
     });
+    
+    // Agregar hoja de Palabras Ignoradas
+    const ignoredSheet = workbook.addWorksheet('Palabras Ignoradas');
+    ignoredSheet.columns = [
+      { header: 'Palabra/Frase Ignorada', key: 'phrase', width: 40 }
+    ];
+    
+    // Estilo del encabezado
+    const ignoredHeaderRow = ignoredSheet.getRow(1);
+    ignoredHeaderRow.eachCell(cell => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFDC3545' }
+      };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+    
+    // Agregar frases ignoradas
+    IGNORED_PHRASES.forEach((phrase, index) => {
+      const row = ignoredSheet.addRow({ phrase });
+      // Alternar colores de fila
+      if (index % 2 === 0) {
+        row.getCell('phrase').fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFEF5F5' }
+        };
+      }
+    });
+    
+    // Aplicar filtros automáticos
+    ignoredSheet.autoFilter = {
+      from: 'A1',
+      to: 'A' + (IGNORED_PHRASES.length + 1)
+    };
     
     // Generar archivo
     const buffer = await workbook.xlsx.writeBuffer();
@@ -2780,10 +3061,11 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
     const ext = path.extname(file.originalname).toLowerCase();
     
     let importedDict = {};
+    let importedIgnoredPhrases = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
     
     // Procesar según el tipo de archivo
     if (ext === '.json') {
-      // Importar desde JSON
+      // Importar desde JSON (solo para casos especiales, NO desde UI)
       const fileContent = fs.readFileSync(file.path, 'utf8');
       const jsonData = JSON.parse(fileContent);
       
@@ -2791,6 +3073,7 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       if (jsonData.dictionary) {
         // Formato completo con metadata
         importedDict = jsonData.dictionary;
+        importedIgnoredPhrases = jsonData.ignored_phrases || importedIgnoredPhrases;
       } else if (jsonData.labels) {
         // Formato de sentiment
         importedDict = jsonData.labels;
@@ -2814,10 +3097,28 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
           importedDict[word.toLowerCase()] = score;
         }
       });
+      
+      // Importar palabras ignoradas si existe la hoja
+      let importedIgnoredPhrases = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
+      
+      if (workbook.SheetNames.includes('Palabras Ignoradas')) {
+        const ignoredSheet = workbook.Sheets['Palabras Ignoradas'];
+        const ignoredData = XLSX.utils.sheet_to_json(ignoredSheet);
+        
+        const phrases = ignoredData
+          .map(row => row['Palabra/Frase Ignorada'] || row['frase'] || row['Frase'] || row['phrase'])
+          .filter(phrase => phrase && phrase.trim().length > 0)
+          .map(phrase => phrase.trim());
+        
+        if (phrases.length > 0) {
+          importedIgnoredPhrases = phrases;
+          console.log(`📥 Importadas ${phrases.length} palabras ignoradas desde Excel`);
+        }
+      }
     } else {
       // Limpiar archivo temporal
       fs.unlinkSync(file.path);
-      return res.status(400).json({ error: 'Formato de archivo no soportado. Use JSON o Excel (.xlsx, .xls)' });
+      return res.status(400).json({ error: 'Formato de archivo no soportado. Use Excel (.xlsx, .xls)' });
     }
     
     // Validar que se importaron palabras
@@ -2835,10 +3136,11 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       fs.mkdirSync(dictionariesDir, { recursive: true });
     }
     
-    // Guardar el diccionario
+    // Guardar el diccionario con las palabras ignoradas importadas
     const dictionaryData = {
       name: dictionaryName,
       dictionary: importedDict,
+      ignored_phrases: importedIgnoredPhrases,
       wordCount: Object.keys(importedDict).length,
       created: new Date().toISOString(),
       imported: true
@@ -2861,8 +3163,11 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       fileName: fileName,
       wordCount: Object.keys(importedDict).length,
       customWords: 0,
-      labels: currentLabels
+      labels: importedDict
     };
+    
+    // Cargar palabras ignoradas del nuevo diccionario
+    loadIgnoredPhrases();
     
     console.log(`✅ Diccionario "${dictionaryName}" importado y activado (${activeDictionary.wordCount} palabras)`);
     
@@ -2950,6 +3255,9 @@ app.post('/api/dictionaries/activate', (req, res) => {
     };
     console.log(`✅ Diccionario "${activeDictionary.name}" activado`);
     res.json({ success: true, message: `Diccionario "${activeDictionary.name}" activado`, activeDictionary });
+    
+    // Cargar palabras ignoradas del diccionario recién activado
+    loadIgnoredPhrases();
   } catch (error) {
     console.error('Error activando diccionario:', error);
     res.status(500).json({ error: 'Error activando diccionario' });
@@ -2995,6 +3303,10 @@ app.post('/api/dictionary/reset', (req, res) => {
     sentiment.registerLanguage('es', { labels: dictCopy });
     currentLabels = dictCopy;
     activeDictionary.wordCount = Object.keys(dictCopy).length;
+    
+    // Recargar también las palabras ignoradas del diccionario
+    loadIgnoredPhrases();
+    
     res.json({ success: true, message: 'Diccionario recargado desde archivo original' });
   } catch (error) {
     console.error('Error restaurando diccionario:', error);

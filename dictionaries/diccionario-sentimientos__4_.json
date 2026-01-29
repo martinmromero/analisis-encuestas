@@ -1,8 +1,6 @@
 {
-  "name": "diccionario-sentimientos",
+  "name": "diccionario-sentimientos (4)",
   "dictionary": {
-    "testing 1": 5,
-    "testing 2": -5,
     "excelente": 5,
     "extraordinario": 5,
     "extraordinaria": 5,
@@ -543,9 +541,6 @@
     "no se aprendió nada": -5,
     "no aprendí": -5
   },
-  "wordCount": 541,
-  "created": "2026-01-05T19:46:39.849Z",
-  "imported": true,
   "ignored_phrases": [
     "-",
     ".",
@@ -560,5 +555,8 @@
     "ninguno",
     "ninguna",
     "nada"
-  ]
+  ],
+  "wordCount": 539,
+  "created": "2026-01-20T12:25:37.877Z",
+  "imported": true
 }
