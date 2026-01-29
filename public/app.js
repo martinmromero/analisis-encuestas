@@ -1660,6 +1660,8 @@ async function activateDictionary(fileName) {
             showNotification(data.message, 'success');
             // Actualizar indicador visual
             await updateActiveDictionaryIndicator();
+            // Recargar palabras ignoradas del nuevo diccionario
+            await loadIgnoredPhrases();
         } else {
             throw new Error(data.error);
         }
@@ -2251,8 +2253,16 @@ function getSentimentClass(score) {
 // Cargar palabras ignoradas
 async function loadIgnoredPhrases() {
     try {
-        const response = await fetch('/api/ignored-phrases');
+        // Agregar timestamp para evitar caché del navegador
+        const response = await fetch(`/api/ignored-phrases?t=${Date.now()}`, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
         const data = await response.json();
+        
+        console.log(`📋 Cargadas ${data.count} palabras ignoradas:`, data.phrases);
         
         if (data.success) {
             displayIgnoredPhrases(data.phrases);
