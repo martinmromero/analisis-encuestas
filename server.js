@@ -2671,13 +2671,25 @@ app.listen(PORT, () => {
 
 // ============= ENDPOINT PARA VERSIÓN =============
 
-// Obtener versión de la aplicación
+// Obtener versión de la aplicación (automática desde commits de Git)
 app.get('/api/version', (req, res) => {
-  const packageJson = require('./package.json');
-  res.json({ 
-    version: packageJson.version,
-    name: packageJson.name 
-  });
+  try {
+    const { execSync } = require('child_process');
+    const commitCount = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+    const version = `1.${commitCount.padStart(3, '0')}`;
+    
+    res.json({ 
+      version: version,
+      name: 'Análisis de Encuestas'
+    });
+  } catch (error) {
+    // Si falla git, usar package.json como fallback
+    const packageJson = require('./package.json');
+    res.json({ 
+      version: packageJson.version,
+      name: packageJson.name 
+    });
+  }
 });
 
 // ============= ENDPOINTS PARA GESTIÓN DEL DICCIONARIO =============
