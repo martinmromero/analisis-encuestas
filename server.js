@@ -3285,10 +3285,12 @@ app.get('/api/dictionaries', (req, res) => {
           try {
             const filePath = path.join(dictionariesDir, file);
             const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            // SIEMPRE contar palabras reales, no confiar en metadata
+            const realWordCount = Object.keys(data.dictionary || {}).length;
             dictionaries.push({
               name: data.name || file.replace('.json', ''),
               fileName: file.replace('.json', ''),
-              wordCount: data.wordCount || Object.keys(data.dictionary || {}).length,
+              wordCount: realWordCount, // Usar conteo real, no data.wordCount
               created: data.created
             });
           } catch (e) {
