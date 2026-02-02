@@ -24,6 +24,10 @@ CMD ["npm", "run", "dev"]
 FROM node:20-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Instalar git para versionado automático
+RUN apk add --no-cache git
+
 # Only install prod deps
 COPY package*.json ./
 RUN npm ci --omit=dev
