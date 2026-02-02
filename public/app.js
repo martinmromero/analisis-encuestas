@@ -166,6 +166,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sentimentFilter) sentimentFilter.addEventListener('change', filterDictionary);
     if (wordSearch) wordSearch.addEventListener('input', filterDictionary);
     
+    // Event listener para botón de colapsar diccionario
+    const toggleDictionaryBtn = document.getElementById('toggleDictionary');
+    if (toggleDictionaryBtn) {
+        toggleDictionaryBtn.addEventListener('click', toggleDictionaryTable);
+    }
+    
     // Event listener para el slider de puntuación
     const sentimentScore = document.getElementById('sentimentScore');
     if (sentimentScore) sentimentScore.addEventListener('input', updateScoreDisplay);
@@ -1378,6 +1384,18 @@ function filterDictionary() {
     displayDictionary(filteredDictionary);
 }
 
+// Función para colapsar/expandir la tabla del diccionario
+function toggleDictionaryTable() {
+    const dictionaryContent = document.getElementById('dictionaryTableContainer');
+    const toggleBtn = document.getElementById('toggleDictionary');
+    
+    if (!dictionaryContent || !toggleBtn) return;
+    
+    // Toggle clase collapsed en ambos elementos
+    dictionaryContent.classList.toggle('collapsed');
+    toggleBtn.classList.toggle('collapsed');
+}
+
 // Actualizar display de puntuación
 function updateScoreDisplay() {
     const score = document.getElementById('sentimentScore').value;
@@ -1610,6 +1628,9 @@ async function importDictionary(event) {
             
             // Actualizar indicador visual
             await updateActiveDictionaryIndicator();
+            
+            // Recargar palabras ignoradas del nuevo diccionario
+            await loadIgnoredPhrases();
         } else {
             throw new Error(data.error);
         }

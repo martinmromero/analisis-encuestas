@@ -89,6 +89,49 @@ Intensidad = |Score| / 5 × 100%
 
 **📐 Ver detalles completos en:** [GUIA-CALCULOS-METRICAS.md](GUIA-CALCULOS-METRICAS.md)
 
+### 🚫 Palabras Ignoradas vs Diccionario
+
+**Concepto importante**: El sistema distingue entre palabras que deben ignorarse y palabras con puntaje:
+
+#### Palabras Ignoradas (Primera Verificación)
+```
+Regla: Solo se ignoran cuando el texto COMPLETO coincide exactamente
+
+Ejemplos:
+✅ "nada" → Se ignora (coincide exactamente)
+❌ "no enseña nada" → NO se ignora (es una frase más larga)
+```
+
+**Palabras ignoradas típicas**: `-`, `.`, `sin comentarios`, `n/a`, `nada` (aislado)
+
+#### Diccionario de Sentimientos (Segunda Verificación)
+```
+Si el texto NO fue ignorado, se buscan coincidencias:
+
+Prioridad 1: Frases completas
+  "no enseña nada": -3
+  "me parece excelente": +4
+
+Prioridad 2: Palabras individuales
+  "excelente": +5
+  "bueno": +3
+```
+
+**Ejemplo práctico**:
+```
+Configuración:
+  - Palabras ignoradas: ["nada"]
+  - Diccionario: {"no enseña nada": -3}
+
+Resultados:
+  Texto: "nada" → IGNORADO (no se analiza)
+  Texto: "no enseña nada" → Score: -3 (negativo)
+```
+
+💡 **Mejor práctica**: Si defines frases como "no enseña nada" en el diccionario, agrega "nada" (aislado) a palabras ignoradas para evitar confusiones.
+
+📚 **Guía completa**: Ver [SENTIMENT-GUIDE.md](SENTIMENT-GUIDE.md) para detalles técnicos
+
 ## 🧠 Motores de Análisis
 
 ### Natural.js Enhanced 🎯

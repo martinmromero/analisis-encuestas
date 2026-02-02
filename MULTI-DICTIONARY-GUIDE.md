@@ -86,7 +86,82 @@ Se aceptan estos nombres (no importa mayúsculas/minúsculas):
 - **Para palabras**: `palabra`, `word`, `Palabra`, `Word`
 - **Para puntuación**: `puntuacion`, `score`, `puntaje`, `Puntuacion`, `Score`, `Puntaje`
 
-## 🔧 Estructura Técnica
+## � Palabras Ignoradas por Diccionario
+
+### 📌 Características Clave
+
+**Las palabras ignoradas son específicas de cada diccionario**, no son globales del sistema:
+
+- ✅ Cada diccionario tiene su propio conjunto de palabras ignoradas
+- ✅ Al cambiar de diccionario, cambian automáticamente las palabras ignoradas
+- ✅ Al exportar un diccionario, se incluyen sus palabras ignoradas
+- ✅ Al importar un diccionario, se importan sus palabras ignoradas
+
+### 🎯 Cómo Funcionan las Palabras Ignoradas
+
+**Regla fundamental**: Las palabras ignoradas solo aplican cuando el texto **COMPLETO** coincide exactamente.
+
+```
+Ejemplos:
+✅ "nada" (solo) → Se ignora
+❌ "no enseña nada" → NO se ignora (es una frase más larga)
+❌ "nada de eso" → NO se ignora (contiene palabras adicionales)
+```
+
+### 🔄 Interacción con el Diccionario
+
+**Orden de procesamiento:**
+
+1. **Primero**: Se verifica si el texto completo está en palabras ignoradas
+   - Si coincide → Se marca como ignorado, no se analiza
+   - Si NO coincide → Se procede al análisis
+
+2. **Segundo**: Se buscan coincidencias en el diccionario
+   - Frases completas (ej: "no enseña nada")
+   - Palabras individuales (ej: "nada")
+
+### 💡 Ejemplo Práctico
+
+```json
+{
+  "dictionary": {
+    "no enseña nada": -3,
+    "excelente": 5
+  },
+  "ignored_phrases": [
+    "nada",
+    "sin comentarios",
+    "n/a"
+  ]
+}
+```
+
+**Resultados del análisis:**
+- Texto: `"nada"` → **Ignorado** ✅
+- Texto: `"no enseña nada"` → Score: **-3** (negativo) ✅
+- Texto: `"sin comentarios"` → **Ignorado** ✅
+- Texto: `"excelente"` → Score: **+5** (muy positivo) ✅
+
+### 📊 Gestión en Excel
+
+Al exportar a Excel, se crea una hoja separada:
+
+```
+Hoja: "Palabras Ignoradas"
+┌─────────────────────────┐
+│ Palabra/Frase Ignorada  │
+├─────────────────────────┤
+│ -                       │
+│ .                       │
+│ sin comentarios         │
+│ n/a                     │
+│ nada                    │
+└─────────────────────────┘
+```
+
+Al importar desde Excel, esta hoja se lee automáticamente.
+
+## �🔧 Estructura Técnica
 
 ### Almacenamiento
 

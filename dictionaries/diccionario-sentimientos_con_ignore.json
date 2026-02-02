@@ -1,5 +1,5 @@
 {
-  "name": "diccionario-sentimientos",
+  "name": "diccionario-sentimientos con ignore",
   "dictionary": {
     "excelente": 5,
     "extraordinario": 5,
@@ -554,9 +554,11 @@
     "na",
     "ninguno",
     "ninguna",
-    "nada"
+    "nada",
+    "ignore 1",
+    "ignore 3"
   ],
   "wordCount": 539,
-  "created": "2026-01-30T21:01:45.466Z",
+  "created": "2026-01-30T21:37:49.318Z",
   "imported": true
 }

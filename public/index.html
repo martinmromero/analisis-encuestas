@@ -390,6 +390,16 @@
                         </div>
                     </div>
 
+                    <!-- Título con botón de colapsar (fuera del contenedor colapsable) -->
+                    <div class="dictionary-collapse-header">
+                        <button id="toggleDictionary" class="collapse-toggle-btn collapsed">
+                            <span class="collapse-icon">▼</span>
+                            <span class="collapse-title">Tabla de Palabras del Diccionario</span>
+                        </button>
+                    </div>
+
+                    <!-- Contenedor colapsable del diccionario -->
+                    <div id="dictionaryTableContainer" class="dictionary-collapsible collapsed">
                     <!-- Filtros para el diccionario -->
                     <div class="dictionary-filters">
                         <select id="sentimentFilter">
@@ -417,6 +427,8 @@
                             <tbody></tbody>
                         </table>
                     </div>
+                    </div>
+                    <!-- Fin contenedor colapsable -->
                 </section>
 
                 <!-- Panel de entrenamiento -->

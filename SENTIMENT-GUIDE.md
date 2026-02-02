@@ -95,6 +95,123 @@ const techWords = {
 finalScore = finalScore * -0.8;  // Cambiar a -0.6 para menos inversión
 ```
 
+## 🎯 **Prioridad de Frases vs Palabras Individuales**
+
+### ⚖️ **Cómo Funciona el Sistema de Coincidencias:**
+
+El sistema procesa el texto en dos etapas:
+
+#### 1️⃣ **Palabras Ignoradas (Primera Verificación)**
+
+**Regla clave**: Las palabras ignoradas solo aplican cuando el texto **COMPLETO** coincide exactamente.
+
+```
+Ejemplos:
+✅ Texto: "nada" → Se ignora (coincide exactamente)
+❌ Texto: "no enseña nada" → NO se ignora (no es una coincidencia exacta)
+❌ Texto: "nada importante" → NO se ignora (contiene palabras adicionales)
+```
+
+**Palabras ignoradas típicas**:
+- Símbolos: `-`, `.`, `...`, `¿`, `?`
+- Respuestas vacías: `sin comentario`, `sin comentarios`, `s/c`, `n/a`, `na`
+- Palabras genéricas: `ninguno`, `ninguna`, `nada`
+
+#### 2️⃣ **Análisis de Sentimientos (Segunda Verificación)**
+
+Si el texto NO fue ignorado, el sistema busca coincidencias en el diccionario:
+
+**A. Frases completas** (tienen prioridad):
+```javascript
+// Busca frases multi-palabra primero
+'no enseña nada': -3,
+'me parece excelente': 4,
+'no vale la pena': -4
+```
+
+**B. Palabras individuales**:
+```javascript
+// Luego busca palabras sueltas
+'nada': 0,
+'excelente': 5,
+'vale': 1
+```
+
+### 🔍 **Ejemplos Prácticos:**
+
+#### Ejemplo 1: Palabra Ignorada vs Frase en Diccionario
+```
+📝 Configuración:
+  - Palabras ignoradas: ["nada"]
+  - Diccionario: {"no enseña nada": -3, "nada": 0}
+
+✅ Caso A: Texto = "nada"
+   → Se IGNORA (coincide exactamente con palabra ignorada)
+   → No se analiza sentimiento
+   → Score: 0 (neutral, marcado como ignorado)
+
+✅ Caso B: Texto = "no enseña nada"
+   → NO se ignora (no coincide exactamente)
+   → Encuentra frase "no enseña nada" en diccionario
+   → Score: -3 (negativo)
+```
+
+#### Ejemplo 2: Frases Largas vs Palabras Sueltas
+```
+📝 Configuración:
+  - Diccionario: {
+      "me parece excelente": 4,
+      "excelente": 5,
+      "parece": 0
+    }
+
+✅ Texto: "me parece excelente"
+   → Encuentra frase completa "me parece excelente" → +4
+   → También encuentra palabra "excelente" → +5
+   → Score total: +9 ⚠️ (doble conteo)
+
+💡 Nota: Actualmente hay doble conteo. 
+   Recomendación: Define solo la frase O solo las palabras, no ambas.
+```
+
+#### Ejemplo 3: Contexto Importa
+```
+📝 Configuración:
+  - Palabras ignoradas: ["sin comentarios"]
+  - Diccionario: {"sin organización": -3}
+
+✅ Caso A: Texto = "sin comentarios"
+   → Se IGNORA completamente
+
+✅ Caso B: Texto = "sin organización"
+   → NO se ignora
+   → Score: -3 (negativo)
+```
+
+### ✅ **Mejores Prácticas:**
+
+1. **Para Palabras Ignoradas**: 
+   - Agrega solo frases cortas y completas que indiquen "sin respuesta"
+   - Ejemplos: `"n/a"`, `"sin comentario"`, `"."`
+
+2. **Para Diccionario de Sentimientos**:
+   - **Prioriza frases específicas** sobre palabras sueltas
+   - Si defines `"no enseña nada": -3`, NO agregues `"nada"` al diccionario
+   - Evita duplicados entre frases y sus palabras componentes
+
+3. **Casos Especiales**:
+   ```javascript
+   // ✅ BIEN: Frase específica
+   "no sirve para nada": -4
+   
+   // ❌ EVITAR: Palabra suelta que está en la frase anterior
+   "nada": -1  // Causará doble conteo
+   
+   // ✅ MEJOR: Solo la frase completa
+   "no sirve para nada": -4
+   // Y "nada" aislado va a palabras ignoradas
+   ```
+
 ### 📈 **Monitoreo del Rendimiento:**
 
 Revisa estos indicadores en tu aplicación:

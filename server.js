@@ -3099,8 +3099,6 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       });
       
       // Importar palabras ignoradas si existe la hoja
-      let importedIgnoredPhrases = ['-', '.', '...', '¿', '?', 'sin comentario', 'sin comentarios', 's/c', 'n/a', 'na', 'ninguno', 'ninguna', 'nada'];
-      
       if (workbook.SheetNames.includes('Palabras Ignoradas')) {
         const ignoredSheet = workbook.Sheets['Palabras Ignoradas'];
         const ignoredData = XLSX.utils.sheet_to_json(ignoredSheet);
