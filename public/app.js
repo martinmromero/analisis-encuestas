@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const loading = document.getElementById('loading');
     const results = document.getElementById('results');
 
+    // Cargar versión de la aplicación
+    loadAppVersion();
+
     // Manejar selección de archivo
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -2270,6 +2273,20 @@ function getSentimentClass(score) {
 }
 
 // ===== GESTIÓN DE PALABRAS IGNORADAS =====
+
+// Cargar versión de la aplicación
+async function loadAppVersion() {
+    try {
+        const response = await fetch('/api/version');
+        const data = await response.json();
+        if (data.version) {
+            document.getElementById('app-version').textContent = data.version;
+        }
+    } catch (error) {
+        console.error('Error cargando versión:', error);
+        document.getElementById('app-version').textContent = '2.0.0';
+    }
+}
 
 // Cargar palabras ignoradas
 async function loadIgnoredPhrases() {

@@ -2669,6 +2669,17 @@ app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
 
+// ============= ENDPOINT PARA VERSIÓN =============
+
+// Obtener versión de la aplicación
+app.get('/api/version', (req, res) => {
+  const packageJson = require('./package.json');
+  res.json({ 
+    version: packageJson.version,
+    name: packageJson.name 
+  });
+});
+
 // ============= ENDPOINTS PARA GESTIÓN DEL DICCIONARIO =============
 
 // Obtener diccionario completo
