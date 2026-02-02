@@ -80,7 +80,29 @@ function saveIgnoredPhrases() {
 }
 
 // Configuración de middleware
-app.use(cors());
+// CORS: permitir solicitudes desde el dominio de producción y desarrollo
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir solicitudes sin origin (como curl, Postman, o misma origin)
+    // y desde dominios permitidos
+    const allowedOrigins = [
+      'https://itd.barcelo.edu.ar',
+      'http://itd.barcelo.edu.ar',
+      'http://192.168.30.12:3000',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ charset: 'utf-8' }));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
