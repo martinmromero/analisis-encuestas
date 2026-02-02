@@ -74,9 +74,22 @@ echo -e "${YELLOW}Deteniendo contenedores previos (si existen)...${NC}"
 docker compose --profile prod down 2>/dev/null || true
 echo ""
 
-# Construir imagen
-echo -e "${CYAN}Construyendo imagen Docker...${NC}"
-docker compose --profile prod build
+# Calcular versión desde git
+echo -e "${CYAN}Calculando versión desde git...${NC}"
+if [ -d .git ]; then
+    COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo "033")
+    APP_VERSION="1.${COMMIT_COUNT}"
+    echo -e "${GREEN}✓ Versión calculada: ${APP_VERSION}${NC}"
+else
+    APP_VERSION="1.033"
+    echo -e "${YELLOW}⚠ No se encontró .git, usando versión default: ${APP_VERSION}${NC}"
+fi
+export APP_VERSION
+echo ""
+
+# Construir imagen con versión
+echo -e "${CYAN}Construyendo imagen Docker con versión ${APP_VERSION}...${NC}"
+docker compose --profile prod build --build-arg APP_VERSION=${APP_VERSION}
 if [ $? -ne 0 ]; then
     echo -e "${RED}ERROR: Falló la construcción de la imagen${NC}"
     exit 1

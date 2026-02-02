@@ -22,17 +22,21 @@ CMD ["npm", "run", "dev"]
 
 # 3) Production image (smaller, no dev deps)
 FROM node:20-alpine AS prod
+
+# Argumento de build para la versión (calculada externamente)
+ARG APP_VERSION=1.033
+
 WORKDIR /app
 ENV NODE_ENV=production
-
-# Instalar git para versionado automático
-RUN apk add --no-cache git
+ENV APP_VERSION=${APP_VERSION}
 
 # Only install prod deps
 COPY package*.json ./
 RUN npm ci --omit=dev
+
 # Copy source code
 COPY . .
+
 # Ensure uploads directory exists
 RUN mkdir -p /app/uploads
 # Dictionary path can be overridden; default remains in app root

@@ -2674,6 +2674,15 @@ app.listen(PORT, () => {
 // Obtener versión de la aplicación (automática desde commits de Git)
 app.get('/api/version', (req, res) => {
   try {
+    // En producción, usar variable de entorno inyectada durante build
+    if (process.env.APP_VERSION) {
+      return res.json({ 
+        version: process.env.APP_VERSION,
+        name: 'Análisis de Encuestas'
+      });
+    }
+    
+    // En desarrollo, calcular desde git
     const { execSync } = require('child_process');
     const commitCount = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
     const version = `1.${commitCount.padStart(3, '0')}`;
@@ -2688,6 +2697,9 @@ app.get('/api/version', (req, res) => {
     res.json({ 
       version: packageJson.version,
       name: packageJson.name 
+    });
+  }
+});
     });
   }
 });
