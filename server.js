@@ -2910,9 +2910,23 @@ app.get('/api/dictionary/export-excel', async (req, res) => {
     if (!activeDictionary.fileName) {
       return res.status(400).json({ error: 'No hay diccionario activo para exportar' });
     }
+    
+    // Cargar el diccionario DIRECTAMENTE del archivo JSON para evitar inconsistencias
+    const dictionariesDir = path.join(__dirname, 'dictionaries');
+    const filePath = path.join(dictionariesDir, `${activeDictionary.fileName}.json`);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Archivo de diccionario no encontrado' });
+    }
+    
+    const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const dict = fileData.dictionary || {};
+    
+    console.log(`📤 Exportando diccionario "${activeDictionary.name}": ${Object.keys(dict).length} palabras (desde archivo JSON)`);
+    
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Diccionario de Sentimientos');
-    const dict = activeDictionary.labels || {};
+    
     const dictionaryData = Object.entries(dict).map(([word, score]) => ({
       word,
       score,
@@ -3110,15 +3124,23 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       const sheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(sheet);
       
-      // Convertir a diccionario
+      console.log(`📥 Procesando ${data.length} filas desde Excel...`);
+      
+      // Convertir a diccionario (solo palabras únicas)
       data.forEach(row => {
         const word = row['Palabra/Frase'] || row['palabra'] || row['Palabra'] || row['word'];
         const score = parseFloat(row['Puntuación'] || row['puntuacion'] || row['score'] || row['Puntuacion']);
         
         if (word && !isNaN(score)) {
-          importedDict[word.toLowerCase()] = score;
+          const normalizedWord = word.toLowerCase().trim();
+          // Solo agregar si no existe (evitar duplicados)
+          if (!importedDict[normalizedWord]) {
+            importedDict[normalizedWord] = score;
+          }
         }
       });
+      
+      console.log(`✅ Importadas ${Object.keys(importedDict).length} palabras únicas desde ${data.length} filas`);
       
       // Importar palabras ignoradas si existe la hoja
       if (workbook.SheetNames.includes('Palabras Ignoradas')) {
