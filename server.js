@@ -2700,9 +2700,6 @@ app.get('/api/version', (req, res) => {
     });
   }
 });
-    });
-  }
-});
 
 // ============= ENDPOINTS PARA GESTIÓN DEL DICCIONARIO =============
 
