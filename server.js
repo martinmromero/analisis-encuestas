@@ -1729,13 +1729,13 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
 function getScoreColorClass(score, escalaConfig = null) {
   // Si no hay configuración de escala o es estándar 1-10, usar score directo
   if (!escalaConfig || (escalaConfig.min === 1 && escalaConfig.max === 10 && escalaConfig.direction !== 'descending')) {
-    // Usar score tal cual está (ya es 0-10 o 1-10)
-    if (score >= 8) return 'green';
-    if (score >= 6) return 'yellow';
-    return 'red';
+    // Escala fija: 1-3 rojo, 4-6 naranja, 7-10 verde
+    if (score >= 7) return 'green';   // Verde: 7-10
+    if (score >= 4) return 'yellow';  // Naranja: 4-6
+    return 'red';                      // Rojo: 1-3
   }
   
-  // Si hay escala personalizada, normalizar a 0-10
+  // Si hay escala personalizada, normalizar a 1-10
   const range = escalaConfig.max - escalaConfig.min;
   let normalizedScore = score;
   
@@ -1748,9 +1748,10 @@ function getScoreColorClass(score, escalaConfig = null) {
     }
   }
   
-  if (normalizedScore >= 8) return 'green';
-  if (normalizedScore >= 6) return 'yellow';
-  return 'red';
+  // Escala fija: 1-3 rojo, 4-6 naranja, 7-10 verde
+  if (normalizedScore >= 7) return 'green';   // Verde: 7-10
+  if (normalizedScore >= 4) return 'yellow';  // Naranja: 4-6
+  return 'red';                                // Rojo: 1-3
 }
 
 // Calcular estadísticas numéricas (con normalización para colores)

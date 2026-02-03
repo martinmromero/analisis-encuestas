@@ -753,13 +753,13 @@ function changePage(newPage) {
 function getScoreColor(score, escalaConfig = null) {
     // Si no hay configuración de escala o es estándar 1-10, usar score directo
     if (!escalaConfig || (escalaConfig.min === 1 && escalaConfig.max === 10 && escalaConfig.direction !== 'descending')) {
-        // Usar score tal cual está (ya es 0-10 o 1-10)
-        if (score >= 8) return 'score-high';
-        if (score >= 6) return 'score-medium';
-        return 'score-low';
+        // Escala fija: 1-3 rojo, 4-6 naranja, 7-10 verde
+        if (score >= 7) return 'score-high';    // Verde: 7-10
+        if (score >= 4) return 'score-medium';  // Naranja: 4-6
+        return 'score-low';                      // Rojo: 1-3
     }
     
-    // Si hay escala personalizada, normalizar a 0-10
+    // Si hay escala personalizada, normalizar a 1-10
     const range = escalaConfig.max - escalaConfig.min;
     let normalizedScore = score;
     
@@ -772,9 +772,10 @@ function getScoreColor(score, escalaConfig = null) {
         }
     }
     
-    if (normalizedScore >= 8) return 'score-high';
-    if (normalizedScore >= 6) return 'score-medium';
-    return 'score-low';
+    // Escala fija: 1-3 rojo, 4-6 naranja, 7-10 verde
+    if (normalizedScore >= 7) return 'score-high';    // Verde: 7-10
+    if (normalizedScore >= 4) return 'score-medium';  // Naranja: 4-6
+    return 'score-low';                                // Rojo: 1-3
 }
 
 function displayNumericMetrics(results, filterOptions) {

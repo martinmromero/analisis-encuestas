@@ -49,11 +49,16 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    pkgconf \
+    pkg-config \
+    cairo \
     cairo-dev \
+    jpeg \
     jpeg-dev \
+    pango \
     pango-dev \
+    giflib \
     giflib-dev \
+    pixman \
     pixman-dev \
     fontconfig \
     ttf-dejavu \
