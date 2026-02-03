@@ -49,7 +49,7 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    pkg-config \
+    pkgconf \
     cairo \
     cairo-dev \
     jpeg \
