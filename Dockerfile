@@ -47,11 +47,11 @@ RUN apk add --no-cache \
     make \
     g++ \
     pkgconf \
-    cairo \
-    jpeg \
-    pango \
-    giflib \
-    pixman
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev
 
 # Only install prod deps
 COPY package*.json ./
