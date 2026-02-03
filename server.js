@@ -1484,7 +1484,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   currentRow += 2;
   
   // ===== INFORMACIÓN DEL ARCHIVO =====
-  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`B${currentRow}:D${currentRow}`);
   const infoHeaderCell = sheet.getCell(`B${currentRow}`);
   infoHeaderCell.value = 'INFORMACIÓN DEL ANÁLISIS';
   infoHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -1497,7 +1497,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   const fileRow = currentRow;
   sheet.getCell(`B${fileRow}`).value = 'Archivo de Origen:';
   sheet.getCell(`B${fileRow}`).font = { bold: true };
-  sheet.mergeCells(`C${fileRow}:E${fileRow}`);
+  sheet.mergeCells(`C${fileRow}:D${fileRow}`);
   sheet.getCell(`C${fileRow}`).value = originalFilename;
   currentRow++;
   
@@ -1511,7 +1511,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   // Carreras
   sheet.getCell(`B${currentRow}`).value = 'Carreras:';
   sheet.getCell(`B${currentRow}`).font = { bold: true };
-  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`C${currentRow}:D${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = carreras.length > 3 ? `${carreras.length} carreras diferentes` : carreras.join(', ');
   sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
   currentRow++;
@@ -1519,7 +1519,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   // Materias
   sheet.getCell(`B${currentRow}`).value = 'Materias:';
   sheet.getCell(`B${currentRow}`).font = { bold: true };
-  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`C${currentRow}:D${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = materias.length > 3 ? `${materias.length} materias diferentes` : materias.join(', ');
   sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
   currentRow++;
@@ -1527,27 +1527,27 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   // Sedes
   sheet.getCell(`B${currentRow}`).value = 'Sedes:';
   sheet.getCell(`B${currentRow}`).font = { bold: true };
-  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`C${currentRow}:D${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = sedes.join(', ');
   currentRow++;
   
   // Modalidades
   sheet.getCell(`B${currentRow}`).value = 'Modalidades:';
   sheet.getCell(`B${currentRow}`).font = { bold: true };
-  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`C${currentRow}:D${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = modalidades.join(', ');
   currentRow++;
   
   // Docentes
   sheet.getCell(`B${currentRow}`).value = 'Docentes:';
   sheet.getCell(`B${currentRow}`).font = { bold: true };
-  sheet.mergeCells(`C${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`C${currentRow}:D${currentRow}`);
   sheet.getCell(`C${currentRow}`).value = docentes.length > 3 ? `${docentes.length} docentes diferentes` : docentes.join(', ');
   sheet.getCell(`C${currentRow}`).alignment = { wrapText: true };
   currentRow += 2;
   
   // ===== ANÁLISIS CUALITATIVO =====
-  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`B${currentRow}:D${currentRow}`);
   const qualHeaderCell = sheet.getCell(`B${currentRow}`);
   qualHeaderCell.value = 'ANÁLISIS CUALITATIVO (SENTIMIENTOS)';
   qualHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -1555,6 +1555,8 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   qualHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getRow(currentRow).height = 25;
   currentRow++;
+  
+  currentRow++; // Fila en blanco después del header
   
   // USAR ESTADÍSTICAS PRECALCULADAS (ya vienen de calculateStats)
   let totalQualitativeRows, avgScore, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
@@ -1694,7 +1696,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   currentRow += 3;
   
   // ===== ANÁLISIS CUANTITATIVO =====
-  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`B${currentRow}:D${currentRow}`);
   const quantHeaderCell = sheet.getCell(`B${currentRow}`);
   quantHeaderCell.value = 'ANÁLISIS CUANTITATIVO (PROMEDIOS)';
   quantHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -1702,6 +1704,8 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   quantHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getRow(currentRow).height = 25;
   currentRow++;
+  
+  currentRow++; // Fila en blanco después del header
   
   // Obtener columnas numéricas desde la configuración (igual que frontend)
   let numericFields = [];
@@ -1888,14 +1892,15 @@ function getScoreColorClass(score, escalaConfig = null) {
     ];
     
     const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
-      width: 500, 
-      height: 350,
+      width: 1200, 
+      height: 900,
       chartCallback: (ChartJS) => {
         ChartJS.defaults.font.family = 'Arial';
       }
     });
     
     // 1. GRÁFICO DE DONA - Distribución de Sentimientos
+    const totalSentiment = sentimentData.reduce((sum, d) => sum + d.value, 0);
     const pieChartConfig = {
       type: 'doughnut',
       data: {
@@ -1913,14 +1918,62 @@ function getScoreColorClass(score, escalaConfig = null) {
           title: {
             display: true,
             text: 'Distribucion de Sentimientos',
-            font: { size: 16, weight: 'bold', family: 'Arial' }
+            font: { size: 40, weight: 'bold', family: 'Arial' }
           },
           legend: {
             position: 'bottom',
-            labels: { font: { size: 11, family: 'Arial' } }
+            labels: { 
+              font: { size: 26, family: 'Arial' },
+              generateLabels: function(chart) {
+                const data = chart.data;
+                if (data.labels.length && data.datasets.length) {
+                  return data.labels.map((label, i) => {
+                    const value = data.datasets[0].data[i];
+                    const percentage = totalSentiment > 0 ? ((value / totalSentiment) * 100).toFixed(1) : 0;
+                    return {
+                      text: label + ': ' + percentage + '%',
+                      fillStyle: data.datasets[0].backgroundColor[i],
+                      hidden: false,
+                      index: i
+                    };
+                  });
+                }
+                return [];
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                const percentage = totalSentiment > 0 ? ((value / totalSentiment) * 100).toFixed(1) : 0;
+                return context.label + ': ' + value + ' (' + percentage + '%)';
+              }
+            }
           }
         }
-      }
+      },
+      plugins: [{
+        id: 'percentageLabels',
+        afterDatasetsDraw(chart) {
+          const ctx = chart.ctx;
+          const dataset = chart.data.datasets[0];
+          const meta = chart.getDatasetMeta(0);
+          
+          meta.data.forEach((element, index) => {
+            const value = dataset.data[index];
+            const percentage = totalSentiment > 0 ? ((value / totalSentiment) * 100).toFixed(1) : 0;
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const position = element.tooltipPosition();
+            ctx.fillText(percentage + '%', position.x, position.y);
+          });
+        }
+      }]
     };
     
     const pieChartBuffer = await chartJSNodeCanvas.renderToBuffer(pieChartConfig);
@@ -1948,38 +2001,77 @@ function getScoreColorClass(score, escalaConfig = null) {
           title: {
             display: true,
             text: 'Analisis por Categorias',
-            font: { size: 16, weight: 'bold', family: 'Arial' }
+            font: { size: 40, weight: 'bold', family: 'Arial' }
           },
           legend: { display: false }
         },
         scales: {
           y: {
             beginAtZero: true,
-            ticks: { font: { size: 10, family: 'Arial' } }
+            ticks: { font: { size: 24, family: 'Arial' } }
           },
           x: {
-            ticks: { font: { size: 10, family: 'Arial' } }
+            ticks: { font: { size: 24, family: 'Arial' } }
           }
         }
-      }
+      },
+      plugins: [{
+        id: 'valueLabels',
+        afterDatasetsDraw(chart) {
+          const ctx = chart.ctx;
+          chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            meta.data.forEach((bar, index) => {
+              const value = dataset.data[index];
+              
+              ctx.fillStyle = '#000';
+              ctx.font = 'bold 32px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              
+              ctx.fillText(value, bar.x, bar.y - 5);
+            });
+          });
+        }
+      }]
     };
     
     const barChartBuffer = await chartJSNodeCanvas.renderToBuffer(barChartConfig);
-    const barImageId = workbook.addImage({
-      buffer: barChartBuffer,
+    
+    // Combinar ambos charts en una sola imagen
+    const { createCanvas, loadImage } = require('canvas');
+    
+    const donutWidth = 450;
+    const barWidth = 450;
+    const chartHeight = 380;
+    const gap = 30; // Espacio entre charts
+    const totalWidth = donutWidth + gap + barWidth;
+    
+    // Crear canvas para la imagen combinada
+    const combinedCanvas = createCanvas(totalWidth, chartHeight);
+    const ctx = combinedCanvas.getContext('2d');
+    
+    // Cargar y pegar donut chart
+    const donutImage = await loadImage(pieChartBuffer);
+    ctx.drawImage(donutImage, 0, 0, donutWidth, chartHeight);
+    
+    // Cargar y pegar bar chart
+    const barImage = await loadImage(barChartBuffer);
+    ctx.drawImage(barImage, donutWidth + gap, 0, barWidth, chartHeight);
+    
+    // Convertir a buffer
+    const combinedBuffer = combinedCanvas.toBuffer('image/png');
+    
+    // Agregar imagen combinada al workbook
+    const combinedImageId = workbook.addImage({
+      buffer: combinedBuffer,
       extension: 'png'
     });
     
-    // Insertar gráfico de dona (izquierda)
-    sheet.addImage(pieImageId, {
+    // Insertar imagen combinada en columna B
+    sheet.addImage(combinedImageId, {
       tl: { col: 1, row: chartStartRow - 1 },
-      ext: { width: 400, height: 280 }
-    });
-    
-    // Insertar gráfico de barras (derecha)
-    sheet.addImage(barImageId, {
-      tl: { col: 4, row: chartStartRow - 1 },
-      ext: { width: 400, height: 280 }
+      ext: { width: totalWidth, height: chartHeight }
     });
     
     currentRow += 18; // Espacio para los gráficos
@@ -1989,10 +2081,10 @@ function getScoreColorClass(score, escalaConfig = null) {
     console.error(error.stack);
   }
   
-  currentRow += 2; // Espacio adicional antes del detalle
+  currentRow += 3; // Espacio adicional antes del detalle (1 renglón más)
   
   // ===== DETALLE DE PREGUNTAS NUMÉRICAS =====
-  sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+  sheet.mergeCells(`B${currentRow}:D${currentRow}`);
   const numericDetailHeaderCell = sheet.getCell(`B${currentRow}`);
   numericDetailHeaderCell.value = 'DETALLE POR PREGUNTA';
   numericDetailHeaderCell.font = { size: 12, bold: true, color: { argb: 'FF2C5282' } };
@@ -2000,6 +2092,8 @@ function getScoreColorClass(score, escalaConfig = null) {
   numericDetailHeaderCell.alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getRow(currentRow).height = 20;
   currentRow++;
+  
+  currentRow++; // Fila en blanco después del header
   
   // Crear boxes para cada pregunta numérica (3 por fila)
   const questionsPerRow = 3;
