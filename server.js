@@ -1875,6 +1875,122 @@ function getScoreColorClass(score, escalaConfig = null) {
   
   currentRow += 3;
   
+  // ===== GENERAR GRÁFICOS COMO IMÁGENES =====
+  const chartStartRow = currentRow;
+  try {
+    // Datos para los gráficos
+    const sentimentData = [
+      { label: 'Muy Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Positivo'] || 0) / 100), color: 'rgb(34, 197, 94)' },
+      { label: 'Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Positivo'] || 0) / 100), color: 'rgb(74, 222, 128)' },
+      { label: 'Neutral', value: neutrales, color: 'rgb(160, 174, 192)' },
+      { label: 'Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Negativo'] || 0) / 100), color: 'rgb(249, 115, 22)' },
+      { label: 'Muy Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Negativo'] || 0) / 100), color: 'rgb(239, 68, 68)' }
+    ];
+    
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
+      width: 500, 
+      height: 350,
+      chartCallback: (ChartJS) => {
+        ChartJS.defaults.font.family = 'Arial';
+      }
+    });
+    
+    // 1. GRÁFICO DE DONA - Distribución de Sentimientos
+    const pieChartConfig = {
+      type: 'doughnut',
+      data: {
+        labels: sentimentData.map(d => d.label),
+        datasets: [{
+          data: sentimentData.map(d => d.value),
+          backgroundColor: sentimentData.map(d => d.color),
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Distribucion de Sentimientos',
+            font: { size: 16, weight: 'bold', family: 'Arial' }
+          },
+          legend: {
+            position: 'bottom',
+            labels: { font: { size: 11, family: 'Arial' } }
+          }
+        }
+      }
+    };
+    
+    const pieChartBuffer = await chartJSNodeCanvas.renderToBuffer(pieChartConfig);
+    const pieImageId = workbook.addImage({
+      buffer: pieChartBuffer,
+      extension: 'png'
+    });
+    
+    // 2. GRÁFICO DE BARRAS - Análisis por Categorías
+    const barChartConfig = {
+      type: 'bar',
+      data: {
+        labels: sentimentData.map(d => d.label),
+        datasets: [{
+          label: 'Respuestas',
+          data: sentimentData.map(d => d.value),
+          backgroundColor: sentimentData.map(d => d.color),
+          borderWidth: 1,
+          borderColor: sentimentData.map(d => d.color)
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Analisis por Categorias',
+            font: { size: 16, weight: 'bold', family: 'Arial' }
+          },
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 10, family: 'Arial' } }
+          },
+          x: {
+            ticks: { font: { size: 10, family: 'Arial' } }
+          }
+        }
+      }
+    };
+    
+    const barChartBuffer = await chartJSNodeCanvas.renderToBuffer(barChartConfig);
+    const barImageId = workbook.addImage({
+      buffer: barChartBuffer,
+      extension: 'png'
+    });
+    
+    // Insertar gráfico de dona (izquierda)
+    sheet.addImage(pieImageId, {
+      tl: { col: 1, row: chartStartRow - 1 },
+      ext: { width: 400, height: 280 }
+    });
+    
+    // Insertar gráfico de barras (derecha)
+    sheet.addImage(barImageId, {
+      tl: { col: 4, row: chartStartRow - 1 },
+      ext: { width: 400, height: 280 }
+    });
+    
+    currentRow += 18; // Espacio para los gráficos
+    
+  } catch (error) {
+    console.error('⚠️ Error generando gráficos:', error.message);
+    console.error(error.stack);
+  }
+  
+  currentRow += 2; // Espacio adicional antes del detalle
+  
   // ===== DETALLE DE PREGUNTAS NUMÉRICAS =====
   sheet.mergeCells(`B${currentRow}:E${currentRow}`);
   const numericDetailHeaderCell = sheet.getCell(`B${currentRow}`);
@@ -1957,116 +2073,6 @@ function getScoreColorClass(score, escalaConfig = null) {
     
     currentRow += 3; // Saltar a la siguiente fila de boxes (ahora son 3 filas por box)
   }
-  
-  currentRow += 2; // Espacio antes de los gráficos
-  
-  // ===== GENERAR GRÁFICOS COMO IMÁGENES =====
-  try {
-    // Datos para los gráficos
-    const sentimentData = [
-      { label: 'Muy Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Positivo'] || 0) / 100), color: 'rgb(34, 197, 94)' },
-      { label: 'Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Positivo'] || 0) / 100), color: 'rgb(74, 222, 128)' },
-      { label: 'Neutral', value: neutrales, color: 'rgb(160, 174, 192)' },
-      { label: 'Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Negativo'] || 0) / 100), color: 'rgb(249, 115, 22)' },
-      { label: 'Muy Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Negativo'] || 0) / 100), color: 'rgb(239, 68, 68)' }
-    ];
-    
-    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width: 500, height: 350 });
-    
-    // 1. GRÁFICO DE DONA - Distribución de Sentimientos
-    const pieChartConfig = {
-      type: 'doughnut',
-      data: {
-        labels: sentimentData.map(d => d.label),
-        datasets: [{
-          data: sentimentData.map(d => d.value),
-          backgroundColor: sentimentData.map(d => d.color),
-          borderWidth: 2,
-          borderColor: '#fff'
-        }]
-      },
-      options: {
-        responsive: false,
-        plugins: {
-          title: {
-            display: true,
-            text: 'Distribución de Sentimientos',
-            font: { size: 16, weight: 'bold' }
-          },
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 11 } }
-          }
-        }
-      }
-    };
-    
-    const pieChartBuffer = await chartJSNodeCanvas.renderToBuffer(pieChartConfig);
-    const pieImageId = workbook.addImage({
-      buffer: pieChartBuffer,
-      extension: 'png'
-    });
-    
-    // 2. GRÁFICO DE BARRAS - Análisis por Categorías
-    const barChartConfig = {
-      type: 'bar',
-      data: {
-        labels: sentimentData.map(d => d.label),
-        datasets: [{
-          label: 'Respuestas',
-          data: sentimentData.map(d => d.value),
-          backgroundColor: sentimentData.map(d => d.color),
-          borderWidth: 1,
-          borderColor: sentimentData.map(d => d.color)
-        }]
-      },
-      options: {
-        responsive: false,
-        plugins: {
-          title: {
-            display: true,
-            text: 'Análisis por Categorías',
-            font: { size: 16, weight: 'bold' }
-          },
-          legend: { display: false }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { font: { size: 10 } }
-          },
-          x: {
-            ticks: { font: { size: 10 } }
-          }
-        }
-      }
-    };
-    
-    const barChartBuffer = await chartJSNodeCanvas.renderToBuffer(barChartConfig);
-    const barImageId = workbook.addImage({
-      buffer: barChartBuffer,
-      extension: 'png'
-    });
-    
-    // Insertar gráfico de dona (izquierda)
-    sheet.addImage(pieImageId, {
-      tl: { col: 1, row: currentRow },
-      ext: { width: 400, height: 280 }
-    });
-    
-    // Insertar gráfico de barras (derecha)
-    sheet.addImage(barImageId, {
-      tl: { col: 4, row: currentRow },
-      ext: { width: 400, height: 280 }
-    });
-    
-    currentRow += 18; // Espacio para los gráficos (aproximadamente 280px / 15 = 18 filas)
-    
-  } catch (error) {
-    console.error('⚠️ Error generando gráficos:', error.message);
-  }
-  
-  currentRow += 2; // Espacio adicional antes del detalle
   
   console.log('✅ Hoja "Portada" creada con gráficos');
 }
