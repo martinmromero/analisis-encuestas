@@ -3,6 +3,16 @@
 # 1) Base deps layer for caching
 FROM node:20-alpine AS deps
 WORKDIR /app
+# Install dependencies for canvas (required for chartjs-node-canvas)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev
 COPY package*.json ./
 # Install all deps for dev layer (dev + prod)
 RUN npm ci
@@ -29,6 +39,17 @@ ARG APP_VERSION=1.033
 WORKDIR /app
 ENV NODE_ENV=production
 ENV APP_VERSION=${APP_VERSION}
+
+# Install runtime dependencies for canvas
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    pixman
 
 # Only install prod deps
 COPY package*.json ./
