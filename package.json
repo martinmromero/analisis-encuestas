@@ -44,6 +44,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
+    "chartjs-node-canvas": "^5.0.0",
     "cors": "^2.8.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.1",
@@ -56,7 +57,7 @@
     "nodemon": "^3.1.7"
   },
   "optionalDependencies": {
-    "canvas": "^3.2.0",
+    "canvas": "^3.2.1",
     "chart.js": "^4.5.1"
   }
 }
