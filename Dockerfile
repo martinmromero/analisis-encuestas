@@ -13,7 +13,10 @@ RUN apk add --no-cache \
     jpeg-dev \
     pango-dev \
     giflib-dev \
-    pixman-dev
+    pixman-dev \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation
 COPY package*.json ./
 # Install all deps for dev layer (dev + prod)
 RUN npm ci
@@ -51,7 +54,10 @@ RUN apk add --no-cache \
     jpeg-dev \
     pango-dev \
     giflib-dev \
-    pixman-dev
+    pixman-dev \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation
 
 # Only install prod deps
 COPY package*.json ./
