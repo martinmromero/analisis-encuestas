@@ -39,6 +39,7 @@ services:
       - PORT=3000
       # Persist dictionary in a separate volume directory
       - USER_DICT_FILE=/data/user-dictionary.json
+      - COLUMN_CONFIGS_FILE=/data/column-configs.json
       - APP_VERSION=${APP_VERSION:-1.033}
     volumes:
       - uploads_data:/app/uploads

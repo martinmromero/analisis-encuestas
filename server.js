@@ -3485,8 +3485,8 @@ app.get('/api/engines', (req, res) => {
 // ENDPOINTS PARA GESTIÓN DE CONFIGURACIÓN DE COLUMNAS
 // ========================================
 
-// Archivo para guardar configuraciones
-const CONFIGS_FILE = path.join(__dirname, 'column-configs.json');
+// Archivo para guardar configuraciones - Persistente en volumen Docker
+const CONFIGS_FILE = process.env.COLUMN_CONFIGS_FILE || path.join(__dirname, 'column-configs.json');
 
 // Cargar configuraciones guardadas
 function loadColumnConfigs() {

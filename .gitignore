@@ -8,6 +8,9 @@ yarn-error.log*
 uploads/*
 !uploads/.gitkeep
 
+# Configuraciones dinámicas (creadas por usuarios en runtime)
+column-configs.json
+
 # Variables de entorno
 .env
 .env.local

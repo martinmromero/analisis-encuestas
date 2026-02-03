@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Ejemplo - Encuesta Docentes",
+    "identificacion": [
+      "ID",
+      "Nombre",
+      "Email",
+      "Carrera",
+      "Sede"
+    ],
+    "numericas": [
+      "Calificación general (1-10)",
+      "Recomendaría al docente (1-5)"
+    ],
+    "textoLibre": [
+      "Comentarios adicionales",
+      "Sugerencias de mejora"
+    ],
+    "escalas": {},
+    "created": "2026-02-03T00:00:00.000Z",
+    "updated": "2026-02-03T00:00:00.000Z"
+  }
+]
