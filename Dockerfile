@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    pkg-config \
     cairo-dev \
     jpeg-dev \
     pango-dev \
@@ -45,6 +46,7 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
+    pkg-config \
     cairo \
     jpeg \
     pango \
