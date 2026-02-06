@@ -224,8 +224,27 @@ const USER_DICT_FILE = process.env.USER_DICT_FILE || path.join(__dirname, 'user-
 // ===== FUNCIONES DE CONFIGURACIÓN DE COLUMNAS =====
 // Usa el archivo column-config.js para la configuración
 
+// Función auxiliar para verificar si un texto contiene palabras del diccionario activo
+function hasWordsInDictionary(text) {
+  if (!text || typeof text !== 'string' || !currentLabels || Object.keys(currentLabels).length === 0) {
+    return false;
+  }
+  
+  const normalizedText = text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  
+  // Verificar si alguna palabra/frase del diccionario está presente
+  for (const key of Object.keys(currentLabels)) {
+    const normKey = key.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    if (normalizedText.includes(normKey)) {
+      return true; // Encontró al menos una palabra del diccionario
+    }
+  }
+  return false;
+}
+
 // Función para determinar si una columna debe ser analizada para sentimiento
 // Acepta configuración personalizada opcional
+// PRIORIDAD: Si contiene palabras del diccionario, se analiza SIN IMPORTAR la longitud
 function shouldAnalyzeColumn(columnName, value, customConfig = null) {
   const config = customConfig || COLUMN_CONFIG;
   
@@ -245,30 +264,54 @@ function shouldAnalyzeColumn(columnName, value, customConfig = null) {
   );
   
   if (isTextoLibre) {
-    // Solo analizar si es string con contenido significativo
-    const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 10;
-    const shouldProcess = typeof value === 'string' && value.trim().length > minLength;
-    if (!shouldProcess && typeof value === 'string' && value.trim().length > 0) {
-      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} <= ${minLength} | Valor: "${value.substring(0, 50)}"`);
-    } else if (!shouldProcess && (!value || (typeof value === 'string' && value.trim().length === 0))) {
+    // Verificar primero si es string válido
+    if (typeof value !== 'string' || value.trim().length === 0) {
       console.log(`[FILTRO] ⚠️ Columna texto libre "${columnName}" vacía: tipo=${typeof value} valor="${value}"`);
-    } else if (shouldProcess) {
-      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA: longitud ${value.trim().length} > ${minLength}`);
+      return false;
+    }
+    
+    // PRIORIDAD 1: Si contiene palabras del diccionario, analizar sin importar longitud
+    if (hasWordsInDictionary(value)) {
+      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA (diccionario): "${value.substring(0, 50)}"`);
+      return true;
+    }
+    
+    // PRIORIDAD 2: Si no tiene palabras del diccionario, verificar longitud mínima (3 caracteres)
+    const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 3;
+    const shouldProcess = value.trim().length >= minLength;
+    if (!shouldProcess) {
+      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} < ${minLength} | Valor: "${value.substring(0, 50)}"`);
+    } else {
+      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA: longitud ${value.trim().length} >= ${minLength}`);
     }
     return shouldProcess;
   } 
   
   // Para cualquier otra columna, aplicar reglas generales:
   // - Debe ser string
-  // - Más de X caracteres (comentarios significativos)
+  // - PRIORIDAD 1: Si contiene palabras del diccionario, analizar
+  // - PRIORIDAD 2: Más de 3 caracteres (comentarios significativos)
   // - No debe ser un número convertido a string
-  const minLength = COLUMN_CONFIG.analisis?.longitudMinimaOtros || 20;
-  if (typeof value === 'string' && value.trim().length > minLength) {
-    // Verificar que no sea solo un número
-    const trimmed = value.trim();
-    if (!isNaN(trimmed) && trimmed !== '') {
-      return false;
-    }
+  
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+  
+  // Verificar que no sea solo un número
+  const trimmed = value.trim();
+  if (!isNaN(trimmed) && trimmed !== '') {
+    return false;
+  }
+  
+  // PRIORIDAD 1: Si contiene palabras del diccionario, analizar
+  if (hasWordsInDictionary(value)) {
+    console.log(`[FILTRO] ✅ Columna "${columnName}" ACEPTADA (diccionario): "${value.substring(0, 50)}"`);
+    return true;
+  }
+  
+  // PRIORIDAD 2: Verificar longitud mínima (3 caracteres)
+  const minLength = COLUMN_CONFIG.analisis?.longitudMinimaOtros || 3;
+  if (value.trim().length >= minLength) {
     return true;
   }
   
@@ -1293,7 +1336,10 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
   // ========== HOJA 0: PORTADA ==========
   await createCoverSheet(workbook, analysisResults, customConfig, originalFilename, statistics);
   
-  // ========== HOJA 1: DATOS DETALLADOS ==========
+  // ========== HOJA 1: CÓMO SE CALCULAN LOS RESULTADOS ==========
+  await createMethodologySheet(workbook);
+  
+  // ========== HOJA 2: DATOS DETALLADOS ==========
   const detailSheet = workbook.addWorksheet('Datos Detallados');
   
   // Obtener todas las columnas originales del primer registro
@@ -2170,6 +2216,240 @@ function getScoreColorClass(score, escalaConfig = null) {
   }
   
   console.log('✅ Hoja "Portada" creada con gráficos');
+}
+
+// Función para crear la hoja de explicación de cálculos (para usuarios no técnicos)
+async function createMethodologySheet(workbook) {
+  const sheet = workbook.addWorksheet('Cómo se Calculan los Resultados', { views: [{ showGridLines: false }] });
+  
+  // Configurar anchos de columnas
+  sheet.columns = [
+    { width: 3 },
+    { width: 80 },
+    { width: 3 }
+  ];
+  
+  let currentRow = 2;
+  
+  // ===== TÍTULO PRINCIPAL =====
+  sheet.mergeCells(`B${currentRow}:B${currentRow}`);
+  const titleCell = sheet.getCell(`B${currentRow}`);
+  titleCell.value = '📊 EXPLICACIÓN DE CÁLCULOS - Guía para Interpretar los Resultados';
+  titleCell.font = { size: 16, bold: true, color: { argb: 'FF2C5282' } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  currentRow += 2;
+  
+  // ===== INTRODUCCIÓN =====
+  const introCell = sheet.getCell(`B${currentRow}`);
+  introCell.value = 'Este reporte analiza dos tipos de datos de la encuesta: respuestas cuantitativas (numéricas) y respuestas cualitativas (texto libre con análisis de sentimientos).';
+  introCell.font = { size: 11 };
+  introCell.alignment = { wrapText: true };
+  sheet.getRow(currentRow).height = 30;
+  currentRow += 2;
+  
+  // ===== SECCIÓN 1: CAMPOS CUANTITATIVOS =====
+  sheet.mergeCells(`B${currentRow}:B${currentRow}`);
+  const quantHeaderCell = sheet.getCell(`B${currentRow}`);
+  quantHeaderCell.value = '1️⃣ CAMPOS CUANTITATIVOS (Preguntas con Escala Numérica)';
+  quantHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  quantHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366092' } };
+  quantHeaderCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  // Explicación escala
+  const scaleCell = sheet.getCell(`B${currentRow}`);
+  scaleCell.value = '📏 Escala utilizada: 1 a 10, siendo 10 el mejor valor posible';
+  scaleCell.font = { size: 11, bold: true };
+  scaleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  scaleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // Cálculo promedio cuantitativo
+  const quantCalcCell = sheet.getCell(`B${currentRow}`);
+  quantCalcCell.value = 'Cálculo del Promedio:\n' +
+    '• Se suman todos los valores numéricos de cada pregunta\n' +
+    '• Se divide por la cantidad total de respuestas\n' +
+    '• Resultado: promedio en escala de 1 a 10';
+  quantCalcCell.font = { size: 11 };
+  quantCalcCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 50;
+  currentRow++;
+  
+  // Ejemplo cuantitativo
+  const quantExampleCell = sheet.getCell(`B${currentRow}`);
+  quantExampleCell.value = '💡 Ejemplo:\n' +
+    'Pregunta: "¿Cómo evalúa el desempeño general del/la docente durante la cursada?"\n' +
+    'Respuestas: 10, 9, 8, 10, 7\n' +
+    'Cálculo: (10 + 9 + 8 + 10 + 7) ÷ 5 = 44 ÷ 5 = 8.8\n' +
+    'Resultado: El promedio es 8.8 sobre 10';
+  quantExampleCell.font = { size: 10, italic: true };
+  quantExampleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFCDD' } };
+  quantExampleCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 70;
+  currentRow += 2;
+  
+  // ===== SECCIÓN 2: CAMPOS CUALITATIVOS =====
+  sheet.mergeCells(`B${currentRow}:B${currentRow}`);
+  const qualHeaderCell = sheet.getCell(`B${currentRow}`);
+  qualHeaderCell.value = '2️⃣ CAMPOS CUALITATIVOS (Análisis de Comentarios de Texto Libre)';
+  qualHeaderCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  qualHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2D3748' } };
+  qualHeaderCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  // Explicación del sistema
+  const qualSystemCell = sheet.getCell(`B${currentRow}`);
+  qualSystemCell.value = '🔍 Sistema de Análisis de Sentimientos:\n' +
+    'El sistema analiza comentarios de texto libre (como "¿Qué te gustó de la materia?") usando un diccionario ' +
+    'de palabras y frases con valores asignados que representan sentimientos positivos o negativos.';
+  qualSystemCell.font = { size: 11 };
+  qualSystemCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  qualSystemCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  sheet.getRow(currentRow).height = 48;
+  currentRow++;
+  
+  // Cómo funciona el diccionario
+  const dictCell = sheet.getCell(`B${currentRow}`);
+  dictCell.value = '📖 Diccionario de Sentimientos:\n' +
+    'El diccionario contiene palabras y frases con valores asignados:\n' +
+    '• Palabras positivas: "excelente" (+5), "bueno" (+3), "genial" (+4)\n' +
+    '• Palabras negativas: "malo" (-3), "terrible" (-5), "confuso" (-2)\n' +
+    '• Valores pueden ser cualquier número positivo o negativo';
+  dictCell.font = { size: 11 };
+  dictCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 75;
+  currentRow++;
+  
+  // Paso a paso del cálculo
+  const stepByStepCell = sheet.getCell(`B${currentRow}`);
+  stepByStepCell.value = '🔢 CÁLCULO POR CADA REGISTRO (Paso a Paso):';
+  stepByStepCell.font = { size: 12, bold: true, color: { argb: 'FF2C5282' } };
+  stepByStepCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // Paso 1
+  const step1Cell = sheet.getCell(`B${currentRow}`);
+  step1Cell.value = 'Paso 1 - Buscar palabras del diccionario:\n' +
+    'El sistema busca cada palabra del comentario en el diccionario y suma sus valores.\n' +
+    'IMPORTANTE: Si una palabra está en el diccionario, se analiza sin importar cuán corta sea.';
+  step1Cell.font = { size: 10 };
+  step1Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
+  sheet.getRow(currentRow).height = 48;
+  currentRow++;
+  
+  // Paso 2
+  const step2Cell = sheet.getCell(`B${currentRow}`);
+  step2Cell.value = 'Paso 2 - Calcular Score RAW:\n' +
+    'Se suman TODOS los valores encontrados (sin límites).\n' +
+    'Por ejemplo: "excelente" (+5) + "bueno" (+3) + "genial" (+4) = +12';
+  step2Cell.font = { size: 10 };
+  step2Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
+  sheet.getRow(currentRow).height = 48;
+  currentRow++;
+  
+  // Paso 3
+  const step3Cell = sheet.getCell(`B${currentRow}`);
+  step3Cell.value = 'Paso 3 - Promediar por columnas analizadas:\n' +
+    'Si una persona respondió MÚLTIPLES preguntas cualitativas, se promedian sus scores.\n' +
+    'Promedio = Score Total ÷ Cantidad de columnas respondidas';
+  step3Cell.font = { size: 10 };
+  step3Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
+  sheet.getRow(currentRow).height = 48;
+  currentRow++;
+  
+  // Paso 4
+  const step4Cell = sheet.getCell(`B${currentRow}`);
+  step4Cell.value = 'Paso 4 - Normalizar a escala 0-10:\n' +
+    'El score promedio se limita a un rango de -10 a +10, y luego se convierte a escala 0-10.\n' +
+    'Fórmula: Puntuación = (Score limitado a [-10,+10] + 10) ÷ 2\n' +
+    '• Score RAW -10 o menor → 0.0 (mínimo)\n' +
+    '• Score RAW 0 → 5.0 (neutral)\n' +
+    '• Score RAW +10 o mayor → 10.0 (máximo)';
+  step4Cell.font = { size: 10 };
+  step4Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
+  sheet.getRow(currentRow).height = 90;
+  currentRow++;
+  
+  // Clasificación
+  const classCell = sheet.getCell(`B${currentRow}`);
+  classCell.value = 'Paso 5 - Clasificar el sentimiento:\n' +
+    'Según la puntuación normalizada (0-10):\n' +
+    '• 8.0 - 10.0 → Muy Positivo\n' +
+    '• 6.0 - 7.9 → Positivo\n' +
+    '• 4.0 - 5.9 → Neutral\n' +
+    '• 2.0 - 3.9 → Negativo\n' +
+    '• 0.0 - 1.9 → Muy Negativo';
+  classCell.font = { size: 10 };
+  classCell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
+  sheet.getRow(currentRow).height = 100;
+  currentRow += 2;
+  
+  // Ejemplo completo cualitativo
+  const qualExampleHeaderCell = sheet.getCell(`B${currentRow}`);
+  qualExampleHeaderCell.value = '💡 EJEMPLO COMPLETO:';
+  qualExampleHeaderCell.font = { size: 12, bold: true, color: { argb: 'FF2C5282' } };
+  qualExampleHeaderCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  const exampleDetailCell = sheet.getCell(`B${currentRow}`);
+  exampleDetailCell.value = 'Comentario del estudiante: "El profesor fue excelente, muy bueno explicando"\n\n' +
+    'Análisis:\n' +
+    '1. Palabras encontradas en diccionario:\n' +
+    '   • "excelente" = +5\n' +
+    '   • "bueno" = +3\n' +
+    '2. Score RAW = +5 + 3 = +8\n' +
+    '3. Solo respondió 1 columna cualitativa → Promedio = 8 ÷ 1 = +8\n' +
+    '4. Normalizar: (8 + 10) ÷ 2 = 18 ÷ 2 = 9.0\n' +
+    '5. Puntuación final: 9.0 sobre 10\n' +
+    '6. Clasificación: "Muy Positivo" (porque 9.0 ≥ 8.0)';
+  exampleDetailCell.font = { size: 10, italic: true };
+  exampleDetailCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFCDD' } };
+  exampleDetailCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 180;
+  currentRow += 2;
+  
+  // CÁLCULO DEL PROMEDIO GENERAL
+  sheet.mergeCells(`B${currentRow}:B${currentRow}`);
+  const avgHeaderCell = sheet.getCell(`B${currentRow}`);
+  avgHeaderCell.value = '📊 CÁLCULO DEL PROMEDIO GENERAL DEL REPORTE';
+  avgHeaderCell.font = { size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+  avgHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF366092' } };
+  avgHeaderCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  sheet.getRow(currentRow).height = 25;
+  currentRow++;
+  
+  const avgCalcCell = sheet.getCell(`B${currentRow}`);
+  avgCalcCell.value = 'Para calcular el promedio que aparece en la portada:\n\n' +
+    '1. Se toma la puntuación normalizada (0-10) de CADA registro\n' +
+    '2. Se suman todas las puntuaciones\n' +
+    '3. Se divide por la cantidad total de registros que respondieron preguntas cualitativas\n\n' +
+    'Fórmula: Promedio General = (Suma de todas las puntuaciones) ÷ (Total de registros con respuestas cualitativas)\n\n' +
+    'Ejemplo:\n' +
+    'Registro 1: 9.0, Registro 2: 7.5, Registro 3: 5.0\n' +
+    'Promedio = (9.0 + 7.5 + 5.0) ÷ 3 = 21.5 ÷ 3 = 7.17';
+  avgCalcCell.font = { size: 10 };
+  avgCalcCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 180;
+  currentRow += 2;
+  
+  // Nota final
+  const noteCell = sheet.getCell(`B${currentRow}`);
+  noteCell.value = '⚠️ NOTA IMPORTANTE:\n' +
+    '• Solo se analizan comentarios con al menos 3 caracteres, a menos que contengan palabras del diccionario\n' +
+    '• Si un comentario tiene palabras del diccionario (ej: "excelente", "malo"), se analiza sin importar su longitud\n' +
+    '• Comentarios vacíos, puntos solos (.) o frases ignoradas (como "sin comentarios") no se incluyen en el análisis\n' +
+    '• Los valores RAW pueden ser mayores a 10 o menores a -10 cuando hay múltiples palabras, pero se normalizan a escala 0-10 para el resultado final';
+  noteCell.font = { size: 10, italic: true };
+  noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+  noteCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 100;
+  
+  console.log('✅ Hoja "Cómo se Calculan los Resultados" creada');
 }
 
 // Función dinámica para crear hojas de resumen

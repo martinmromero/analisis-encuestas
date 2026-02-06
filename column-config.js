@@ -62,11 +62,18 @@ module.exports = {
   /**
    * CONFIGURACIÓN DE ANÁLISIS
    * Parámetros para determinar qué texto analizar
+   * 
+   * IMPORTANTE: PRIORIDAD DEL DICCIONARIO
+   * Si el texto contiene palabras/frases del diccionario activo, se analiza 
+   * SIN IMPORTAR la longitud (incluso "excelente", "malo", etc.)
+   * 
+   * Los umbrales de longitud solo aplican si NO hay palabras del diccionario.
    */
   analisis: {
     // Longitud mínima de texto para análisis (en caracteres)
-    longitudMinimaTextoLibre: 3,  // Cambiado de 10 a 3 para aceptar comentarios cortos
-    longitudMinimaOtros: 20,
+    // Solo aplica si NO hay palabras del diccionario en el texto
+    longitudMinimaTextoLibre: 3,  // Para columnas de texto libre
+    longitudMinimaOtros: 3,        // Para otras columnas (reducido de 20 a 3)
     
     // Longitud máxima de texto a almacenar en resultados
     longitudMaximaAlmacenada: 200
