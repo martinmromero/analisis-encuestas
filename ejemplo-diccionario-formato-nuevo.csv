@@ -1,0 +1,31 @@
+Comentario / Frase Original,Clasificación,Puntaje,Racional (Contexto)
+excelente,Positivo,5,Máxima calidad y satisfacción
+muy bueno,Positivo,4,Alta satisfacción
+bueno,Positivo,3,Satisfactorio
+aceptable,Positivo,2,Apenas positivo
+bien,Positivo,1,Ligeramente positivo
+regular,Neutral,0,Ni bueno ni malo
+mal,Negativo,-1,Ligeramente negativo
+insuficiente,Negativo,-2,Apenas negativo
+malo,Negativo,-3,Insatisfactorio
+muy malo,Negativo,-4,Muy insatisfactorio
+terrible,Negativo,-5,Pésima experiencia
+didáctico,Positivo,4,Facilita el aprendizaje
+pedagógico,Positivo,3,Enfoque educativo apropiado
+claro,Positivo,4,Fácil de entender
+confuso,Negativo,-4,Difícil de comprender
+aburrido,Negativo,-3,Poco interesante
+motivador,Positivo,4,Inspira al estudiante
+desmotivador,Negativo,-4,Desanima al estudiante
+organizado,Positivo,3,Bien estructurado
+desorganizado,Negativo,-4,Mal estructurado
+puntual,Positivo,2,Cumple horarios
+impuntual,Negativo,-3,No cumple horarios
+respetuoso,Positivo,4,Trato adecuado
+irrespetuoso,Negativo,-5,Trato inadecuado
+preparado,Positivo,4,Domina la materia
+improvisado,Negativo,-2,Falta preparación
+dinámico,Positivo,3,Clases activas
+monótono,Negativo,-3,Clases aburridas
+accesible,Positivo,3,Disponible para consultas
+inaccesible,Negativo,-3,No disponible

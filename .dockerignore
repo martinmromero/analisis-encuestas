@@ -1,0 +1,69 @@
+# Dependencias (se instalan en el contenedor)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store
+
+# Control de versiones
+.git
+.gitignore
+.gitattributes
+
+# Archivos Docker (no necesarios dentro del contenedor)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentación
+*.md
+README.md
+DEPLOYMENT-GUIDE.md
+DOCKER-GUIDE.md
+API-DOCS.md
+FORMATO-DICCIONARIO.md
+
+# Scripts de sistema local
+*.ps1
+*.sh
+quick-setup.ps1
+start-server.ps1
+docker-setup.ps1
+prepare-deployment.ps1
+deploy-server.sh
+
+# Archivos de uploads (se manejan con volúmenes)
+uploads/*
+!uploads/.gitkeep
+
+# Archivos temporales
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.env.local
+.env.*.local
+
+# Python (si se usó para alguna prueba)
+.python-version
+venv
+__pycache__
+*.pyc
+*.pyo
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist
+build
+
+# Backups
+*.bak
+*.backup
+*.old
+

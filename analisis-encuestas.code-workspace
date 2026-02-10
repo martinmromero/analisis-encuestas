@@ -1,0 +1,38 @@
+{
+    "folders": [
+        {
+            "name": "📊 Análisis de Encuestas",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "terminal.integrated.cwd": "${workspaceFolder}",
+        "terminal.integrated.defaultProfile.windows": "PowerShell",
+        "terminal.integrated.profiles.windows": {
+            "PowerShell": {
+                "source": "PowerShell",
+                "args": ["-NoExit", "-Command", "Set-Location '${workspaceFolder}'"]
+            }
+        },
+        "files.defaultLanguage": "javascript",
+        "git.openRepositoryInParentFolders": "never",
+        "explorer.compactFolders": false,
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/uploads/*.xlsx": true,
+            "**/uploads/*.xls": true,
+            "**/.git": false
+        },
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/uploads": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-vscode.vscode-node-azure-pack",
+            "esbenp.prettier-vscode",
+            "ms-vscode.vscode-json"
+        ]
+    }
+}

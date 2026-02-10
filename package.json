@@ -1,0 +1,63 @@
+{
+  "name": "analisis-encuestas",
+  "version": "1.035",
+  "description": "Sistema web completo para análisis de sentimientos de encuestas educativas en español",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo 'No build required - Static files ready'",
+    "clean": "rmdir /s /q uploads 2>nul & mkdir uploads",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "echo 'Linting not configured'",
+    "postinstall": "echo 'Dependencias instaladas correctamente'"
+  },
+  "keywords": [
+    "sentiment-analysis",
+    "spanish-nlp",
+    "survey-analysis",
+    "natural-language-processing",
+    "excel-processing",
+    "web-application",
+    "node.js",
+    "express",
+    "chart.js",
+    "education",
+    "analytics"
+  ],
+  "author": {
+    "name": "Tu Nombre",
+    "email": "tu-email@ejemplo.com",
+    "url": "https://github.com/tu-usuario"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tu-usuario/analisis-encuestas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tu-usuario/analisis-encuestas/issues"
+  },
+  "homepage": "https://github.com/tu-usuario/analisis-encuestas#readme",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "chartjs-node-canvas": "^5.0.0",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.1",
+    "multer": "^1.4.5-lts.1",
+    "node-nlp": "^5.0.0-alpha.5",
+    "sentiment": "^5.0.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "optionalDependencies": {
+    "canvas": "^3.2.1",
+    "chart.js": "^4.5.1"
+  }
+}

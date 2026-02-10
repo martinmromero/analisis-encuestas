@@ -1,0 +1,52 @@
+volumes:
+  node_modules: {}
+  uploads_data: {}
+  app_data: {}
+  dict_data: {}
+
+services:
+  app-dev:
+    build:
+      context: .
+      target: dev
+    image: analisis-encuestas:dev
+    container_name: analisis-encuestas-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - USER_DICT_FILE=/app/user-dictionary.json
+    volumes:
+      # Bind mount source for live editing
+      - .:/app
+      # Keep node_modules inside the container (not overridden by bind mount)
+      - node_modules:/app/node_modules
+      # Persist uploads across restarts
+      - uploads_data:/app/uploads
+      # Persist dictionaries in development
+      - dict_data:/app/dictionaries
+    command: npm run dev
+    profiles: ["dev"]
+
+  app:
+    build:
+      context: .
+      target: prod
+      args:
+        APP_VERSION: ${APP_VERSION:-1.033}
+    image: analisis-encuestas:latest
+    container_name: analisis-encuestas
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Persist dictionary in a separate volume directory
+      - USER_DICT_FILE=/data/user-dictionary.json
+      - COLUMN_CONFIGS_FILE=/data/column-configs.json
+      - APP_VERSION=${APP_VERSION:-1.033}
+    volumes:
+      - uploads_data:/app/uploads
+      - app_data:/data
+      - dict_data:/app/dictionaries
+    restart: unless-stopped
+    profiles: ["prod"]

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Encuestas - Análisis de Sentimientos</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <img src="logobarcelo_cmyk_jpg.jpg?v=1" alt="Fundación H.A. Barceló" class="header-logo" onerror="console.error('Error cargando logo')">
+                <div class="header-text">
+                    <h1>📊 Análisis de Encuestas</h1>
+                    <p>Sube tu archivo Excel y obtén un análisis de sentimientos detallado</p>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Navegación entre secciones -->
+            <nav class="section-nav">
+                <button id="analysisTab" class="nav-tab active">📊 Análisis de Encuestas</button>
+                <button id="columnConfigTab" class="nav-tab">⚙️ Configuración de Columnas</button>
+                <button id="dictionaryTab" class="nav-tab">📚 Gestión de Diccionario</button>
+                <button id="comparisonTab" class="nav-tab">⚖️ Comparar Motores</button>
+            </nav>
+
+            <!-- Sección de análisis de encuestas -->
+            <div id="analysisSection" class="main-section">
+                
+                <!-- Sección de carga de archivo - PRIMERO -->
+                <section class="upload-section">
+                <div class="upload-card">
+                    <h2>📁 1. Subir Archivo Excel</h2>
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="excelFile" name="excelFile" accept=".xlsx,.xls,.csv" required>
+                            <label for="excelFile" class="file-label">
+                                <span class="file-icon">📄</span>
+                                <span class="file-text">Seleccionar archivo Excel</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Selector de motor de análisis -->
+                        <div class="engine-selector-section">
+                            <h3>🤖 Seleccionar Motor de Análisis</h3>
+                            <div class="engine-options">
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="natural" checked>
+                                    <div class="engine-card">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">🧠</span>
+                                            <span class="engine-name">Natural.js Enhanced</span>
+                                            <span class="engine-badge recommended">Recomendado</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Diccionario personalizado de 894 palabras en español. Ideal para comentarios específicos y análisis preciso.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>📊 Efectividad: 8.5/10 para español</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="nlpjs">
+                                    <div class="engine-card">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">🚀</span>
+                                            <span class="engine-name">NLP.js (AXA)</span>
+                                            <span class="engine-badge advanced">Avanzado</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Motor de IA con procesamiento avanzado y soporte nativo multiidioma. Mejor para contexto complejo.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>🎯 Efectividad: 10.3/10 para español</span>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="engine-option">
+                                    <input type="radio" name="analysisEngine" value="both">
+                                    <div class="engine-card dual">
+                                        <div class="engine-header">
+                                            <span class="engine-icon">⚖️</span>
+                                            <span class="engine-name">Análisis Dual</span>
+                                            <span class="engine-badge premium">Premium</span>
+                                        </div>
+                                        <div class="engine-description">
+                                            Combina ambos motores y genera un consenso inteligente. Máxima precisión pero mayor tiempo de procesamiento.
+                                        </div>
+                                        <div class="engine-stats">
+                                            <span>🏆 Mejor precisión combinada</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Indicador de diccionario activo -->
+                        <div id="activeDictionaryIndicator" style="background: #f0f7ff; border: 2px solid #4a90e2; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center;">
+                            <strong>📚 Diccionario Activo:</strong> 
+                            <span id="activeDictionaryName" style="color: #4a90e2; font-weight: bold;">Cargando...</span>
+                            <span id="activeDictionaryStats" style="color: #666; font-size: 0.9em; margin-left: 10px;"></span>
+                        </div>
+                        
+                        <div class="button-group">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <select id="quickConfigSelect" style="flex: 1; padding: 12px; border: 2px solid #4a90e2; border-radius: 8px; font-size: 14px; background: white; cursor: pointer;">
+                                    <option value="">⚙️ Seleccionar configuración de columnas...</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="analyze-btn" id="analyzeBtn" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                <span class="btn-icon">🔍</span>
+                                <span id="analyzeBtnText">Selecciona una configuración primero</span>
+                            </button>
+                            <button type="button" id="advancedReportBtn" class="advanced-report-btn">
+                                <span class="btn-icon">📋</span>
+                                Generar Reporte XLSX Completo
+                            </button>
+                        </div>
+                    </form>
+                    <div class="file-info">
+                        <p>💡 <strong>Formatos soportados:</strong> .xlsx, .xls, .csv (separado por ; o ,)</p>
+                        <p>📝 <strong>Requisitos:</strong> El archivo debe contener columnas como: carrera, materia, sede, docente, comentarios</p>
+                        <p>🎯 <strong>Reporte Completo:</strong> Incluye filtros automáticos, análisis por carrera/docente y colores por sentiment</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading spinner -->
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Procesando archivo y analizando sentimientos...</p>
+            </div>
+
+            <!-- Panel de Filtros (box separado) -->
+            <section id="filtersSection" class="filters-section hidden">
+                <div class="filters-panel" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px;">
+                    <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none; margin-top: 0;" onclick="document.getElementById('filtersContent').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('filtersContent').classList.contains('hidden') ? '▶' : '▼';">
+                        <span class="toggle-icon">▶</span>
+                        🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
+                    </h3>
+                    <div id="filtersContent" class="filters-grid hidden">
+                        <div class="filter-group">
+                            <label for="filterCarrera">Carrera:</label>
+                            <select id="filterCarrera" class="filter-select">
+                                <option value="">Todas las carreras</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterMateria">Materia:</label>
+                            <select id="filterMateria" class="filter-select">
+                                <option value="">Todas las materias</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterModalidad">Modalidad:</label>
+                            <select id="filterModalidad" class="filter-select">
+                                <option value="">Todas las modalidades</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterSede">Sede:</label>
+                            <select id="filterSede" class="filter-select">
+                                <option value="">Todas las sedes</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterDocente">Docente:</label>
+                            <select id="filterDocente" class="filter-select">
+                                <option value="">Todos los docentes</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFilters" class="filter-btn apply">
+                                <span>✓</span> Aplicar Filtros
+                            </button>
+                            <button id="clearFilters" class="filter-btn clear">
+                                <span>✕</span> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="filter-summary" id="filterSummary" style="display: none;">
+                        <span id="filterSummaryText"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de resultados -->
+            <section id="results" class="results-section hidden">
+                <div class="results-header">
+                    <h2>📈 Resultados del Análisis</h2>
+                </div>
+
+                <h3>📊  Análisis cualitativo</h3>
+
+                <!-- Estadísticas generales -->
+                <div class="stats-grid">
+                    <!-- Fila 1: Métricas generales -->
+                    <div class="stat-card">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-content">
+                            <h3 id="totalResponses">0</h3>
+                            <p>Total Respuestas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <h3 id="quantitativeResponses">0</h3>
+                            <p>Respuestas Cualitativas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-content">
+                            <h3 id="averageScore">0</h3>
+                            <p>Puntuación Promedio (0-10)</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Fila 2: Sentimientos -->
+                    <div class="stat-card sentiment-positive">
+                        <div class="stat-icon">😊</div>
+                        <div class="stat-content">
+                            <h3 id="positivePercent">0%</h3>
+                            <p>Sentimientos Positivos</p>
+                        </div>
+                    </div>
+                    <div class="stat-card sentiment-neutral">
+                        <div class="stat-icon">😐</div>
+                        <div class="stat-content">
+                            <h3 id="neutralPercent">0%</h3>
+                            <p>Sentimiento Neutral</p>
+                        </div>
+                    </div>
+                    <div class="stat-card sentiment-negative">
+                        <div class="stat-icon">😞</div>
+                        <div class="stat-content">
+                            <h3 id="negativePercent">0%</h3>
+                            <p>Sentimientos Negativos</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Métricas Numéricas Promedio -->
+                <div class="numeric-metrics-container" id="numericMetricsContainer" style="display: none;">
+                    <h3>📊 Análisis cuantitativo</h3>
+                    <div class="metrics-grid" id="metricsGrid">
+                        <!-- Se llena dinámicamente con JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Gráficos -->
+                <div class="charts-container hidden" id="chartsContainer">
+                    <div class="chart-wrapper">
+                        <div class="chart-card">
+                            <h3>Distribución de Sentimientos</h3>
+                            <div class="chart-container">
+                                <canvas id="sentimentChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div class="chart-card">
+                            <h3>Análisis por Categorías</h3>
+                            <div class="chart-container">
+                                <canvas id="categoryChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de resultados detallados -->
+                <!-- NOTA: Sección oculta para futuras versiones. Funciones asociadas: displayResultsTable(), filterResults(), paginación -->
+                <div class="table-container hidden" id="detailedResultsTable">
+                    <h3 onclick="const content = this.nextElementSibling; content.classList.toggle('hidden'); const icon = this.querySelector('.collapse-icon'); icon.textContent = content.classList.contains('hidden') ? '▶' : '▼';" style="cursor: pointer; user-select: none;"><span class="collapse-icon">▶</span> Resultados Detallados</h3>
+                    <div class="hidden">
+                    <div class="table-filters">
+                        <select id="filterSentiment">
+                            <option value="">Todos los sentimientos</option>
+                            <option value="Muy Positivo">Muy Positivo</option>
+                            <option value="Positivo">Positivo</option>
+                            <option value="Neutral">Neutral</option>
+                            <option value="Negativo">Negativo</option>
+                            <option value="Muy Negativo">Muy Negativo</option>
+                        </select>
+                        <input type="text" id="searchText" placeholder="Buscar en el texto...">
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Texto Principal</th>
+                                    <th>Clasificación</th>
+                                    <th>Puntuación</th>
+                                    <th>Confianza</th>
+                                    <th>Palabras Positivas</th>
+                                    <th>Palabras Negativas</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+            <!-- Sección de configuración de columnas -->
+            <div id="columnConfigSection" class="main-section hidden">
+                <section class="column-config-section">
+                    <div class="config-card">
+                        <h2>⚙️ Configuración de Columnas</h2>
+                        <p class="config-description">Define qué columnas son de identificación, numéricas (cuantitativas) o de texto libre (cualitativas)</p>
+                        
+                        <div class="config-controls" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+                            <!-- Mitad izquierda: Selector de configuración -->
+                            <div class="config-selector" style="display: flex; flex-direction: column; gap: 10px;">
+                                <label for="savedConfigsSelect">📋 Configuraciones Guardadas:</label>
+                                <select id="savedConfigsSelect" style="width: 100%; padding: 10px; font-size: 1em;">
+                                    <option value="">-- Seleccionar configuración --</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Mitad derecha: Botones -->
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="newConfigBtn" class="btn-success" style="flex: 1; min-width: 160px;">➕ Nueva Configuración</button>
+                                <button id="deleteConfigBtn" class="btn-danger" style="flex: 1; min-width: 140px;">🗑️ Eliminar</button>
+                                <button id="showConfigModalBtn" class="btn-primary" style="flex: 1 1 100%; min-width: 200px;">✏️ Editar Configuración</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Configuración actual con detalle colapsable -->
+                        <div id="currentConfigPreview" class="config-preview hidden" style="margin-top: 20px;">
+                            <h3 style="cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="document.getElementById('configDetails').classList.toggle('hidden'); this.querySelector('.toggle-icon').textContent = document.getElementById('configDetails').classList.contains('hidden') ? '▶' : '▼';">
+                                <span class="toggle-icon">▶</span>
+                                📊 Configuración Actual: <span id="currentConfigName">Default</span>
+                            </h3>
+                            <div id="configDetails" class="config-columns hidden">
+                                <div class="column-type-preview">
+                                    <h4>🏷️ Identificación (<span id="previewIdCount">0</span>)</h4>
+                                    <div id="previewIdColumns" class="column-pills"></div>
+                                </div>
+                                <div class="column-type-preview">
+                                    <h4>📊 Numéricas (<span id="previewNumCount">0</span>)</h4>
+                                    <div id="previewNumColumns" class="column-pills"></div>
+                                </div>
+                                <div class="column-type-preview">
+                                    <h4>💬 Cualitativas (<span id="previewTextCount">0</span>)</h4>
+                                    <div id="previewTextColumns" class="column-pills"></div>
+                                </div>
+                                <div class="column-type-preview" id="previewUnassignedSection" style="display: none;">
+                                    <h4>❓ Sin Asignar (<span id="previewUnassignedCount">0</span>)</h4>
+                                    <div id="previewUnassignedColumns" class="column-pills"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Sección de gestión de diccionario -->
+            <div id="dictionarySection" class="main-section hidden">
+                <!-- Panel de visualización del diccionario actual -->
+                <section class="dictionary-viewer">
+                    <h2>📖 Diccionario Actual de Sentimientos</h2>
+                    <div class="dictionary-stats">
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalWords">0</span>
+                            <span class="stat-label">Palabras Total</span>
+                        </div>
+                        <div class="stat-item positive">
+                            <span class="stat-number" id="positiveWords">0</span>
+                            <span class="stat-label">Positivas</span>
+                        </div>
+                        <div class="stat-item negative">
+                            <span class="stat-number" id="negativeWords">0</span>
+                            <span class="stat-label">Negativas</span>
+                        </div>
+                        <div class="stat-item neutral">
+                            <span class="stat-number" id="neutralWords">0</span>
+                            <span class="stat-label">Neutrales</span>
+                        </div>
+                    </div>
+
+                    <!-- Título con botón de colapsar (fuera del contenedor colapsable) -->
+                    <div class="dictionary-collapse-header">
+                        <button id="toggleDictionary" class="collapse-toggle-btn collapsed">
+                            <span class="collapse-icon">▼</span>
+                            <span class="collapse-title">Tabla de Palabras del Diccionario</span>
+                        </button>
+                    </div>
+
+                    <!-- Contenedor colapsable del diccionario -->
+                    <div id="dictionaryTableContainer" class="dictionary-collapsible collapsed">
+                    <!-- Filtros para el diccionario -->
+                    <div class="dictionary-filters">
+                        <select id="sentimentFilter">
+                            <option value="">Todos los sentimientos</option>
+                            <option value="positive">Solo Positivas</option>
+                            <option value="negative">Solo Negativas</option>
+                            <option value="neutral">Solo Neutrales</option>
+                        </select>
+                        <input type="text" id="wordSearch" placeholder="Buscar palabra o frase...">
+                        <button id="refreshDictionary" class="refresh-btn">🔄 Actualizar</button>
+                    </div>
+
+                    <!-- Lista de palabras del diccionario -->
+                    <div class="dictionary-list">
+                        <table id="dictionaryTable">
+                            <thead>
+                                <tr>
+                                    <th>Palabra/Frase</th>
+                                    <th>Puntuación</th>
+                                    <th>Tipo</th>
+                                    <th>Origen</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    </div>
+                    <!-- Fin contenedor colapsable -->
+                </section>
+
+                <!-- Panel de entrenamiento -->
+                <section class="training-panel">
+                    <h2>🎯 Entrenar Modelo de Sentimientos</h2>
+                    
+                    <!-- Pestañas para cambiar entre diccionario y palabras ignoradas -->
+                    <div class="training-tabs">
+                        <button class="tab-button active" data-tab="dictionary">📖 Diccionario</button>
+                        <button class="tab-button" data-tab="ignored">🚫 Palabras Ignoradas</button>
+                    </div>
+
+                    <!-- Pestaña de Diccionario -->
+                    <div id="dictionaryContent" class="tab-content active">
+                        <div class="training-form">
+                            <div class="form-group">
+                                <label for="newWord">Palabra o Frase:</label>
+                                <input type="text" id="newWord" placeholder="Ej: excelente, muy bueno, no me gusta...">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sentimentScore">Puntuación de Sentimiento:</label>
+                                <div class="score-input">
+                                    <input type="range" id="sentimentScore" min="-5" max="5" value="0" step="0.5">
+                                    <div class="score-display">
+                                        <span id="scoreValue">0</span>
+                                        <span id="scoreLabel">Neutral</span>
+                                    </div>
+                                </div>
+                                <div class="score-guide">
+                                    <div class="score-item">-5 a -2: Muy Negativo</div>
+                                    <div class="score-item">-2 a 0: Negativo</div>
+                                    <div class="score-item">0: Neutral</div>
+                                    <div class="score-item">0 a 2: Positivo</div>
+                                    <div class="score-item">2 a 5: Muy Positivo</div>
+                                </div>
+                            </div>
+
+                            <div class="form-buttons">
+                                <button id="addWord" class="add-btn">➕ Agregar al Diccionario</button>
+                                <button id="cancelEdit" type="button" class="test-btn hidden">✖️ Cancelar edición</button>
+                                <button id="testWord" class="test-btn">🧪 Probar Análisis</button>
+                            </div>
+                        </div>
+
+                        <!-- Resultado de prueba -->
+                        <div id="testResult" class="test-result hidden">
+                            <h3>Resultado de Prueba:</h3>
+                            <div class="test-output"></div>
+                        </div>
+                    </div>
+
+                    <!-- Pestaña de Palabras Ignoradas -->
+                    <div id="ignoredContent" class="tab-content">
+                        <div class="ignored-info">
+                            <p><strong>ℹ️ Palabras Ignoradas:</strong> Estas palabras/frases no recibirán puntaje en el análisis cualitativo y serán excluidas de las estadísticas.</p>
+                        </div>
+
+                        <div class="training-form">
+                            <div class="form-group">
+                                <label for="newIgnoredPhrase">Palabra o Frase a Ignorar:</label>
+                                <input type="text" id="newIgnoredPhrase" placeholder='Ej: sin comentario, n/a, -, ...'>
+                            </div>
+
+                            <div class="form-buttons">
+                                <button id="addIgnored" class="add-btn">➕ Agregar a Ignoradas</button>
+                            </div>
+                        </div>
+
+                        <!-- Lista de palabras ignoradas -->
+                        <div class="ignored-list">
+                            <h3>📋 Lista de Palabras Ignoradas (<span id="ignoredCount">0</span>)</h3>
+                            <div id="ignoredPhrasesList" class="ignored-phrases-container"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel de importación/exportación -->
+                <section class="import-export-panel">
+                    <h2>💾 Gestión de Diccionarios</h2>
+                    
+                    <!-- Selector de diccionario activo -->
+                    <div class="dictionary-selector">
+                        <label for="activeDictionarySelect">Diccionario Activo:</label>
+                        <select id="activeDictionarySelect" class="dictionary-select">
+                            <option value="default">Diccionario Base (894 palabras)</option>
+                        </select>
+                        <button id="deleteDictionary" class="btn-small btn-danger" title="Eliminar diccionario seleccionado">🗑️</button>
+                    </div>
+                    
+                    <div class="management-buttons">
+                        <button id="exportDictionaryExcel" class="management-btn export">
+                            📊 Exportar a Excel
+                        </button>
+                        <button id="importDictionary" class="management-btn import">
+                            📥 Importar Diccionario
+                        </button>
+                        <button id="resetDictionary" class="management-btn reset">
+                            🔄 Restaurar Original
+                        </button>
+                    </div>
+
+                    <!-- Input oculto para importar archivos -->
+                    <input type="file" id="dictionaryFileInput" accept=".json,.xlsx,.xls,.csv" style="display: none;">
+                </section>
+            </div>
+
+            <!-- Sección de comparación de motores -->
+            <div id="comparisonSection" class="main-section hidden">
+                <header class="section-header">
+                    <h2>⚖️ Comparación de Motores de Análisis</h2>
+                    <p>Prueba diferentes motores de análisis de sentimientos para encontrar el mejor para tu caso de uso</p>
+                </header>
+
+                <!-- Panel de motores disponibles -->
+                <section class="engines-section">
+                    <h3>🔧 Motores Disponibles</h3>
+                    <div class="engines-grid" id="enginesGrid">
+                        <!-- Los motores se cargarán dinámicamente -->
+                    </div>
+                </section>
+
+                <!-- Panel de prueba de texto -->
+                <section class="test-section">
+                    <h3>🧪 Prueba de Análisis</h3>
+                    <div class="test-card">
+                        <div class="test-input">
+                            <label for="testText">Texto a analizar:</label>
+                            <textarea id="testText" rows="4" placeholder="Escribe aquí el texto que quieres analizar con diferentes motores...">El servicio fue excelente, superó mis expectativas completamente. Estoy muy satisfecho con la calidad.</textarea>
+                        </div>
+                        
+                        <div class="engine-selection">
+                            <label>Seleccionar motores para comparar:</label>
+                            <div class="engine-checkboxes" id="engineCheckboxes">
+                                <!-- Se cargarán dinámicamente -->
+                            </div>
+                        </div>
+                        
+                        <button id="compareEngines" class="compare-btn">
+                            <span>⚖️</span> Comparar Motores
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Loading para comparación -->
+                <div id="comparisonLoading" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Analizando con múltiples motores...</p>
+                </div>
+
+                <!-- Resultados de comparación -->
+                <section id="comparisonResults" class="comparison-results hidden">
+                    <h3>📊 Resultados de Comparación</h3>
+                    
+                    <!-- Resumen de consenso -->
+                    <div class="consensus-card" id="consensusCard">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                    
+                    <!-- Grid de resultados por motor -->
+                    <div class="results-grid" id="resultsGrid">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                    
+                    <!-- Tabla de métricas detalladas -->
+                    <div class="metrics-table-container">
+                        <h4>📋 Métricas Detalladas</h4>
+                        <table class="metrics-table" id="metricsTable">
+                            <thead>
+                                <tr>
+                                    <th>Motor</th>
+                                    <th>Puntuación</th>
+                                    <th>Clasificación</th>
+                                    <th>Confianza</th>
+                                    <th>Tiempo (ms)</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metricsTableBody">
+                                <!-- Se llenará dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <p>💡 Esta aplicación utiliza análisis de sentimientos para evaluar el contenido de texto en las encuestas</p>
+        </footer>
+    </div>
+
+    <!-- Modal de Configuración de Columnas -->
+    <div id="columnConfigModal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>⚙️ Configurar Columnas de Análisis</h2>
+                <button class="modal-close" id="closeConfigModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-instructions">
+                    <p>📋 <strong>Instrucciones:</strong> Arrastra las columnas a las categorías correspondientes o usa los botones para moverlas.</p>
+                    <p>💡 <strong>Tip:</strong> Las columnas de identificación y numéricas NO se analizan para sentiment.</p>
+                </div>
+                
+                <div class="config-name-section">
+                    <label for="configNameInput">📝 Nombre de esta configuración:</label>
+                    <input type="text" id="configNameInput" placeholder="Ej: Encuesta Docentes 2025" value="Default" style="max-width: 400px;">
+                </div>
+                
+                <div class="columns-config-grid">
+                    <div class="column-category" data-type="identificacion">
+                        <h3>🏷️ Identificación</h3>
+                        <p class="category-desc">Datos para filtrar y agrupar (no se analizan)</p>
+                        <div id="idColumnsList" class="columns-list" data-category="identificacion"></div>
+                    </div>
+                    
+                    <div class="column-category" data-type="numericas">
+                        <h3>📊 Numéricas (Cuantitativas)</h3>
+                        <p class="category-desc">Escalas numéricas para estadísticas</p>
+                        <div id="numColumnsList" class="columns-list" data-category="numericas"></div>
+                    </div>
+                    
+                    <div class="column-category" data-type="textoLibre">
+                        <h3>💬 Texto Libre (Cualitativas)</h3>
+                        <p class="category-desc">Comentarios para análisis de sentiment</p>
+                        <div id="textColumnsList" class="columns-list" data-category="textoLibre"></div>
+                    </div>
+                    
+                    <div class="column-category unassigned" data-type="unassigned">
+                        <h3>❓ Sin Asignar</h3>
+                        <p class="category-desc">Columnas detectadas en el archivo</p>
+                        <div id="unassignedColumnsList" class="columns-list" data-category="unassigned"></div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="saveConfigBtn" class="btn-success">💾 Guardar Configuración</button>
+                    <button id="applyConfigBtn" class="btn-primary">✅ Aplicar y Continuar</button>
+                    <button id="cancelConfigBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuración de Escala -->
+    <div id="scaleConfigModal" class="modal hidden">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2>⚙️ Configurar Escala Numérica</h2>
+                <button class="modal-close" id="closeScaleModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="scale-config-form">
+                    <p><strong>Columna:</strong> <span id="scaleColumnName"></span></p>
+                    
+                    <div id="autoDetectedBadge" class="auto-detected-badge hidden">
+                        ✨ Escala detectada automáticamente
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scaleMinInput">Valor Mínimo:</label>
+                        <input type="number" id="scaleMinInput" placeholder="Ej: 1" value="1" min="0" step="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scaleMaxInput">Valor Máximo:</label>
+                        <input type="number" id="scaleMaxInput" placeholder="Ej: 5" value="5" min="1" step="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scaleDirectionSelect">Dirección de la Escala:</label>
+                        <select id="scaleDirectionSelect" class="scale-direction-select">
+                            <option value="ascending">⬆️ Ascendente (1 = Peor, 5 = Mejor)</option>
+                            <option value="descending">⬇️ Descendente (5 = Peor, 1 = Mejor)</option>
+                        </select>
+                        <p class="direction-hint" id="directionHint">El valor mínimo representa la peor calificación</p>
+                    </div>
+                    
+                    <div class="scale-examples">
+                        <p><strong>Ejemplos comunes:</strong></p>
+                        <ul>
+                            <li>Escala 1-5 Ascendente (Likert estándar)</li>
+                            <li>Escala 1-10 Ascendente (NPS)</li>
+                            <li>Escala 5-1 Descendente (ranking inverso)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="applyToAllNumeric" style="width: auto;">
+                            <span>✨ Usar esta misma configuración para todas las preguntas numéricas</span>
+                        </label>
+                        <p style="font-size: 0.9em; color: #666; margin-top: 8px; margin-left: 28px;">Esta opción aplicará la escala y dirección configuradas a todas las columnas numéricas de la encuesta.</p>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="saveScaleBtn" class="btn-success">✅ Guardar Escala</button>
+                    <button id="cancelScaleBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer con número de versión -->
+    <footer style="text-align: center; padding: 20px 0; color: #fff; font-size: 0.9em; border-top: 1px solid #e0e0e0; margin-top: 40px;">
+        <p>Análisis de Encuestas - Fundación H.A. Barceló | Versión <span id="app-version">cargando...</span></p>
+    </footer>
+
+    <script src="cascade-filters.js"></script>
+    <script src="app.js"></script>
+    <script src="column-config-manager.js"></script>
+</body>
+</html>
