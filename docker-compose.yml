@@ -33,7 +33,7 @@ services:
       context: .
       target: prod
       args:
-        APP_VERSION: ${APP_VERSION:-1.033}
+        APP_VERSION: ${APP_VERSION:-1.1}
     image: analisis-encuestas:latest
     container_name: analisis-encuestas
     ports:
@@ -43,7 +43,7 @@ services:
       # Persist dictionary in a separate volume directory
       - USER_DICT_FILE=/data/user-dictionary.json
       - COLUMN_CONFIGS_FILE=/data/column-configs.json
-      - APP_VERSION=${APP_VERSION:-1.033}
+      - APP_VERSION=${APP_VERSION:-1.1
     volumes:
       - uploads_data:/app/uploads
       - app_data:/data

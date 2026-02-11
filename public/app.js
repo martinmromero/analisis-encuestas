@@ -156,14 +156,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Event listener para modal de explicaciones desde el tab
+    // Event listener para sección de metodología
     if (howCalculatedTab) {
         howCalculatedTab.addEventListener('click', () => {
             console.log('👆 Click en howCalculatedTab');
-            const calculationsModal = document.getElementById('calculationsModal');
-            if (calculationsModal) {
-                calculationsModal.style.display = 'flex';
-            }
+            showSection('howCalculated');
         });
     }
 
@@ -240,27 +237,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchTextInput = document.getElementById('searchText');
     if (filterSentimentSelect) filterSentimentSelect.addEventListener('change', filterResults);
     if (searchTextInput) searchTextInput.addEventListener('input', filterResults);
-    
-    // Event listener para cerrar modal de explicaciones
-    const calculationsModal = document.getElementById('calculationsModal');
-    const closeCalculationsModal = document.getElementById('closeCalculationsModal');
-    
-    if (closeCalculationsModal) {
-        closeCalculationsModal.addEventListener('click', () => {
-            if (calculationsModal) {
-                calculationsModal.style.display = 'none';
-            }
-        });
-    }
-    
-    // Cerrar modal al hacer click fuera del contenido
-    if (calculationsModal) {
-        calculationsModal.addEventListener('click', (e) => {
-            if (e.target === calculationsModal) {
-                calculationsModal.style.display = 'none';
-            }
-        });
-    }
     
     console.log('✅ Event listeners configurados correctamente');
 });
@@ -566,7 +542,40 @@ function createSentimentChart(statistics) {
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            id: 'percentageLabels',
+            afterDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                const dataset = chart.data.datasets[0];
+                const total = dataset.data.reduce((a, b) => a + b, 0);
+                
+                ctx.save();
+                ctx.font = 'bold 14px Arial';
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const meta = chart.getDatasetMeta(0);
+                meta.data.forEach((arc, index) => {
+                    const value = dataset.data[index];
+                    const percentage = ((value / total) * 100).toFixed(1);
+                    
+                    // Solo mostrar si el porcentaje es significativo (mayor a 3%)
+                    if (parseFloat(percentage) > 3) {
+                        const angle = (arc.startAngle + arc.endAngle) / 2;
+                        const radius = (arc.innerRadius + arc.outerRadius) / 2;
+                        
+                        const x = arc.x + Math.cos(angle) * radius;
+                        const y = arc.y + Math.sin(angle) * radius;
+                        
+                        ctx.fillText(percentage + '%', x, y);
+                    }
+                });
+                
+                ctx.restore();
+            }
+        }]
     });
 }
 
@@ -619,7 +628,7 @@ function createCategoryChart(statistics) {
             }]
         },
         options: {
-            indexAxis: 'y', // Barras horizontales
+            indexAxis: 'x', // Barras verticales
             responsive: false,
             maintainAspectRatio: false,
             animation: false,
@@ -631,6 +640,8 @@ function createCategoryChart(statistics) {
                     }
                 },
                 y: {
+                    beginAtZero: true,
+                    grace: '10%',
                     ticks: {
                         font: { size: 11 }
                     }
@@ -644,7 +655,8 @@ function createCategoryChart(statistics) {
                     callbacks: {
                         label: function(context) {
                             const percentage = data[context.dataIndex];
-                            return `${context.parsed.x} respuestas (${percentage}%)`;
+                            const value = context.parsed.y;
+                            return `${value} respuestas (${percentage}%)`;
                         }
                     }
                 },
@@ -662,11 +674,11 @@ function createCategoryChart(statistics) {
                         
                         ctx.fillStyle = '#000';
                         ctx.font = 'bold 14px Arial';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
                         
-                        // Mostrar valor al final de la barra
-                        ctx.fillText(value, bar.x + 5, bar.y);
+                        // Mostrar valor encima de la barra
+                        ctx.fillText(value, bar.x, bar.y - 5);
                     });
                 });
             }
@@ -1283,6 +1295,7 @@ function showSection(sectionName) {
     const columnConfigSection = document.getElementById('columnConfigSection');
     const dictionarySection = document.getElementById('dictionarySection');
     const comparisonSection = document.getElementById('comparisonSection');
+    const howCalculatedSection = document.getElementById('howCalculatedSection');
     const resultsSection = document.getElementById('results');
     
     // Elementos específicos a ocultar/mostrar
@@ -1294,12 +1307,14 @@ function showSection(sectionName) {
     if (!columnConfigSection) console.error('❌ columnConfigSection no encontrada');
     if (!dictionarySection) console.error('❌ dictionarySection no encontrada');
     if (!comparisonSection) console.error('❌ comparisonSection no encontrada');
+    if (!howCalculatedSection) console.error('❌ howCalculatedSection no encontrada');
     
     // Ocultar todas las secciones
     if (analysisSection) analysisSection.classList.add('hidden');
     if (columnConfigSection) columnConfigSection.classList.add('hidden');
     if (dictionarySection) dictionarySection.classList.add('hidden');
     if (comparisonSection) comparisonSection.classList.add('hidden');
+    if (howCalculatedSection) howCalculatedSection.classList.add('hidden');
     
     // Remover clase active de todas las pestañas
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
@@ -1352,6 +1367,16 @@ function showSection(sectionName) {
                 console.error('❌ Error inicializando comparación:', error);
                 alert('Error al cargar comparación de motores: ' + error.message);
             });
+        }
+    } else if (sectionName === 'howCalculated') {
+        if (howCalculatedSection) {
+            howCalculatedSection.classList.remove('hidden');
+            document.getElementById('howCalculatedTab')?.classList.add('active');
+            // Ocultar gráficos, métricas y tabla en pestaña de metodología
+            if (chartsContainer) chartsContainer.style.display = 'none';
+            if (numericMetricsContainer) numericMetricsContainer.style.display = 'none';
+            if (detailedResultsTable) detailedResultsTable.style.display = 'none';
+            console.log('✅ Sección de metodología mostrada');
         }
     }
 }

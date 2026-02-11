@@ -1,6 +1,6 @@
 {
   "name": "analisis-encuestas",
-  "version": "1.035",
+  "version": "1.1",
   "description": "Sistema web completo para análisis de sentimientos de encuestas educativas en español",
   "main": "server.js",
   "scripts": {

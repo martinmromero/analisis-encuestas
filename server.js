@@ -1250,21 +1250,24 @@ function calculateStats(results, qualitativeCount = null) {
   });
 
   // Calcular promedio sobre validResults (filas que tienen análisis)
-  // qualitativeCount se usa solo para los porcentajes de clasificación
   const averageScore = validResults > 0 ? totalScore / validResults : 5; // 5 = neutral
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   
-  // Usar qualitativeCount para los porcentajes (base total de respuestas cualitativas)
-  const baseCount = qualitativeCount !== null ? qualitativeCount : validResults;
-  const totalResults = baseCount > 0 ? baseCount : 1; // Evitar división por cero
+  // Calcular suma total de clasificaciones para usar como base de porcentajes
+  const totalClassified = classifications['Muy Positivo'] + classifications['Positivo'] + 
+                          classifications['Neutral'] + classifications['Negativo'] + 
+                          classifications['Muy Negativo'];
+  
+  // Usar la suma real de clasificaciones como base para porcentajes
+  const totalResults = totalClassified > 0 ? totalClassified : 1; // Evitar división por cero
   
   // DEBUG: Mostrar qué se está usando
   console.log('📊 calculateStats DEBUG:');
   console.log(`  - validResults (filas con sentiment): ${validResults}`);
-  console.log(`  - qualitativeCount (base para %): ${qualitativeCount}`);
+  console.log(`  - qualitativeCount (filas con texto): ${qualitativeCount}`);
+  console.log(`  - totalClassified (suma de clasificaciones): ${totalClassified}`);
   console.log(`  - totalScore acumulado: ${totalScore.toFixed(2)}`);
   console.log(`  - averageScore (totalScore/${validResults}): ${averageScore.toFixed(2)}`);
-  console.log(`  - baseCount usado para %: ${baseCount}`);
   console.log(`  - Clasificaciones: Positivo=${classifications['Muy Positivo']+classifications['Positivo']}, Negativo=${classifications['Muy Negativo']+classifications['Negativo']}, Neutral=${classifications['Neutral']}`);
   
   // Score ya está en escala 0..10, no requiere normalización
@@ -1274,7 +1277,7 @@ function calculateStats(results, qualitativeCount = null) {
     averageScore: parseFloat(averageScore.toFixed(2)), // Promedio 0..10
     rawScore: parseFloat(averageScore.toFixed(2)), // Score 0..10
     averageComparative: parseFloat(averageComparative.toFixed(4)),
-    totalResults: baseCount, // Total de respuestas cualitativas
+    totalResults: totalClassified, // Total real de respuestas clasificadas
     percentages: {
       'Muy Positivo': parseFloat((classifications['Muy Positivo'] / totalResults * 100).toFixed(1)),
       'Positivo': parseFloat((classifications['Positivo'] / totalResults * 100).toFixed(1)),
@@ -1944,13 +1947,13 @@ function getScoreColorClass(score, escalaConfig = null) {
   // ===== GENERAR GRÁFICOS COMO IMÁGENES =====
   const chartStartRow = currentRow;
   try {
-    // Datos para los gráficos
+    // Datos para los gráficos (colores iguales al sitio web, valores directos de classifications)
     const sentimentData = [
-      { label: 'Muy Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Positivo'] || 0) / 100), color: 'rgb(34, 197, 94)' },
-      { label: 'Positivo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Positivo'] || 0) / 100), color: 'rgb(74, 222, 128)' },
-      { label: 'Neutral', value: neutrales, color: 'rgb(160, 174, 192)' },
-      { label: 'Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Negativo'] || 0) / 100), color: 'rgb(249, 115, 22)' },
-      { label: 'Muy Negativo', value: Math.round(totalQualitativeRows * parseFloat(statistics?.percentages['Muy Negativo'] || 0) / 100), color: 'rgb(239, 68, 68)' }
+      { label: 'Muy Positivo', value: statistics?.classifications['Muy Positivo'] || 0, color: '#28a745' },
+      { label: 'Positivo', value: statistics?.classifications['Positivo'] || 0, color: '#17a2b8' },
+      { label: 'Neutral', value: statistics?.classifications['Neutral'] || 0, color: '#6c757d' },
+      { label: 'Negativo', value: statistics?.classifications['Negativo'] || 0, color: '#fd7e14' },
+      { label: 'Muy Negativo', value: statistics?.classifications['Muy Negativo'] || 0, color: '#dc3545' }
     ];
     
     const chartJSNodeCanvas = new ChartJSNodeCanvas({ 
@@ -2026,13 +2029,16 @@ function getScoreColorClass(score, escalaConfig = null) {
             const value = dataset.data[index];
             const percentage = totalSentiment > 0 ? ((value / totalSentiment) * 100).toFixed(1) : 0;
             
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 32px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            const position = element.tooltipPosition();
-            ctx.fillText(percentage + '%', position.x, position.y);
+            // Solo mostrar si el porcentaje es significativo (mayor a 3%)
+            if (parseFloat(percentage) > 3) {
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 32px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              
+              const position = element.tooltipPosition();
+              ctx.fillText(percentage + '%', position.x, position.y);
+            }
           });
         }
       }]
@@ -2044,7 +2050,7 @@ function getScoreColorClass(score, escalaConfig = null) {
       extension: 'png'
     });
     
-    // 2. GRÁFICO DE BARRAS HORIZONTALES - Análisis por Categorías
+    // 2. GRÁFICO DE BARRAS VERTICALES - Análisis por Categorías
     const barChartConfig = {
       type: 'bar',
       data: {
@@ -2058,7 +2064,7 @@ function getScoreColorClass(score, escalaConfig = null) {
         }]
       },
       options: {
-        indexAxis: 'y', // Barras horizontales
+        indexAxis: 'x', // Barras verticales
         responsive: false,
         plugins: {
           title: {
@@ -2074,6 +2080,8 @@ function getScoreColorClass(score, escalaConfig = null) {
             ticks: { font: { size: 24, family: 'Arial' } }
           },
           y: {
+            beginAtZero: true,
+            grace: '10%',
             ticks: { font: { size: 24, family: 'Arial' } }
           }
         }
@@ -2089,11 +2097,11 @@ function getScoreColorClass(score, escalaConfig = null) {
               
               ctx.fillStyle = '#000';
               ctx.font = 'bold 32px Arial';
-              ctx.textAlign = 'left';
-              ctx.textBaseline = 'middle';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
               
-              // Mostrar valor al final de la barra
-              ctx.fillText(value, bar.x + 10, bar.y);
+              // Mostrar valor encima de la barra
+              ctx.fillText(value, bar.x, bar.y - 10);
             });
           });
         }

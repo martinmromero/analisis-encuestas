@@ -2927,17 +2927,6 @@ footer {
     gap: 15px;
 }
 
-/* Modal de explicaciones */
-.calculations-modal {
-    max-width: 900px;
-    max-height: 85vh;
-    overflow-y: auto;
-}
-
-.calculations-modal .modal-body {
-    padding: 25px;
-}
-
 .calculation-section {
     background: #f8f9fa;
     border-left: 4px solid #667eea;
@@ -2994,13 +2983,8 @@ footer {
     font-size: 0.95rem;
 }
 
-/* Responsive para el modal */
+/* Responsive para sección de metodología */
 @media (max-width: 768px) {
-    .calculations-modal {
-        max-width: 95%;
-        max-height: 90vh;
-    }
-    
     .calculation-section {
         padding: 15px;
     }
@@ -3014,4 +2998,27 @@ footer {
         flex-direction: column;
         align-items: stretch;
     }
+    
+    .methodology-section .config-card {
+        padding: 15px;
+    }
+}
+
+/* Sección de metodología */
+.methodology-section {
+    padding: 0;
+}
+
+.methodology-section .config-card {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.methodology-section .calculation-section {
+    background: white;
+    border-left: 4px solid #667eea;
+    padding: 25px;
+    margin-bottom: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
