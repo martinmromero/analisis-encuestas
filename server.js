@@ -3310,7 +3310,7 @@ app.get('/api/dictionary', (req, res) => {
     const dictionaryData = Object.entries(activeDict).map(([word, score]) => ({
       word,
       score,
-      type: score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral'
+      type: score > 0.5 ? 'positive' : score < -0.5 ? 'negative' : 'neutral'
     }));
     res.json({
       success: true,
@@ -3929,19 +3929,78 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       
       console.log(`📥 Procesando ${data.length} filas desde Excel...`);
       
+      // DEBUG: Ver nombres de columnas reales CON caracteres exactos
+      if (data.length > 0) {
+        console.log(`📋 Columnas detectadas en Excel:`, Object.keys(data[0]));
+        // Mostrar cada columna con su longitud y códigos de caracteres
+        Object.keys(data[0]).forEach(key => {
+          console.log(`   "${key}" (${key.length} chars) - Códigos: [${Array.from(key).map(c => c.charCodeAt(0)).join(', ')}]`);
+        });
+      }
+      
       // Convertir a diccionario (solo palabras únicas)
-      data.forEach(row => {
+      let duplicates = 0;
+      let skippedRows = 0;
+      let neutralWords = [];
+      data.forEach((row, index) => {
         const word = row['Palabra/Frase'] || row['palabra'] || row['Palabra'] || row['word'];
-        const score = parseFloat(row['Puntuación'] || row['puntuacion'] || row['score'] || row['Puntuacion']);
+        
+        // BUSCAR la columna de puntuación por coincidencia flexible
+        let scoreRaw;
+        for (const key of Object.keys(row)) {
+          const normalizedKey = key.toLowerCase().trim();
+          if (normalizedKey.includes('puntuaci') || normalizedKey === 'score') {
+            scoreRaw = row[key];
+            break;
+          }
+        }
+        
+        const score = parseFloat(scoreRaw);
+        
+        // DEBUG: Loggear primeras 5 filas para ver estructura
+        if (index < 5) {
+          console.log(`   Fila ${index + 1}: Palabra="${word}" | ScoreRaw="${scoreRaw}" | ScoreParsed="${score}" | Tipo="${row['Tipo'] || row['tipo']}"`);
+        }
+        
+        // DEBUG: Loggear filas específicas problemáticas
+        const problematicRows = [519, 520, 694, 788, 792, 919]; // indices 0-based
+        if (problematicRows.includes(index)) {
+          console.log(`   🔍 DEBUG Fila ${index + 2}: Palabra="${word}" | ScoreRaw="${scoreRaw}" | Score parsed="${score}" | Tipo raw="${row['Tipo']}" | Todas las columnas:`, row);
+        }
         
         if (word && !isNaN(score)) {
           const normalizedWord = word.toLowerCase().trim();
+          
+          // Detectar neutrales (score entre -0.5 y 0.5)
+          if (score >= -0.5 && score <= 0.5) {
+            neutralWords.push({ word: normalizedWord, score: score });
+          }
+          
           // Solo agregar si no existe (evitar duplicados)
           if (!importedDict[normalizedWord]) {
             importedDict[normalizedWord] = score;
+          } else {
+            duplicates++;
+            console.log(`⚠️ Duplicado ignorado: "${word}" (ya existe como "${normalizedWord}")`);
+          }
+        } else {
+          skippedRows++;
+          if (!word) {
+            console.log(`⚠️ Fila ${index + 2} (Excel): Sin palabra válida`);
+          } else if (isNaN(score)) {
+            console.log(`⚠️ Fila ${index + 2} (Excel): Palabra "${word}" tiene puntuación inválida: "${scoreRaw}" (columna Puntuación vacía o no numérica)`);
           }
         }
       });
+      
+      console.log(`📊 Palabras neutrales detectadas en Excel: ${neutralWords.length}`);
+      if (neutralWords.length > 0) {
+        console.log(`   Ejemplos:`, neutralWords.slice(0, 5));
+      }
+      
+      if (duplicates > 0) {
+        console.log(`⚠️ Total duplicados ignorados: ${duplicates} palabras`);
+      }
       
       // Detectar rango de valores y convertir si está en escala 0-10
       const scores = Object.values(importedDict);

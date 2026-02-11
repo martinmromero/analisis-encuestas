@@ -226,6 +226,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Actualizar indicador de diccionario activo
     updateActiveDictionaryIndicator();
+    
+    // Cargar diccionario activo para mostrar estadísticas y palabras
+    loadDictionary();
 
     // Inicializar display del score
     if (typeof updateScoreDisplay === 'function') {
@@ -1430,8 +1433,8 @@ function displayDictionary(dictionary) {
         
         // Determinar clase CSS para la puntuación
         let scoreClass = 'neutral';
-        if (item.score > 0) scoreClass = 'positive';
-        if (item.score < 0) scoreClass = 'negative';
+        if (item.score > 0.5) scoreClass = 'positive';
+        if (item.score < -0.5) scoreClass = 'negative';
         
         row.innerHTML = `
             <td><strong>${item.word}</strong></td>
@@ -1470,6 +1473,21 @@ function filterDictionary() {
     });
     
     displayDictionary(filteredDictionary);
+}
+
+// Resetear filtros del diccionario
+function resetDictionaryFilters() {
+    const sentimentFilter = document.getElementById('sentimentFilter');
+    const searchText = document.getElementById('wordSearch');
+    
+    if (sentimentFilter) sentimentFilter.value = '';
+    if (searchText) searchText.value = '';
+    
+    // Mostrar todos los items
+    if (currentDictionary) {
+        filteredDictionary = [...currentDictionary];
+        displayDictionary(filteredDictionary);
+    }
 }
 
 // Función para colapsar/expandir la tabla del diccionario
@@ -1719,6 +1737,12 @@ async function importDictionary(event) {
             
             // Recargar palabras ignoradas del nuevo diccionario
             await loadIgnoredPhrases();
+            
+            // Recargar diccionario para actualizar estadísticas y tabla
+            await loadDictionary();
+            
+            // Resetear filtros
+            resetDictionaryFilters();
         } else {
             throw new Error(data.error);
         }
@@ -1771,6 +1795,10 @@ async function activateDictionary(fileName) {
             await updateActiveDictionaryIndicator();
             // Recargar palabras ignoradas del nuevo diccionario
             await loadIgnoredPhrases();
+            // Recargar diccionario para actualizar estadísticas y tabla
+            await loadDictionary();
+            // Resetear filtros
+            resetDictionaryFilters();
         } else {
             throw new Error(data.error);
         }
@@ -1809,9 +1837,21 @@ async function deleteDictionary() {
         if (data.success) {
             alert(`✅ ${data.message}`);
             await loadAvailableDictionaries();
-            // Activar diccionario base
-            select.value = 'base';
-            await activateDictionary('base');
+            
+            // Activar el primer diccionario disponible en la lista
+            if (select.options.length > 0) {
+                const firstDictFileName = select.options[0].value;
+                select.value = firstDictFileName;
+                await activateDictionary(firstDictFileName);
+            } else {
+                // No hay más diccionarios
+                alert('⚠️ No quedan diccionarios disponibles');
+                // Limpiar estadísticas
+                document.getElementById('totalWords').textContent = '0';
+                document.getElementById('positiveWords').textContent = '0';
+                document.getElementById('negativeWords').textContent = '0';
+                document.getElementById('neutralWords').textContent = '0';
+            }
         } else {
             throw new Error(data.error);
         }
