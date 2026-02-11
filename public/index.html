@@ -195,6 +195,10 @@
             <section id="results" class="results-section hidden">
                 <div class="results-header">
                     <h2>📈 Resultados del Análisis</h2>
+                    <button id="howCalculatedBtn" class="how-calculated-btn" title="Ver cómo se calculan los resultados">
+                        <span class="btn-icon">📐</span>
+                        ¿Cómo se calculan los resultados?
+                    </button>
                 </div>
 
                 <h3>📊  Análisis cualitativo</h3>
@@ -729,6 +733,132 @@
                 <div class="modal-actions">
                     <button id="saveScaleBtn" class="btn-success">✅ Guardar Escala</button>
                     <button id="cancelScaleBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de explicación de cálculos -->
+    <div id="calculationsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content calculations-modal">
+            <div class="modal-header">
+                <h2>📐 ¿Cómo se Calculan los Resultados?</h2>
+                <button class="modal-close" id="closeCalculationsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="calculation-section">
+                    <h3>📊 Análisis Cuantitativo (Preguntas Numéricas)</h3>
+                    <p><strong>¿Qué se analiza?</strong> Preguntas con escala numérica (típicamente 1-10)</p>
+                    <div class="formula-box">
+                        <p><strong>Fórmula de Promedio:</strong></p>
+                        <code>Promedio = Σ(valores válidos) / cantidad de valores válidos</code>
+                    </div>
+                    <p><strong>Ejemplo:</strong></p>
+                    <p>Si las respuestas son: [10, 9, 10, 8, null, 10, 9, "", 10]</p>
+                    <ul>
+                        <li>Valores válidos: [10, 9, 10, 8, 10, 9, 10] = 7 respuestas</li>
+                        <li>Suma: 10 + 9 + 10 + 8 + 10 + 9 + 10 = 66</li>
+                        <li>Promedio: 66 / 7 = <strong>9.43</strong></li>
+                    </ul>
+                    <p class="note">⚠️ Las celdas vacías o con texto inválido se excluyen del cálculo</p>
+                </div>
+
+                <div class="calculation-section">
+                    <h3>🎭 Análisis Cualitativo (Comentarios de Texto)</h3>
+                    <p><strong>¿Qué se analiza?</strong> Comentarios de texto libre usando análisis de sentimientos con diccionario especializado</p>
+                    
+                    <h4>Paso 1: Normalización del Texto</h4>
+                    <p>El texto se convierte a minúsculas, se eliminan acentos y se divide en palabras (tokens).</p>
+                    <p><strong>Ejemplo:</strong> "La profesora es EXCELENTE!" → ["la", "profesora", "es", "excelente"]</p>
+                    
+                    <h4>Paso 2: Búsqueda en Diccionario</h4>
+                    <p>Cada palabra se busca en el diccionario de sentimientos (569 palabras):</p>
+                    <ul>
+                        <li>"excelente" → +5 puntos (muy positivo)</li>
+                        <li>"bueno" → +3 puntos (positivo)</li>
+                        <li>"malo" → -3 puntos (negativo)</li>
+                        <li>"pésimo" → -5 puntos (muy negativo)</li>
+                    </ul>
+                    
+                    <h4>Paso 3: Score RAW</h4>
+                    <p>Se suman todos los puntos encontrados (puede ser cualquier valor).</p>
+                    <div class="formula-box">
+                        <code>Score RAW = Σ(puntos palabras positivas) - Σ(puntos palabras negativas)</code>
+                    </div>
+                    
+                    <h4>Paso 4: Normalización a Escala 0-10</h4>
+                    <p>El score RAW se normaliza a una escala de 0 a 10:</p>
+                    <div class="formula-box">
+                        <code>Score Normalizado = (min(max(Score RAW, -10), 10) + 10) / 2</code>
+                    </div>
+                    <ul>
+                        <li>Score RAW = -10 → 0.0 (Muy Negativo)</li>
+                        <li>Score RAW = 0 → 5.0 (Neutral)</li>
+                        <li>Score RAW = +10 → 10.0 (Muy Positivo)</li>
+                    </ul>
+                    
+                    <h4>Paso 5: Clasificación</h4>
+                    <p>Según el score normalizado (0-10):</p>
+                    <ul>
+                        <li><strong>Muy Positivo:</strong> score ≥ 8</li>
+                        <li><strong>Positivo:</strong> 6 ≤ score &lt; 8</li>
+                        <li><strong>Neutral:</strong> 4 ≤ score &lt; 6</li>
+                        <li><strong>Negativo:</strong> 2 ≤ score &lt; 4</li>
+                        <li><strong>Muy Negativo:</strong> score &lt; 2</li>
+                    </ul>
+                    
+                    <h4>Confianza del Análisis</h4>
+                    <div class="formula-box">
+                        <code>Confianza = (palabras reconocidas / total palabras) × 80%</code>
+                    </div>
+                    <p>Mayor confianza = más palabras del diccionario encontradas en el texto</p>
+                </div>
+
+                <div class="calculation-section">
+                    <h3>📈 Estadísticas Agregadas</h3>
+                    
+                    <h4>Porcentajes por Categoría</h4>
+                    <div class="formula-box">
+                        <code>Porcentaje = (comentarios en categoría / total comentarios analizados) × 100</code>
+                    </div>
+                    <p class="note">⚠️ Los porcentajes se calculan sobre comentarios analizados, NO sobre el total de filas</p>
+                    
+                    <h4>Puntuación Promedio</h4>
+                    <p>Promedio de todos los scores normalizados (escala 0-10)</p>
+                    <div class="formula-box">
+                        <code>Promedio = Σ(scores normalizados) / cantidad de comentarios</code>
+                    </div>
+                    
+                    <p><strong>Ejemplo:</strong></p>
+                    <ul>
+                        <li>Total filas en Excel: 1000</li>
+                        <li>Filas con comentarios: 150</li>
+                        <li>Clasificaciones:</li>
+                        <ul>
+                            <li>Muy Positivo: 30 → 30/150 = 20.0%</li>
+                            <li>Positivo: 45 → 45/150 = 30.0%</li>
+                            <li>Neutral: 40 → 40/150 = 26.7%</li>
+                            <li>Negativo: 25 → 25/150 = 16.7%</li>
+                            <li>Muy Negativo: 10 → 10/150 = 6.7%</li>
+                        </ul>
+                    </ul>
+                </div>
+
+                <div class="calculation-section">
+                    <h3>🔍 Filtros</h3>
+                    <p>Cuando aplicas filtros (por carrera, materia, docente, etc.), <strong>todas las métricas se recalculan</strong> usando únicamente las filas filtradas.</p>
+                    <p>Los filtros se aplican sobre el dataset original, no son acumulativos.</p>
+                </div>
+
+                <div class="calculation-section">
+                    <h3>📋 Notas Importantes</h3>
+                    <ul>
+                        <li>✓ Solo se cuentan filas con datos válidos (no vacías)</li>
+                        <li>✓ Los porcentajes cualitativos se calculan sobre comentarios analizados</li>
+                        <li>✓ La confianza baja indica que el diccionario no reconoce muchas palabras</li>
+                        <li>✓ Escala de sentimientos normalizada: 0 (muy negativo) a 10 (muy positivo)</li>
+                        <li>✓ Escala cuantitativa: configurable según la encuesta</li>
+                    </ul>
                 </div>
             </div>
         </div>

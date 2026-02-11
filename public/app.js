@@ -229,6 +229,36 @@ document.addEventListener('DOMContentLoaded', function() {
     if (filterSentimentSelect) filterSentimentSelect.addEventListener('change', filterResults);
     if (searchTextInput) searchTextInput.addEventListener('input', filterResults);
     
+    // Event listener para modal de explicaciones
+    const howCalculatedBtn = document.getElementById('howCalculatedBtn');
+    const calculationsModal = document.getElementById('calculationsModal');
+    const closeCalculationsModal = document.getElementById('closeCalculationsModal');
+    
+    if (howCalculatedBtn) {
+        howCalculatedBtn.addEventListener('click', () => {
+            if (calculationsModal) {
+                calculationsModal.style.display = 'flex';
+            }
+        });
+    }
+    
+    if (closeCalculationsModal) {
+        closeCalculationsModal.addEventListener('click', () => {
+            if (calculationsModal) {
+                calculationsModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Cerrar modal al hacer click fuera del contenido
+    if (calculationsModal) {
+        calculationsModal.addEventListener('click', (e) => {
+            if (e.target === calculationsModal) {
+                calculationsModal.style.display = 'none';
+            }
+        });
+    }
+    
     console.log('✅ Event listeners configurados correctamente');
 });
 

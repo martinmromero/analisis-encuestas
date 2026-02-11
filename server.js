@@ -2105,7 +2105,7 @@ function getScoreColorClass(score, escalaConfig = null) {
     
     const donutWidth = 450;
     const barWidth = 450;
-    const chartHeight = 380;
+    const chartHeight = 346; // Reducido 9% (de 380 a 346)
     const gap = 30; // Espacio entre charts
     const totalWidth = donutWidth + gap + barWidth;
     
