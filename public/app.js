@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const columnConfigTab = document.getElementById('columnConfigTab');
     const dictionaryTab = document.getElementById('dictionaryTab');
     const comparisonTab = document.getElementById('comparisonTab');
+    const howCalculatedTab = document.getElementById('howCalculatedTab');
     
     if (!analysisTab) console.error('❌ analysisTab no encontrado');
     if (!columnConfigTab) console.error('❌ columnConfigTab no encontrado');
@@ -152,6 +153,17 @@ document.addEventListener('DOMContentLoaded', function() {
         comparisonTab.addEventListener('click', () => {
             console.log('👆 Click en comparisonTab');
             showSection('comparison');
+        });
+    }
+    
+    // Event listener para modal de explicaciones desde el tab
+    if (howCalculatedTab) {
+        howCalculatedTab.addEventListener('click', () => {
+            console.log('👆 Click en howCalculatedTab');
+            const calculationsModal = document.getElementById('calculationsModal');
+            if (calculationsModal) {
+                calculationsModal.style.display = 'flex';
+            }
         });
     }
 
@@ -229,18 +241,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (filterSentimentSelect) filterSentimentSelect.addEventListener('change', filterResults);
     if (searchTextInput) searchTextInput.addEventListener('input', filterResults);
     
-    // Event listener para modal de explicaciones
-    const howCalculatedBtn = document.getElementById('howCalculatedBtn');
+    // Event listener para cerrar modal de explicaciones
     const calculationsModal = document.getElementById('calculationsModal');
     const closeCalculationsModal = document.getElementById('closeCalculationsModal');
-    
-    if (howCalculatedBtn) {
-        howCalculatedBtn.addEventListener('click', () => {
-            if (calculationsModal) {
-                calculationsModal.style.display = 'flex';
-            }
-        });
-    }
     
     if (closeCalculationsModal) {
         closeCalculationsModal.addEventListener('click', () => {
@@ -588,12 +591,13 @@ function createCategoryChart(statistics) {
 
     const labels = Object.keys(statistics.percentages);
     const data = Object.values(statistics.percentages).map(p => parseFloat(p));
+    const counts = Object.keys(statistics.classifications).map(key => statistics.classifications[key]);
     const colors = [
-        '#28a745', // Muy Positivo
-        '#17a2b8', // Positivo
-        '#6c757d', // Neutral
-        '#fd7e14', // Negativo
-        '#dc3545'  // Muy Negativo
+        '#22c55e', // Muy Positivo - verde
+        '#4ade80', // Positivo - verde claro
+        '#6b7280', // Neutral - gris
+        '#fb923c', // Negativo - naranja
+        '#ef4444'  // Muy Negativo - rojo
     ];
 
     // Configurar canvas con tamaño fijo
@@ -607,25 +611,28 @@ function createCategoryChart(statistics) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Porcentaje',
-                data: data,
+                label: 'Respuestas',
+                data: counts,
                 backgroundColor: colors,
                 borderColor: colors,
                 borderWidth: 1
             }]
         },
         options: {
+            indexAxis: 'y', // Barras horizontales
             responsive: false,
             maintainAspectRatio: false,
-            animation: false, // Desactivar animaciones para evitar memory leaks
+            animation: false,
             scales: {
-                y: {
+                x: {
                     beginAtZero: true,
-                    max: 100,
                     ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
+                        font: { size: 11 }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: { size: 11 }
                     }
                 }
             },
@@ -636,12 +643,34 @@ function createCategoryChart(statistics) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.parsed.y}%`;
+                            const percentage = data[context.dataIndex];
+                            return `${context.parsed.x} respuestas (${percentage}%)`;
                         }
                     }
-                }
+                },
+                datalabels: false
             }
-        }
+        },
+        plugins: [{
+            id: 'valueLabels',
+            afterDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    meta.data.forEach((bar, index) => {
+                        const value = dataset.data[index];
+                        
+                        ctx.fillStyle = '#000';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        
+                        // Mostrar valor al final de la barra
+                        ctx.fillText(value, bar.x + 5, bar.y);
+                    });
+                });
+            }
+        }]
     });
 }
 

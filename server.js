@@ -2044,7 +2044,7 @@ function getScoreColorClass(score, escalaConfig = null) {
       extension: 'png'
     });
     
-    // 2. GRÁFICO DE BARRAS - Análisis por Categorías
+    // 2. GRÁFICO DE BARRAS HORIZONTALES - Análisis por Categorías
     const barChartConfig = {
       type: 'bar',
       data: {
@@ -2058,6 +2058,7 @@ function getScoreColorClass(score, escalaConfig = null) {
         }]
       },
       options: {
+        indexAxis: 'y', // Barras horizontales
         responsive: false,
         plugins: {
           title: {
@@ -2068,11 +2069,11 @@ function getScoreColorClass(score, escalaConfig = null) {
           legend: { display: false }
         },
         scales: {
-          y: {
+          x: {
             beginAtZero: true,
             ticks: { font: { size: 24, family: 'Arial' } }
           },
-          x: {
+          y: {
             ticks: { font: { size: 24, family: 'Arial' } }
           }
         }
@@ -2088,10 +2089,11 @@ function getScoreColorClass(score, escalaConfig = null) {
               
               ctx.fillStyle = '#000';
               ctx.font = 'bold 32px Arial';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
               
-              ctx.fillText(value, bar.x, bar.y - 5);
+              // Mostrar valor al final de la barra
+              ctx.fillText(value, bar.x + 10, bar.y);
             });
           });
         }
@@ -2132,11 +2134,11 @@ function getScoreColorClass(score, escalaConfig = null) {
     
     // Insertar imagen combinada en columna B
     sheet.addImage(combinedImageId, {
-      tl: { col: 1, row: chartStartRow - 1 },
+      tl: { col: 1, row: chartStartRow },
       ext: { width: totalWidth, height: chartHeight }
     });
     
-    currentRow += 18; // Espacio para los gráficos
+    currentRow += 21; // Espacio para los gráficos (aumentado para evitar solapamiento)
     
   } catch (error) {
     console.error('⚠️ Error generando gráficos:', error.message);
