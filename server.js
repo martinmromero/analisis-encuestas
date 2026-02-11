@@ -911,6 +911,7 @@ function analyzeTextEnhanced(text) {
       comparative: 0,
       positive: [],
       negative: [],
+      neutral: [],
       confidence: 0,
       hasNegation: false,
       intensity: 0,
@@ -929,6 +930,7 @@ function analyzeTextEnhanced(text) {
   let rawScore = 0;
   const positives = [];
   const negatives = [];
+  const neutrals = [];
   let matchedCount = 0;
 
   for (const [key, value] of Object.entries(currentLabels)) {
@@ -940,13 +942,17 @@ function analyzeTextEnhanced(text) {
         const count = (normalizedText.match(new RegExp(escapeRegex(normKey), 'g')) || []).length;
         rawScore += value * count;
         matchedCount += count;
-        if (value > 0) positives.push(key); else if (value < 0) negatives.push(key);
+        if (value > 0.5) positives.push(key); 
+        else if (value < -0.5) negatives.push(key);
+        else neutrals.push(key); // Valores entre -0.5 y +0.5 son neutrales
       }
     } else {
       if (tokenSet.has(normKey)) {
         rawScore += value;
         matchedCount += 1;
-        if (value > 0) positives.push(key); else if (value < 0) negatives.push(key);
+        if (value > 0.5) positives.push(key); 
+        else if (value < -0.5) negatives.push(key);
+        else neutrals.push(key); // Valores entre -0.5 y +0.5 son neutrales
       }
     }
   }
@@ -966,6 +972,7 @@ function analyzeTextEnhanced(text) {
     comparative: Math.round(comparative * 100) / 100,
     positive: positives.slice(0,5),
     negative: negatives.slice(0,5),
+    neutral: neutrals.slice(0,5), // Palabras neutrales detectadas
     confidence: Math.round(confidence * 100) / 100,
     hasNegation,
     intensity: 1,
@@ -1030,6 +1037,7 @@ function analyzeWithNatural(text) {
     classification: analysis.classification,
     positive: analysis.positive,
     negative: analysis.negative,
+    neutral: analysis.neutral || [],
     responseTime: endTime - startTime,
     details: {
       totalWords: analysis.totalWords,
@@ -3934,6 +3942,22 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
           }
         }
       });
+      
+      // Detectar rango de valores y convertir si está en escala 0-10
+      const scores = Object.values(importedDict);
+      const minScore = Math.min(...scores);
+      const maxScore = Math.max(...scores);
+      
+      // Si el rango está entre 0-10 (escala absoluta), convertir a escala relativa (-5 a +5)
+      if (minScore >= 0 && maxScore <= 10 && maxScore > 5) {
+        console.log(`📊 Detectada escala 0-10. Convirtiendo a escala relativa (-5 a +5)...`);
+        for (const [word, score] of Object.entries(importedDict)) {
+          importedDict[word] = score - 5; // 0→-5, 5→0, 10→+5
+        }
+        console.log(`✅ Conversión completada: ${Object.keys(importedDict).length} palabras convertidas`);
+      } else {
+        console.log(`✅ Detectada escala relativa. Se mantienen los valores originales.`);
+      }
       
       console.log(`✅ Importadas ${Object.keys(importedDict).length} palabras únicas desde ${data.length} filas`);
       
