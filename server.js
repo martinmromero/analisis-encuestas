@@ -159,7 +159,7 @@ let sentiment = new Sentiment(); // Se recreará al activar un diccionario
 // Cargar únicamente diccionario v4; si falta, se inicia vacío (no se mezclan otras fuentes)
 let completeSpanishDict = {};
 try {
-  const v4Path = path.join(__dirname, 'dictionaries', 'Diccionario_Sentimientos_v4.json');
+  const v4Path = path.join(__dirname, 'dictionaries', 'Diccionario_de_sentimientos_06_02_2026_v4.json');
   if (fs.existsSync(v4Path)) {
     const v4Data = JSON.parse(fs.readFileSync(v4Path, 'utf8'));
     if (v4Data && v4Data.dictionary) {
@@ -200,8 +200,8 @@ let activeDictionary = { name: null, fileName: null, wordCount: 0 };
 if (Object.keys(completeSpanishDict).length > 0) {
   // Auto-activar v4 si existe (sin concepto de "base")
   activeDictionary = {
-    name: 'Diccionario Sentimientos v4',
-    fileName: 'Diccionario_Sentimientos_v4',
+    name: 'Diccionario Sentimientos v4 (06/02/2026)',
+    fileName: 'Diccionario_de_sentimientos_06_02_2026_v4',
     wordCount: Object.keys(completeSpanishDict).length,
     labels: completeSpanishDict
   };
@@ -499,13 +499,14 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         sentimentResults.push({
           column: columnNames[idx], // Incluir nombre de columna
           text: limitedText,
-          score: enhancedAnalysis.score,
+          score: enhancedAnalysis.normalizedScore, // USAR SCORE NORMALIZADO
+          scoreRaw: enhancedAnalysis.score, // Score RAW para referencia
           comparative: enhancedAnalysis.comparative,
           positive: enhancedAnalysis.positive.slice(0, 5), // Máximo 5 palabras
           negative: enhancedAnalysis.negative.slice(0, 5), // Máximo 5 palabras
           confidence: enhancedAnalysis.confidence
         });
-        overallScore += enhancedAnalysis.score;
+        overallScore += enhancedAnalysis.normalizedScore; // USAR SCORE NORMALIZADO
         overallComparative += enhancedAnalysis.comparative;
       });
 
@@ -518,22 +519,15 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
         ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length 
         : 0.5;
 
-  // Suma valores relativos y convierte a escala 0..10
-  // overallScore es suma de valores relativos (pueden ser +/- del neutral)
-  // Promediamos y limitamos el rango antes de normalizar
-  const avgRelativeScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
+      // Calcular promedio de scores normalizados (ya están en escala 0-10)
+      let perColumnAvgScore = sentimentResults.length > 0 
+        ? overallScore / sentimentResults.length 
+        : 5.0; // Neutral por defecto
   
-  // Normalizar a escala 0-10 con límites para evitar valores fuera de rango
-  // Asumimos rango típico de -10 a +10 para rawScore, mapeamos a 0-10
-  const clampedScore = Math.max(-10, Math.min(10, avgRelativeScore)); // Limitar a [-10, 10]
-  let perColumnAvgScore = ((clampedScore + 10) / 2); // Mapear [-10,10] a [0,10]
-  
-  // FORZAR que NUNCA sea negativo
-  if (perColumnAvgScore < 0) {
-    console.error(`❌ SCORE NEGATIVO DETECTADO: ${perColumnAvgScore} | Raw: ${avgRelativeScore} | Clamped: ${clampedScore}`);
-    perColumnAvgScore = 0;
-  }
-  console.log(`✅ Score calculado - Raw: ${avgRelativeScore.toFixed(2)} → Normalized: ${perColumnAvgScore.toFixed(2)}`);
+      // Asegurar que esté en rango válido 0-10
+      perColumnAvgScore = Math.max(0, Math.min(10, perColumnAvgScore));
+      
+      console.log(`✅ Score calculado - Avg normalized: ${perColumnAvgScore.toFixed(2)} | Columnas analizadas: ${sentimentResults.length}`);
 
       return {
         id: index + 1,
@@ -661,13 +655,20 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
         }
         
         const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
-        const safeScore = typeof analysis.score === 'number' ? analysis.score : 0;
+        
+        // Para analyzeTextEnhanced, usar el normalizedScore
+        // Para otros motores (nlpjs), usar el score que ya viene normalizado
+        const safeScore = analysis.normalizedScore !== undefined 
+          ? analysis.normalizedScore 
+          : (typeof analysis.score === 'number' ? analysis.score : 0);
         const safeComparative = typeof analysis.comparative === 'number' ? analysis.comparative : 0;
         const safeConfidence = typeof analysis.confidence === 'number' ? analysis.confidence : 0.5;
+        
         sentimentResults.push({
           column,
             text: limitedText,
-            score: safeScore,
+            score: safeScore, // Ya normalizado 0-10
+            scoreRaw: analysis.score, // Score RAW para referencia
             comparative: safeComparative,
             positive: Array.isArray(analysis.positive) ? analysis.positive.slice(0, 5) : [],
             negative: Array.isArray(analysis.negative) ? analysis.negative.slice(0, 5) : [],
@@ -681,20 +682,20 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
       if (sentimentResults.length > 0) {
         overallComparative = overallComparative / sentimentResults.length;
       }
-      const averageScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
+      
+      // Calcular promedio de scores (ya normalizados 0-10)
+      const averageScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 5.0;
       const averageConfidence = sentimentResults.length > 0 ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length : 0.5;
       
-      // Normalizar score a escala 0-10
-      const clampedScore = Math.max(-10, Math.min(10, averageScore));
-      let normalizedScore = ((clampedScore + 10) / 2);
-      if (normalizedScore < 0) normalizedScore = 0;
+      // Asegurar que esté en rango válido 0-10
+      const normalizedScore = Math.max(0, Math.min(10, averageScore));
       
       results.push({
         row: i + 1,
         ...row,
         numericMetrics: numericValues,
         sentiment: {
-          score: parseFloat(averageScore.toFixed(2)),
+          score: parseFloat(normalizedScore.toFixed(2)), // Score normalizado
           perColumnAvgScore: parseFloat(normalizedScore.toFixed(2)),
           comparative: parseFloat((overallComparative || 0).toFixed(4)),
           overallComparative: parseFloat((overallComparative || 0).toFixed(4)),
@@ -925,7 +926,12 @@ function analyzeTextEnhanced(text) {
   
   const tokens = normalizedText.split(/[^a-zA-Záéíóúüñ0-9]+/).filter(t => t.length > 0);
   const tokenSet = new Set(tokens);
-  const hasNegation = negationWords.some(neg => normalizedText.includes(neg));
+  // FIX: Usar word boundaries para evitar detectar negaciones dentro de otras palabras
+  // Ejemplo: "ni" NO debe detectarse en "orga-NI-zacionales"
+  const hasNegation = negationWords.some(neg => {
+    const regex = new RegExp(`\\b${escapeRegex(neg)}\\b`, 'i');
+    return regex.test(normalizedText);
+  });
 
   let rawScore = 0;
   const positives = [];
@@ -933,6 +939,10 @@ function analyzeTextEnhanced(text) {
   const neutrals = [];
   let matchedCount = 0;
 
+  // Rastrear qué partes del texto ya fueron procesadas como frases
+  const usedTokenIndices = new Set();
+
+  // PASO 1: Buscar frases completas primero (tienen prioridad)
   for (const [key, value] of Object.entries(currentLabels)) {
     const normKey = removeAccents(key.toLowerCase().trim());
     if (!normKey) continue;
@@ -945,14 +955,32 @@ function analyzeTextEnhanced(text) {
         if (value > 0.5) positives.push(key); 
         else if (value < -0.5) negatives.push(key);
         else neutrals.push(key); // Valores entre -0.5 y +0.5 son neutrales
+        
+        // Marcar tokens de esta frase como usados
+        const phraseTokens = normKey.split(/\s+/);
+        phraseTokens.forEach(ptoken => {
+          const idx = tokens.indexOf(ptoken);
+          if (idx !== -1) usedTokenIndices.add(idx);
+        });
       }
-    } else {
+    }
+  }
+
+  // PASO 2: Buscar palabras individuales (solo las NO usadas en frases)
+  for (const [key, value] of Object.entries(currentLabels)) {
+    const normKey = removeAccents(key.toLowerCase().trim());
+    if (!normKey) continue;
+    if (!normKey.includes(' ')) {
       if (tokenSet.has(normKey)) {
-        rawScore += value;
-        matchedCount += 1;
-        if (value > 0.5) positives.push(key); 
-        else if (value < -0.5) negatives.push(key);
-        else neutrals.push(key); // Valores entre -0.5 y +0.5 son neutrales
+        const tokenIdx = tokens.indexOf(normKey);
+        // Solo contar si no fue parte de una frase
+        if (tokenIdx !== -1 && !usedTokenIndices.has(tokenIdx)) {
+          rawScore += value;
+          matchedCount += 1;
+          if (value > 0.5) positives.push(key); 
+          else if (value < -0.5) negatives.push(key);
+          else neutrals.push(key); // Valores entre -0.5 y +0.5 son neutrales
+        }
       }
     }
   }
@@ -967,9 +995,18 @@ function analyzeTextEnhanced(text) {
   const confidence = totalWords > 0 ? Math.min(1, matchedCount / totalWords) : 0;
   const comparative = totalWords > 0 ? rawScore / totalWords : 0;
 
+  // Normalizar score a escala 0-10
+  const limitedScore = Math.max(-10, Math.min(10, rawScore));
+  const normalizedScore = (limitedScore + 10) / 2;
+  
+  // Calcular clasificación basada en score normalizado
+  const classification = getClassification(normalizedScore, confidence);
+
   return {
     score: rawScore, // Score RELATIVO (valores +/- del neutral)
+    normalizedScore: Math.round(normalizedScore * 100) / 100, // Score en escala 0-10
     comparative: Math.round(comparative * 100) / 100,
+    classification: classification, // Clasificación basada en score normalizado
     positive: positives.slice(0,5),
     negative: negatives.slice(0,5),
     neutral: neutrals.slice(0,5), // Palabras neutrales detectadas
@@ -1031,10 +1068,11 @@ function analyzeWithNatural(text) {
   return {
     engine: 'Natural.js Enhanced',
     version: '1.0.0',
-    score: analysis.score,
+    score: analysis.normalizedScore, // Usar score normalizado para consistencia
+    scoreRaw: analysis.score, // Score RAW disponible en detalles
     comparative: analysis.comparative,
     confidence: analysis.confidence,
-    classification: analysis.classification,
+    classification: analysis.classification, // Ya viene calculada correctamente
     positive: analysis.positive,
     negative: analysis.negative,
     neutral: analysis.neutral || [],
@@ -3106,7 +3144,8 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
             
             result.sentimentAnalysis[columnName] = {
               classification: analysis.classification,
-              score: analysis.score,
+              score: analysis.normalizedScore,
+              scoreRaw: analysis.score,
               consensus: analysis.classification
             };
             
@@ -3170,10 +3209,10 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
       console.log('⚠️ Calculando estadísticas en el backend (fallback)');
       
       const resultsForStats = processedResults.map((item, index) => {
-        if (item.sentimentAnalysis && Object.keys(item.sentimentAnalysis).length > 0) {
-          const scores = Object.values(item.sentimentAnalysis).map(a => a.score || 0).filter(s => s > 0);
-          const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-          const classification = getClassification(avgScore);
+        if (item.sentiment && item.sentiment.perColumnAvgScore !== undefined) {
+          // Usar perColumnAvgScore que ya está normalizado 0-10
+          const avgScore = item.sentiment.perColumnAvgScore;
+          const classification = item.sentiment.classification || getClassification(avgScore);
           
           return {
             row: index + 1,
@@ -3545,7 +3584,7 @@ app.post('/api/dictionary/test', (req, res) => {
       analysis: analysis,
       ignored: analysis.ignored || false, // Indicar si fue ignorado
       message: analysis.ignored ? 'Texto ignorado (sin comentario, puntuación vacía, etc.)' : null,
-      classification: getClassification(analysis.score, analysis.confidence)
+      classification: getClassification(analysis.normalizedScore, analysis.confidence)
     });
     
   } catch (error) {

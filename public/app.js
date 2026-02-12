@@ -1591,7 +1591,7 @@ async function testWordAnalysis() {
             
             outputDiv.innerHTML = `
                 <div><strong>Texto:</strong> "${data.text}"</div>
-                <div><strong>Puntuación:</strong> ${data.analysis.score}</div>
+                <div><strong>Puntuación:</strong> ${data.analysis.normalizedScore !== undefined ? data.analysis.normalizedScore.toFixed(1) : data.analysis.score}</div>
                 <div><strong>Puntuación Comparativa:</strong> ${data.analysis.comparative}</div>
                 <div><strong>Clasificación:</strong> ${data.classification}</div>
                 <div><strong>Confianza:</strong> ${(data.analysis.confidence * 100).toFixed(1)}%</div>
@@ -1658,7 +1658,8 @@ async function testSingleWord(word) {
         const data = await response.json();
         
         if (data.success) {
-            alert(`Análisis de "${word}":\nPuntuación: ${data.analysis.score}\nClasificación: ${data.classification}\nConfianza: ${(data.analysis.confidence * 100).toFixed(1)}%`);
+            const score = data.analysis.normalizedScore !== undefined ? data.analysis.normalizedScore.toFixed(1) : data.analysis.score;
+            alert(`Análisis de "${word}":\nPuntuación: ${score}\nClasificación: ${data.classification}\nConfianza: ${(data.analysis.confidence * 100).toFixed(1)}%`);
         } else {
             throw new Error(data.error);
         }
