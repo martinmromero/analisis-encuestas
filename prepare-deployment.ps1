@@ -15,10 +15,10 @@ $itemsToInclude = @(
     ".dockerignore",
     "sentiment-dict.js",
     "column-config.js",
-    "user-dictionary.json",
-    "column-configs.json",
+    # ❌ NO INCLUIR: "user-dictionary.json" - Se mantiene en producción
+    # ❌ NO INCLUIR: "column-configs.json" - Se mantiene en producción
     "ignored-phrases.json",
-    "dictionaries",
+    # ❌ NO INCLUIR: "dictionaries" - Se mantienen en producción
     "public",
     "auto-deploy.sh",
     "verify-server.sh"
