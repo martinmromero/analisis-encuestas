@@ -10,6 +10,11 @@ uploads/*
 
 # Configuraciones dinámicas (creadas por usuarios en runtime)
 column-configs.json
+user-dictionary.json
+
+# Diccionarios importados por usuarios (producción)
+dictionaries/
+!dictionaries/.gitkeep
 
 # Variables de entorno
 .env

@@ -79,6 +79,12 @@ totalPalabras = cantidad total de palabras en el texto
 confianza = palabrasReconocidas / totalPalabras
 ```
 
+**Interpretación de Confianza:**
+- **100%**: Todas las palabras están en el diccionario → clasificación muy confiable
+- **50-99%**: Texto parcialmente reconocido → clasificación moderadamente confiable
+- **1-49%**: Pocas palabras reconocidas → clasificación poco confiable
+- **0%**: Ninguna palabra reconocida → "No clasificado"
+
 ### 4. Promedio por Columnas Analizadas
 ```javascript
 // Si una persona respondió MÚLTIPLES columnas cualitativas,
@@ -109,12 +115,15 @@ perColumnAvgScore = (clampedScore + 10) / 2
 ```
 
 ### 6. Clasificación Final
-Basada en el score normalizado (escala 0-10):
+Basada en el score normalizado (escala 0-10) **y la confianza**:
+- **Confianza = 0%**: No clasificado (ninguna palabra del texto está en el diccionario)
 - **≥ 8**: Muy Positivo
 - **≥ 6**: Positivo  
-- **≥ 4 y < 6**: Neutral
+- **≥ 4 y < 6**: Neutral (palabra/frase en diccionario con valor cercano a 0)
 - **≥ 2**: Negativo
 - **< 2**: Muy Negativo
+
+⚠️ **Nota**: "Neutral" significa que la palabra/frase **ESTÁ** en el diccionario pero con valor cercano a 0 (ni positiva ni negativa). "No clasificado" significa que ninguna palabra del texto fue reconocida en el diccionario.
 
 ## 🎯 Qué Hace el Sistema
 

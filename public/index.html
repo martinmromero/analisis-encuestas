@@ -399,16 +399,36 @@
                             <p><strong>Ejemplo:</strong> "La profesora es EXCELENTE!" → ["la", "profesora", "es", "excelente"]</p>
                             
                             <h4>Paso 2: Búsqueda en Diccionario</h4>
-                            <p>Cada palabra se busca en el diccionario de sentimientos (569 palabras):</p>
+                            <p>El sistema busca <strong>primero frases completas</strong> y luego palabras individuales:</p>
                             <ul>
                                 <li>"excelente" → +5 puntos (muy positivo)</li>
                                 <li>"bueno" → +3 puntos (positivo)</li>
+                                <li>"muy bueno" → +4 puntos (frase completa)</li>
                                 <li>"malo" → -3 puntos (negativo)</li>
                                 <li>"pésimo" → -5 puntos (muy negativo)</li>
                             </ul>
+                            <p class="note">💡 El tamaño del diccionario varía según el diccionario activo seleccionado</p>
+                            
+                            <div class="calculation-section" style="background-color: #fff3cd; padding: 15px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                                <h4 style="margin-top: 0;">⚠️ Importante: Sin Suma Doble</h4>
+                                <p><strong>El sistema evita contar la misma palabra dos veces:</strong></p>
+                                <ol>
+                                    <li><strong>Prioridad a frases completas:</strong> Se buscan primero las frases del diccionario (ej: "muy bueno")</li>
+                                    <li><strong>Palabras ya usadas no se cuentan:</strong> Si "muy bueno" fue encontrado como frase, las palabras "muy" y "bueno" individuales NO se analizan</li>
+                                    <li><strong>Sin duplicación:</strong> Cada palabra/frase se cuenta UNA SOLA VEZ</li>
+                                </ol>
+                                <p><strong>Ejemplo:</strong></p>
+                                <p>Diccionario: "muy bueno" (+4), "bueno" (+3), "muy" (+1)</p>
+                                <p>Texto: "El curso es muy bueno"</p>
+                                <ul>
+                                    <li>❌ NO suma: "muy" (+1) + "bueno" (+3) + "muy bueno" (+4) = +8</li>
+                                    <li>✅ SÍ suma: "muy bueno" (+4) solamente = +4</li>
+                                </ul>
+                                <p class="note">Las palabras que forman parte de una frase encontrada quedan "marcadas" y no se analizan individualmente.</p>
+                            </div>
                             
                             <h4>Paso 3: Score RAW</h4>
-                            <p>Se suman todos los puntos encontrados (puede ser cualquier valor).</p>
+                            <p>Se suman todos los puntos encontrados (puede ser cualquier valor), sin duplicar palabras.</p>
                             <div class="formula-box">
                                 <code>Score RAW = Σ(puntos palabras positivas) - Σ(puntos palabras negativas)</code>
                             </div>
@@ -425,20 +445,29 @@
                             </ul>
                             
                             <h4>Paso 5: Clasificación</h4>
-                            <p>Según el score normalizado (0-10):</p>
+                            <p>Según el score normalizado (0-10) y la confianza:</p>
                             <ul>
+                                <li><strong>No clasificado:</strong> confianza = 0% (ninguna palabra del texto está en el diccionario)</li>
                                 <li><strong>Muy Positivo:</strong> score ≥ 8</li>
                                 <li><strong>Positivo:</strong> 6 ≤ score &lt; 8</li>
-                                <li><strong>Neutral:</strong> 4 ≤ score &lt; 6</li>
+                                <li><strong>Neutral:</strong> 4 ≤ score &lt; 6 (palabra en diccionario con valor cercano a 0)</li>
                                 <li><strong>Negativo:</strong> 2 ≤ score &lt; 4</li>
                                 <li><strong>Muy Negativo:</strong> score &lt; 2</li>
                             </ul>
+                            <p class="note">⚠️ Si el texto contiene palabras pero ninguna está en el diccionario, se clasifica como "No clasificado"</p>
                             
                             <h4>Confianza del Análisis</h4>
                             <div class="formula-box">
-                                <code>Confianza = (palabras reconocidas / total palabras) × 80%</code>
+                                <code>Confianza = palabras reconocidas / total palabras del texto</code>
                             </div>
-                            <p>Mayor confianza = más palabras del diccionario encontradas en el texto</p>
+                            <p><strong>Interpretación:</strong></p>
+                            <ul>
+                                <li><strong>100%:</strong> Todas las palabras están en el diccionario → clasificación muy confiable</li>
+                                <li><strong>50-99%:</strong> Texto parcialmente reconocido → clasificación moderadamente confiable</li>
+                                <li><strong>1-49%:</strong> Pocas palabras reconocidas → clasificación poco confiable</li>
+                                <li><strong>0%:</strong> Ninguna palabra reconocida → "No clasificado"</li>
+                            </ul>
+                            <p class="note">💡 Mayor confianza indica que el diccionario cubre mejor el vocabulario usado en el texto</p>
                         </div>
 
                         <div class="calculation-section">

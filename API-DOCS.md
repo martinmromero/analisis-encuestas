@@ -306,13 +306,20 @@ Permite verificar cómo impacta el diccionario en el análisis.
 ## Escalas de Sentimiento
 
 ### Natural.js Enhanced
-- **Rango**: -10 a +10
+- **Rango**: 0 a 10 (normalizado)
 - **Clasificación**:
-  - `Muy Negativo`: -10 a -3
-  - `Negativo`: -2.9 a -0.1
-  - `Neutral`: 0
-  - `Positivo`: 0.1 a 2.9
-  - `Muy Positivo`: 3 a 10
+  - `No clasificado`: Confianza = 0% (ninguna palabra del texto está en el diccionario)
+  - `Muy Positivo`: 8.0 a 10.0
+  - `Positivo`: 6.0 a 7.9
+  - `Neutral`: 4.0 a 5.9 (palabra/frase en diccionario con valor cercano a 0)
+  - `Negativo`: 2.0 a 3.9
+  - `Muy Negativo`: 0.0 a 1.9
+
+**Confianza**: Porcentaje de palabras reconocidas del texto que están en el diccionario activo
+- `100%`: Todas las palabras están en el diccionario → clasificación muy confiable
+- `50-99%`: Texto parcialmente reconocido → clasificación moderadamente confiable
+- `1-49%`: Pocas palabras reconocidas → clasificación poco confiable
+- `0%`: Ninguna palabra reconocida → "No clasificado"
 
 ### NLP.js
 - **Rango**: 0 a 1 (confidence)

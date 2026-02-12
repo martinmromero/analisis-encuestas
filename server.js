@@ -1044,10 +1044,14 @@ function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 // Función para clasificar sentimiento mejorada
 function getClassification(score, confidence = 0.5) {
   // Score esperado: 0 .. 10
+  
+  // Si no hay confianza (0%), significa que la palabra/frase NO está en el diccionario
+  if (confidence === 0) return 'No clasificado';
+  
   // Umbrales fijos (independientes de confidence para estabilidad):
   // >= 8 Muy Positivo
   // >= 6 Positivo
-  // >= 4 y < 6 Neutral
+  // >= 4 y < 6 Neutral (palabra/frase en diccionario con valor cercano a 0)
   // >= 2 Negativo
   // < 2 Muy Negativo
   if (score >= 8) return 'Muy Positivo';
@@ -2387,11 +2391,36 @@ async function createMethodologySheet(workbook) {
   dictCell.value = '📖 Diccionario de Sentimientos:\n' +
     'El diccionario contiene palabras y frases con valores asignados:\n' +
     '• Palabras positivas: "excelente" (+5), "bueno" (+3), "genial" (+4)\n' +
+    '• Frases positivas: "muy bueno" (+4), "muy bien explicado" (+5)\n' +
     '• Palabras negativas: "malo" (-3), "terrible" (-5), "confuso" (-2)\n' +
     '• Valores pueden ser cualquier número positivo o negativo';
   dictCell.font = { size: 11 };
   dictCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
-  sheet.getRow(currentRow).height = 75;
+  sheet.getRow(currentRow).height = 90;
+  currentRow++;
+  
+  // Importante: Sin Suma Doble
+  const noDuplicateCell = sheet.getCell(`B${currentRow}`);
+  noDuplicateCell.value = '⚠️ IMPORTANTE: SIN SUMA DOBLE\n\n' +
+    'El sistema evita contar la misma palabra dos veces:\n\n' +
+    '1. PRIORIDAD A FRASES COMPLETAS:\n' +
+    '   Se buscan primero las frases del diccionario (ej: "muy bueno")\n\n' +
+    '2. PALABRAS YA USADAS NO SE CUENTAN:\n' +
+    '   Si "muy bueno" fue encontrado como frase, las palabras "muy" y "bueno"\n' +
+    '   individuales NO se analizan\n\n' +
+    '3. SIN DUPLICACIÓN:\n' +
+    '   Cada palabra/frase se cuenta UNA SOLA VEZ\n\n' +
+    'EJEMPLO:\n' +
+    'Diccionario: "muy bueno" (+4), "bueno" (+3), "muy" (+1)\n' +
+    'Texto: "El curso es muy bueno"\n\n' +
+    '❌ NO suma: "muy" (+1) + "bueno" (+3) + "muy bueno" (+4) = +8\n' +
+    '✅ SÍ suma: "muy bueno" (+4) solamente = +4\n\n' +
+    'Las palabras que forman parte de una frase encontrada quedan "marcadas"\n' +
+    'y no se analizan individualmente.';
+  noDuplicateCell.font = { size: 10, bold: true };
+  noDuplicateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+  noDuplicateCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+  sheet.getRow(currentRow).height = 240;
   currentRow++;
   
   // Paso a paso del cálculo
@@ -2404,22 +2433,26 @@ async function createMethodologySheet(workbook) {
   
   // Paso 1
   const step1Cell = sheet.getCell(`B${currentRow}`);
-  step1Cell.value = 'Paso 1 - Buscar palabras del diccionario:\n' +
-    'El sistema busca cada palabra del comentario en el diccionario y suma sus valores.\n' +
-    'IMPORTANTE: Si una palabra está en el diccionario, se analiza sin importar cuán corta sea.';
+  step1Cell.value = 'Paso 1 - Buscar palabras y frases del diccionario:\n' +
+    'El sistema busca PRIMERO frases completas, luego palabras individuales.\n' +
+    'IMPORTANTE: Si una palabra está en el diccionario, se analiza sin importar cuán corta sea.\n' +
+    'Las palabras que forman parte de frases encontradas NO se cuentan individualmente.';
   step1Cell.font = { size: 10 };
   step1Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
-  sheet.getRow(currentRow).height = 48;
+  sheet.getRow(currentRow).height = 65;
   currentRow++;
   
   // Paso 2
   const step2Cell = sheet.getCell(`B${currentRow}`);
-  step2Cell.value = 'Paso 2 - Calcular Score RAW:\n' +
-    'Se suman TODOS los valores encontrados (sin límites).\n' +
-    'Por ejemplo: "excelente" (+5) + "bueno" (+3) + "genial" (+4) = +12';
+  step2Cell.value = 'Paso 2 - Calcular Score RAW (sin duplicar palabras):\n' +
+    'Se suman TODOS los valores encontrados (sin límites), pero cada palabra/frase se cuenta UNA SOLA VEZ.\n' +
+    'Por ejemplo: "El curso es muy bueno y genial"\n' +
+    '  Si "muy bueno" (+4) está como frase → cuenta +4\n' +
+    '  Si "genial" (+4) está como palabra → cuenta +4\n' +
+    '  Total: +8 (NO se cuentan "muy" ni "bueno" por separado)';
   step2Cell.font = { size: 10 };
   step2Cell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
-  sheet.getRow(currentRow).height = 48;
+  sheet.getRow(currentRow).height = 90;
   currentRow++;
   
   // Paso 3
@@ -2448,15 +2481,17 @@ async function createMethodologySheet(workbook) {
   // Clasificación
   const classCell = sheet.getCell(`B${currentRow}`);
   classCell.value = 'Paso 5 - Clasificar el sentimiento:\n' +
-    'Según la puntuación normalizada (0-10):\n' +
+    'Según la puntuación normalizada (0-10) y la confianza:\n' +
+    '• No clasificado → Confianza = 0% (ninguna palabra del texto está en el diccionario)\n' +
     '• 8.0 - 10.0 → Muy Positivo\n' +
     '• 6.0 - 7.9 → Positivo\n' +
-    '• 4.0 - 5.9 → Neutral\n' +
+    '• 4.0 - 5.9 → Neutral (palabra/frase en diccionario con valor cercano a 0)\n' +
     '• 2.0 - 3.9 → Negativo\n' +
-    '• 0.0 - 1.9 → Muy Negativo';
+    '• 0.0 - 1.9 → Muy Negativo\n\n' +
+    '⚠️ Si el texto contiene palabras pero ninguna está en el diccionario, se clasifica como "No clasificado"';
   classCell.font = { size: 10 };
   classCell.alignment = { wrapText: true, vertical: 'top', indent: 2 };
-  sheet.getRow(currentRow).height = 100;
+  sheet.getRow(currentRow).height = 130;
   currentRow += 2;
   
   // Nueva sección: Score Normalizado en Datos Detallados
@@ -2545,11 +2580,17 @@ async function createMethodologySheet(workbook) {
     '• Solo se analizan comentarios con al menos 3 caracteres, a menos que contengan palabras del diccionario\n' +
     '• Si un comentario tiene palabras del diccionario (ej: "excelente", "malo"), se analiza sin importar su longitud\n' +
     '• Comentarios vacíos, puntos solos (.) o frases ignoradas (como "sin comentarios") no se incluyen en el análisis\n' +
-    '• Los valores RAW pueden ser mayores a 10 o menores a -10 cuando hay múltiples palabras, pero se normalizan a escala 0-10 para el resultado final';
+    '• Los valores RAW pueden ser mayores a 10 o menores a -10 cuando hay múltiples palabras, pero se normalizan a escala 0-10 para el resultado final\n\n' +
+    '📊 CONFIANZA DEL ANÁLISIS:\n' +
+    'Confianza = (palabras reconocidas en el diccionario) ÷ (total palabras del texto)\n' +
+    '• 100% = Todas las palabras están en el diccionario → clasificación muy confiable\n' +
+    '• 50-99% = Texto parcialmente reconocido → clasificación moderadamente confiable\n' +
+    '• 1-49% = Pocas palabras reconocidas → clasificación poco confiable\n' +
+    '• 0% = Ninguna palabra reconocida → "No clasificado"';
   noteCell.font = { size: 10, italic: true };
   noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
   noteCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
-  sheet.getRow(currentRow).height = 100;
+  sheet.getRow(currentRow).height = 180;
   
   console.log('✅ Hoja "Cómo se Calculan los Resultados" creada');
 }

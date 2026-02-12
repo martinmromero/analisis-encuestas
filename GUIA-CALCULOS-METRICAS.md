@@ -326,10 +326,13 @@ function normalizeScore(avgRelativeScore) {
 
 // Clasificación basada en escala 0-10
 function getClassification(score, confidence) {
+  // Si no hay confianza, la palabra no está en el diccionario
+  if (confidence === 0) return 'No clasificado';
+  
   // Umbrales en escala 0-10
   if (score >= 8)  return 'Muy Positivo';
   if (score >= 6)  return 'Positivo';
-  if (score >= 4 && score < 6) return 'Neutral';
+  if (score >= 4 && score < 6) return 'Neutral';  // Palabra en diccionario con valor ~0
   if (score >= 2)  return 'Negativo';
   return 'Muy Negativo';  // score < 2
 }
@@ -467,7 +470,8 @@ function calculateStats(results) {
     'Positivo': 0,
     'Neutral': 0,
     'Negativo': 0,
-    'Muy Negativo': 0
+    'Muy Negativo': 0,
+    'No clasificado': 0
   };
   
   let totalScore = 0;
@@ -481,12 +485,14 @@ function calculateStats(results) {
         result.sentiment.details.length > 0) {
       
       const avgScore = result.sentiment.perColumnAvgScore;  // Ya normalizado 0-10
+      const confidence = result.sentiment.confidence || 0;
       
-      // Clasificar según umbrales en escala 0-10
+      // Clasificar según umbrales en escala 0-10 y confianza
       let classification = 'Neutral';
-      if (avgScore >= 8)  classification = 'Muy Positivo';
+      if (confidence === 0) classification = 'No clasificado';  // Ninguna palabra en diccionario
+      else if (avgScore >= 8)  classification = 'Muy Positivo';
       else if (avgScore >= 6)  classification = 'Positivo';
-      else if (avgScore >= 4 && avgScore < 6) classification = 'Neutral';
+      else if (avgScore >= 4 && avgScore < 6) classification = 'Neutral';  // Palabra en diccionario con valor ~0
       else if (avgScore >= 2) classification = 'Negativo';
       else classification = 'Muy Negativo';  // avgScore < 2
       
@@ -508,7 +514,8 @@ function calculateStats(results) {
     'Positivo': (classifications['Positivo'] / totalResults * 100).toFixed(1),
     'Neutral': (classifications['Neutral'] / totalResults * 100).toFixed(1),
     'Negativo': (classifications['Negativo'] / totalResults * 100).toFixed(1),
-    'Muy Negativo': (classifications['Muy Negativo'] / totalResults * 100).toFixed(1)
+    'Muy Negativo': (classifications['Muy Negativo'] / totalResults * 100).toFixed(1),
+    'No clasificado': (classifications['No clasificado'] / totalResults * 100).toFixed(1)
   };
   
   return {

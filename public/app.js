@@ -389,7 +389,8 @@ function displayResults(data) {
         'Positivo': 0,
         'Neutral': 0,
         'Negativo': 0,
-        'Muy Negativo': 0
+        'Muy Negativo': 0,
+        'No clasificado': 0
     };
     
     const positivePercent = parseFloat(percentages['Muy Positivo'] || 0) + 
@@ -501,7 +502,8 @@ function createSentimentChart(statistics) {
         '#17a2b8', // Positivo
         '#6c757d', // Neutral
         '#fd7e14', // Negativo
-        '#dc3545'  // Muy Negativo
+        '#dc3545', // Muy Negativo
+        '#9ca3af'  // No clasificado - gris claro
     ];
 
     // Configurar canvas con tamaño fijo
@@ -609,7 +611,8 @@ function createCategoryChart(statistics) {
         '#4ade80', // Positivo - verde claro
         '#6b7280', // Neutral - gris
         '#fb923c', // Negativo - naranja
-        '#ef4444'  // Muy Negativo - rojo
+        '#ef4444', // Muy Negativo - rojo
+        '#9ca3af'  // No clasificado - gris claro
     ];
 
     // Configurar canvas con tamaño fijo
@@ -1031,14 +1034,17 @@ function calculateFilteredStats(results) {
         'Positivo': 0,
         'Neutral': 0,
         'Negativo': 0,
-        'Muy Negativo': 0
+        'Muy Negativo': 0,
+        'No clasificado': 0
     };
 
     let totalScore = 0;
     let scoreCount = 0;
 
     // Función auxiliar para obtener clasificación si no existe
-    function getClassification(score) {
+    function getClassification(score, confidence = 0.5) {
+        // Si no hay confianza, la palabra no está en el diccionario
+        if (confidence === 0) return 'No clasificado';
         if (score >= 8) return 'Muy Positivo';
         if (score >= 6) return 'Positivo';
         if (score >= 4 && score < 6) return 'Neutral';
@@ -1065,7 +1071,7 @@ function calculateFilteredStats(results) {
                 console.warn('perColumnAvgScore faltante, recalculado:', score, 'para resultado', result.id);
             }
             
-            const classification = result.sentiment.classification || getClassification(score);
+            const classification = result.sentiment.classification || getClassification(score, result.sentiment.confidence || 0);
             
             if (classification) {
                 classifications[classification]++;
