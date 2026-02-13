@@ -91,7 +91,9 @@ const corsOptions = {
       'http://itd.barcelo.edu.ar',
       'http://192.168.30.12:3000',
       'http://localhost:3000',
-      'http://127.0.0.1:3000'
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',  // Para desarrollo local en puerto 3001
+      'http://127.0.0.1:3001'
     ];
     
     if (!origin || allowedOrigins.includes(origin)) {
