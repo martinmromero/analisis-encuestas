@@ -989,7 +989,10 @@ function analyzeTextEnhanced(text) {
     console.log(`[DEBUG] Sin coincidencias para: "${normalizedText}" | Ejemplos diccionario:`, Object.keys(currentLabels).slice(0,5));
   }
 
-  if (hasNegation && rawScore !== 0) rawScore = -rawScore;
+  // FIX: Eliminada inversión global de score por negación
+  // Las negaciones ya se manejan a nivel palabra individual
+  // "sin embargo" no debe invertir todo el análisis
+  // if (hasNegation && rawScore !== 0) rawScore = -rawScore;
 
   const totalWords = tokens.length;
   const confidence = totalWords > 0 ? Math.min(1, matchedCount / totalWords) : 0;
