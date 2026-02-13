@@ -1,0 +1,50 @@
+============================================
+INSTRUCCIONES DE DEPLOYMENT AL SERVIDOR
+============================================
+
+SERVIDOR: 192.168.30.12
+USER: root
+PASSWORD: PN4lG4gJqRWX5o$fJx2M1
+
+============================================
+PASO 1: Subir archivos (ejecutar desde PowerShell local)
+============================================
+
+scp C:\Users\marti\analisis-encuestas\deployment-package.zip root@192.168.30.12:/tmp/
+(Cuando pida password: PN4lG4gJqRWX5o$fJx2M1)
+
+scp C:\Users\marti\analisis-encuestas\deploy-to-server.sh root@192.168.30.12:/tmp/
+(Cuando pida password: PN4lG4gJqRWX5o$fJx2M1)
+
+============================================
+PASO 2: Conectarse al servidor
+============================================
+
+ssh root@192.168.30.12
+(Cuando pida password: PN4lG4gJqRWX5o$fJx2M1)
+
+============================================
+PASO 3: Ejecutar deployment en el servidor
+============================================
+
+chmod +x /tmp/deploy-to-server.sh
+/tmp/deploy-to-server.sh
+
+============================================
+ARCHIVOS PROTEGIDOS (NO se sobrescriben):
+============================================
+✓ column-configs.json
+✓ user-dictionary.json
+✓ dictionaries/
+✓ uploads/
+
+============================================
+CAMBIOS INCLUIDOS EN ESTA VERSIÓN:
+============================================
+✓ Nueva clasificación "No clasificado" (confidence = 0%)
+✓ Documentación actualizada (sitio + Excel)
+✓ Aclaraciones sobre "sin suma doble" en búsqueda
+✓ Frontend con soporte para 6 categorías
+✓ Fórmula de confianza corregida
+
+============================================
