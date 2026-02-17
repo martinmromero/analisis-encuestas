@@ -62,34 +62,50 @@ function updateCascadeOptions(changedFilter) {
     const selectedSedes = tomSelectInstances.sede?.getValue() || [];
     const selectedDocentes = tomSelectInstances.docente?.getValue() || [];
     
+    console.log('📋 Selecciones actuales:', {
+        carreras: selectedCarreras.length > 0 ? selectedCarreras : 'ninguna',
+        materias: selectedMaterias.length > 0 ? selectedMaterias : 'ninguna',
+        modalidades: selectedModalidades.length > 0 ? selectedModalidades : 'ninguna',
+        sedes: selectedSedes.length > 0 ? selectedSedes : 'ninguna',
+        docentes: selectedDocentes.length > 0 ? selectedDocentes : 'ninguna'
+    });
+    
     // Filtrar resultados basándose en selecciones actuales
     let filteredData = allResults.slice();
+    const totalOriginal = filteredData.length;
     
     if (selectedCarreras.length > 0) {
         filteredData = filteredData.filter(row => 
             selectedCarreras.includes(row.originalData?.CARRERA || row.CARRERA)
         );
+        console.log(`  → Filtrado por carreras: ${filteredData.length} registros`);
     }
     if (selectedMaterias.length > 0) {
         filteredData = filteredData.filter(row => 
             selectedMaterias.includes(row.originalData?.MATERIA || row.MATERIA)
         );
+        console.log(`  → Filtrado por materias: ${filteredData.length} registros`);
     }
     if (selectedModalidades.length > 0) {
         filteredData = filteredData.filter(row => 
             selectedModalidades.includes(row.originalData?.MODALIDAD || row.MODALIDAD)
         );
+        console.log(`  → Filtrado por modalidades: ${filteredData.length} registros`);
     }
     if (selectedSedes.length > 0) {
         filteredData = filteredData.filter(row => 
             selectedSedes.includes(row.originalData?.SEDE || row.SEDE)
         );
+        console.log(`  → Filtrado por sedes: ${filteredData.length} registros`);
     }
     if (selectedDocentes.length > 0) {
         filteredData = filteredData.filter(row => 
             selectedDocentes.includes(row.originalData?.DOCENTE || row.DOCENTE)
         );
+        console.log(`  → Filtrado por docentes: ${filteredData.length} registros`);
     }
+    
+    console.log(`📊 Resultado filtrado: ${filteredData.length} de ${totalOriginal} registros totales`);
     
     // Extraer opciones únicas de datos filtrados
     const availableOptions = {
@@ -99,6 +115,14 @@ function updateCascadeOptions(changedFilter) {
         sedes: [...new Set(filteredData.map(r => r.originalData?.SEDE || r.SEDE).filter(Boolean))],
         docentes: [...new Set(filteredData.map(r => r.originalData?.DOCENTE || r.DOCENTE).filter(Boolean))]
     };
+    
+    console.log('🎯 Opciones disponibles extraídas:', {
+        carreras: availableOptions.carreras.length,
+        materias: availableOptions.materias.length,
+        modalidades: availableOptions.modalidades.length,
+        sedes: availableOptions.sedes.length,
+        docentes: availableOptions.docentes.length
+    });
     
     // Si no hay selecciones, usar todas las opciones originales
     if (selectedCarreras.length === 0 && selectedMaterias.length === 0 && 
@@ -111,29 +135,22 @@ function updateCascadeOptions(changedFilter) {
         availableOptions.docentes = allFilterOptions.docentes || [];
     }
     
-    // Actualizar opciones en cada Tom-Select (excepto el que cambió para evitar parpadeo)
-    if (changedFilter !== 'carrera') {
-        updateTomSelectOptions(tomSelectInstances.carrera, availableOptions.carreras, selectedCarreras);
-    }
-    if (changedFilter !== 'materia') {
-        updateTomSelectOptions(tomSelectInstances.materia, availableOptions.materias, selectedMaterias);
-    }
-    if (changedFilter !== 'modalidad') {
-        updateTomSelectOptions(tomSelectInstances.modalidad, availableOptions.modalidades, selectedModalidades);
-    }
-    if (changedFilter !== 'sede') {
-        updateTomSelectOptions(tomSelectInstances.sede, availableOptions.sedes, selectedSedes);
-    }
-    if (changedFilter !== 'docente') {
-        updateTomSelectOptions(tomSelectInstances.docente, availableOptions.docentes, selectedDocentes);
-    }
+    // Actualizar TODOS los filtros para reflejar opciones disponibles
+    // El filtro que cambió también se actualiza, pero manteniendo su selección
+    // Esto asegura que todos los campos muestren solo opciones válidas
+    updateTomSelectOptions(tomSelectInstances.carrera, availableOptions.carreras, selectedCarreras);
+    updateTomSelectOptions(tomSelectInstances.materia, availableOptions.materias, selectedMaterias);
+    updateTomSelectOptions(tomSelectInstances.modalidad, availableOptions.modalidades, selectedModalidades);
+    updateTomSelectOptions(tomSelectInstances.sede, availableOptions.sedes, selectedSedes);
+    updateTomSelectOptions(tomSelectInstances.docente, availableOptions.docentes, selectedDocentes);
     
-    console.log(`✅ Opciones actualizadas:`, {
+    console.log(`✅ Opciones actualizadas (desde ${changedFilter}):`, {
         carreras: availableOptions.carreras.length,
         materias: availableOptions.materias.length,
         modalidades: availableOptions.modalidades.length,
         sedes: availableOptions.sedes.length,
-        docentes: availableOptions.docentes.length
+        docentes: availableOptions.docentes.length,
+        filteredRecords: filteredData.length
     });
 }
 
@@ -149,10 +166,16 @@ function updateTomSelectOptions(instance, newOptions, selectedValues) {
     // Guardar selecciones válidas (que existen en las nuevas opciones)
     const validSelections = selectedValues.filter(val => newOptions.includes(val));
     
+    // Si hay selecciones inválidas, mostrar advertencia
+    const invalidSelections = selectedValues.filter(val => !newOptions.includes(val));
+    if (invalidSelections.length > 0) {
+        console.log(`⚠️ Selecciones removidas (no disponibles en filtro actual):`, invalidSelections);
+    }
+    
     // Limpiar opciones actuales
     instance.clearOptions();
     
-    // Agregar nuevas opciones
+    // Agregar nuevas opciones ordenadas
     newOptions.sort().forEach(option => {
         instance.addOption({
             value: option,
@@ -160,8 +183,8 @@ function updateTomSelectOptions(instance, newOptions, selectedValues) {
         });
     });
     
-    // Restaurar selecciones válidas
-    instance.setValue(validSelections, true); // true = silent (no trigger onChange)
+    // Restaurar selecciones válidas (silent = no trigger onChange)
+    instance.setValue(validSelections, true);
     
     // Refrescar UI
     instance.refreshOptions(false);

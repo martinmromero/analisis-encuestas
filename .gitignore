@@ -114,6 +114,10 @@ Thumbs.db
 *.bak
 *.backup
 
+# Archivos de deployment
+analisis-encuestas-deploy.zip
+*.deploy.zip
+
 # Excel temporary files
 ~$*.xlsx
 ~$*.xls
