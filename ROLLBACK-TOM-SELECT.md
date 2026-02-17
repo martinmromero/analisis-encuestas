@@ -2,7 +2,7 @@
 
 **Fecha:** 17 de febrero de 2026
 **Feature:** Sistema de filtros multiselect con Tom-Select
-**Commit:** (se completará después del commit)
+**Commit:** `01f19a9` - Feature: Tom-Select multiselect filters con búsqueda
 
 ---
 
