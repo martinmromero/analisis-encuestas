@@ -77,15 +77,13 @@
 
 /* Input dentro del control */
 .ts-wrapper.multi .ts-control > input {
-    font-size: 14px;
-    color: #333;
-    flex: 1 1 auto;
+    font-size: 14px !important;
+    color: #333 !important;
+    flex: 1 1 120px !important;
     min-width: 120px !important;
-    max-width: 100%;
     border: none !important;
     background: transparent !important;
-    padding: 4px 8px !important;
-    margin: 0 !important;
+    outline: none !important;
 }
 
 .ts-wrapper.multi .ts-control > input::placeholder {
