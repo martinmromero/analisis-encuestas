@@ -16,12 +16,14 @@
     border-radius: 8px;
     background: white;
     min-height: 44px;
+    max-height: 140px; /* Limitar altura máxima */
+    overflow-y: auto; /* Scroll vertical si hay muchos chips */
     font-size: 14px;
     transition: all 0.3s ease;
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    align-items: center;
+    align-items: flex-start; /* Alinear arriba para scroll */
 }
 
 .ts-wrapper.single .ts-control:hover,
@@ -39,16 +41,17 @@
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
     border-radius: 6px;
-    padding: 5px 10px;
+    padding: 4px 8px; /* Más compacto */
     margin: 0;
     color: white;
-    font-size: 13px;
+    font-size: 12px; /* Ligeramente más pequeño */
     font-weight: 500;
     transition: all 0.2s ease;
     transform: scale(1);
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
+    line-height: 1.4;
 }
 
 /* Hover sutil en chips - solo cambia ligeramente el brillo, sin agrandar */
@@ -88,6 +91,26 @@
 
 .ts-wrapper.multi .ts-control > input::placeholder {
     color: #999;
+}
+
+/* Scrollbar personalizada para control multiselect */
+.ts-wrapper.multi .ts-control::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.ts-wrapper.multi .ts-control::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.ts-wrapper.multi .ts-control::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.ts-wrapper.multi .ts-control::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
 }
 
 /* Dropdown */
