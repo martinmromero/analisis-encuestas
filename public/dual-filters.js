@@ -94,11 +94,6 @@ function handleSimpleSelectChange(filterName, value) {
     const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
     const addBtn = multiArea?.querySelector('.add-multi-btn');
     
-    // Si ya hay chips, no permitir cambiar dropdown
-    if (multiSelections[filterName].length > 0) {
-        return;
-    }
-    
     // Habilitar/deshabilitar botón +Agregar según si hay selección
     if (value && value !== '') {
         // HAY selección en dropdown → HABILITAR botón para agregar a chips
@@ -156,21 +151,19 @@ function addToMultiSelection(filterName) {
     // Renderizar chip
     renderMultiChips(filterName);
     
-    // Resetear dropdown y deshabilitarlo (ahora estamos en modo multi)
+    // Resetear dropdown PERO MANTENERLO HABILITADO para seguir agregando
     select.value = '';
-    select.disabled = true;
-    select.style.opacity = '0.5';
+    // NO deshabilitar el dropdown - el usuario debe poder seguir agregando
     
-    // Deshabilitar botón +Agregar
+    // Deshabilitar botón +Agregar hasta que se seleccione algo nuevo
     const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
     const addBtn = multiArea?.querySelector('.add-multi-btn');
     if (addBtn) addBtn.disabled = true;
-    if (multiArea) multiArea.style.opacity = '1'; // Mantener área visible
     
     // Actualizar cascada
     updateCascadeFilter();
     
-    console.log(`✅ Agregado a multi ${filterName}:`, value);
+    console.log(`✅ Agregado a multi ${filterName}:`, value, `(Total: ${multiSelections[filterName].length})`);
 }
 
 /**
