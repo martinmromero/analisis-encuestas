@@ -40,6 +40,16 @@
     color: white;
     font-size: 13px;
     font-weight: 500;
+    transition: all 0.2s ease;
+    transform: scale(1); /* Forzar escala inicial */
+}
+
+/* Hover sutil en chips - solo cambia ligeramente el brillo, sin agrandar */
+.ts-wrapper.multi .ts-control > div:hover {
+    filter: brightness(1.1);
+    cursor: default;
+    transform: scale(1) !important; /* Evitar que se agrande */
+    box-shadow: none !important; /* Evitar sombras grandes */
 }
 
 /* Botón de remover en chips */

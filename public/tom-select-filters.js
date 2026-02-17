@@ -217,22 +217,25 @@ function initCarreraFilter() {
     const selectElement = document.getElementById('filterCarrera');
     if (!selectElement) return;
     
-    // Limpiar opciones "Todas las carreras"
+    // Limpiar completamente el select
     selectElement.innerHTML = '';
     
-    // Agregar opciones desde filterOptions
-    if (allFilterOptions && allFilterOptions.carreras) {
-        allFilterOptions.carreras.forEach(carrera => {
-            const option = document.createElement('option');
-            option.value = carrera;
-            option.textContent = carrera;
-            selectElement.appendChild(option);
-        });
-    }
+    // NO agregar opciones iniciales - Tom-Select las agregará después
+    // Esto evita que se auto-seleccione la primera opción
     
     // Inicializar Tom-Select
-    const config = getBaseTomSelectConfig('Seleccionar carreras...', 'carrera');
+    const config = getBaseTomSelectConfig('Todas las carreras', 'carrera');
     tomSelectInstances.carrera = new TomSelect('#filterCarrera', config);
+    
+    // Ahora agregar opciones después de inicializar
+    if (allFilterOptions && allFilterOptions.carreras) {
+        allFilterOptions.carreras.forEach(carrera => {
+            tomSelectInstances.carrera.addOption({
+                value: carrera,
+                text: carrera
+            });
+        });
+    }
     
     console.log(`✅ Filtro Carrera: ${allFilterOptions?.carreras?.length || 0} opciones`);
 }
@@ -246,17 +249,17 @@ function initMateriaFilter() {
     
     selectElement.innerHTML = '';
     
+    const config = getBaseTomSelectConfig('Todas las materias', 'materia');
+    tomSelectInstances.materia = new TomSelect('#filterMateria', config);
+    
     if (allFilterOptions && allFilterOptions.materias) {
         allFilterOptions.materias.forEach(materia => {
-            const option = document.createElement('option');
-            option.value = materia;
-            option.textContent = materia;
-            selectElement.appendChild(option);
+            tomSelectInstances.materia.addOption({
+                value: materia,
+                text: materia
+            });
         });
     }
-    
-    const config = getBaseTomSelectConfig('Seleccionar materias...', 'materia');
-    tomSelectInstances.materia = new TomSelect('#filterMateria', config);
     
     console.log(`✅ Filtro Materia: ${allFilterOptions?.materias?.length || 0} opciones`);
 }
@@ -270,17 +273,17 @@ function initModalidadFilter() {
     
     selectElement.innerHTML = '';
     
+    const config = getBaseTomSelectConfig('Todas las modalidades', 'modalidad');
+    tomSelectInstances.modalidad = new TomSelect('#filterModalidad', config);
+    
     if (allFilterOptions && allFilterOptions.modalidades) {
         allFilterOptions.modalidades.forEach(modalidad => {
-            const option = document.createElement('option');
-            option.value = modalidad;
-            option.textContent = modalidad;
-            selectElement.appendChild(option);
+            tomSelectInstances.modalidad.addOption({
+                value: modalidad,
+                text: modalidad
+            });
         });
     }
-    
-    const config = getBaseTomSelectConfig('Seleccionar modalidades...', 'modalidad');
-    tomSelectInstances.modalidad = new TomSelect('#filterModalidad', config);
     
     console.log(`✅ Filtro Modalidad: ${allFilterOptions?.modalidades?.length || 0} opciones`);
 }
@@ -294,17 +297,17 @@ function initSedeFilter() {
     
     selectElement.innerHTML = '';
     
+    const config = getBaseTomSelectConfig('Todas las sedes', 'sede');
+    tomSelectInstances.sede = new TomSelect('#filterSede', config);
+    
     if (allFilterOptions && allFilterOptions.sedes) {
         allFilterOptions.sedes.forEach(sede => {
-            const option = document.createElement('option');
-            option.value = sede;
-            option.textContent = sede;
-            selectElement.appendChild(option);
+            tomSelectInstances.sede.addOption({
+                value: sede,
+                text: sede
+            });
         });
     }
-    
-    const config = getBaseTomSelectConfig('Seleccionar sedes...', 'sede');
-    tomSelectInstances.sede = new TomSelect('#filterSede', config);
     
     console.log(`✅ Filtro Sede: ${allFilterOptions?.sedes?.length || 0} opciones`);
 }
@@ -318,17 +321,17 @@ function initDocenteFilter() {
     
     selectElement.innerHTML = '';
     
+    const config = getBaseTomSelectConfig('Todos los docentes', 'docente');
+    tomSelectInstances.docente = new TomSelect('#filterDocente', config);
+    
     if (allFilterOptions && allFilterOptions.docentes) {
         allFilterOptions.docentes.forEach(docente => {
-            const option = document.createElement('option');
-            option.value = docente;
-            option.textContent = docente;
-            selectElement.appendChild(option);
+            tomSelectInstances.docente.addOption({
+                value: docente,
+                text: docente
+            });
         });
     }
-    
-    const config = getBaseTomSelectConfig('Seleccionar docentes...', 'docente');
-    tomSelectInstances.docente = new TomSelect('#filterDocente', config);
     
     console.log(`✅ Filtro Docente: ${allFilterOptions?.docentes?.length || 0} opciones`);
 }
