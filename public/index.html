@@ -124,6 +124,27 @@
                                 Generar Reporte XLSX Completo
                             </button>
                         </div>
+
+                        <!-- NUEVO: Separador Visual -->
+                        <div style="margin: 25px 0; padding: 15px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 10px; border: 2px dashed #4a90e2;">
+                            <div style="text-align: center; margin-bottom: 10px;">
+                                <strong style="font-size: 16px; color: #2c5282;">📊 NUEVO: Análisis con Columna de Validación</strong>
+                                <p style="margin: 8px 0 0 0; color: #4a5568; font-size: 13px;">
+                                    Para archivos que ya tienen la columna "<b>validación final</b>" con categorías predefinidas<br>
+                                    <span style="font-size: 12px; color: #718096;">(No se analizará el texto, solo se leerá la clasificación existente)</span>
+                                </p>
+                            </div>
+                            <div class="button-group" style="margin-top: 15px;">
+                                <button type="button" id="analyzeValidationBtn" class="analyze-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                                    <span class="btn-icon">📋</span>
+                                    <span>Analizar con Columna Validación</span>
+                                </button>
+                                <button type="button" id="validationReportBtn" class="advanced-report-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border: none;">
+                                    <span class="btn-icon">📊</span>
+                                    <span>Generar Reporte Validación</span>
+                                </button>
+                            </div>
+                        </div>
                     </form>
                     <div class="file-info">
                         <p>💡 <strong>Formatos soportados:</strong> .xlsx, .xls, .csv (separado por ; o ,)</p>

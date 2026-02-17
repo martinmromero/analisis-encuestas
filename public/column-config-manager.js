@@ -288,6 +288,7 @@ function autoClassifyColumns(columns) {
     
     if (Object.keys(analysis).length > 0) {
         console.log('🤖 Usando clasificación inteligente basada en análisis de contenido');
+        console.log(`   Análisis disponible para ${Object.keys(analysis).length} columnas`);
         
         columns.forEach(col => {
             const columnInfo = analysis[col];
@@ -319,8 +320,22 @@ function autoClassifyColumns(columns) {
                     console.log(`  ⚠️ ${col} → ${columnInfo.type} (${columnInfo.reason})`);
                 }
             } else {
-                // Fallback: clasificación por nombre
-                config.identificacion.push(col);
+                // Fallback: clasificación por nombre cuando no hay análisis
+                console.log(`  ℹ️ ${col} → sin análisis, clasificando por nombre`);
+                const colLower = col.toLowerCase();
+                const idPatterns = /^(id|codigo|cod|numero|nro|num)$|carrera|materia|docente|profesor|sede|modalidad|comision|turno|año|periodo|fecha/i;
+                const textPatterns = /comentario|observacion|sugerencia|motivo|porque|por que|descripcion|detalle|opinion|feedback|respuesta abierta|indique|explique|mencione/i;
+                const numericPatterns = /evalua|califica|puntua|escala|cumple|demost|considera|aprend|desempeño|desempen|satisfaccion|calidad|nota|promedio|puntaje/i;
+                
+                if (idPatterns.test(colLower)) {
+                    config.identificacion.push(col);
+                } else if (textPatterns.test(colLower)) {
+                    config.textoLibre.push(col);
+                } else if (numericPatterns.test(colLower)) {
+                    config.numericas.push(col);
+                } else {
+                    config.identificacion.push(col);
+                }
             }
         });
     } else {
@@ -354,6 +369,24 @@ function autoClassifyColumns(columns) {
         console.log(`  📏 Escalas detectadas: ${Object.keys(config.escalas).length} columnas`);
     }
     
+    // VERIFICACIÓN: Contar cuántas columnas se clasificaron en total
+    const totalClassified = config.identificacion.length + config.numericas.length + config.textoLibre.length;
+    console.log(`  ✅ Total clasificadas: ${totalClassified} de ${columns.length} columnas`);
+    
+    if (totalClassified !== columns.length) {
+        console.warn(`  ⚠️ ADVERTENCIA: Se perdieron ${columns.length - totalClassified} columnas en la clasificación!`);
+        
+        // Encontrar columnas faltantes
+        const allClassified = [...config.identificacion, ...config.numericas, ...config.textoLibre];
+        const missing = columns.filter(col => !allClassified.includes(col));
+        if (missing.length > 0) {
+            console.warn(`  ❌ Columnas faltantes:`, missing);
+            // Agregar columnas faltantes a identificación como fallback
+            config.identificacion.push(...missing);
+            console.log(`  ✓ Columnas recuperadas y agregadas a Identificación`);
+        }
+    }
+    
     return config;
 }
 
@@ -385,6 +418,12 @@ function populateColumnLists() {
     
     if (!idList || !numList || !textList || !unassignedList) return;
     
+    console.log('🎨 Poblando listas de columnas en modal:');
+    console.log(`   - Identificación: ${currentColumnConfig.identificacion.length} columnas`);
+    console.log(`   - Numéricas: ${currentColumnConfig.numericas.length} columnas`);
+    console.log(`   - Texto Libre: ${currentColumnConfig.textoLibre.length} columnas`);
+    console.log(`   - Columnas detectadas totales: ${detectedColumns.length}`);
+    
     // Limpiar listas
     idList.innerHTML = '';
     numList.innerHTML = '';
@@ -397,6 +436,8 @@ function populateColumnLists() {
         ...currentColumnConfig.numericas,
         ...currentColumnConfig.textoLibre
     ]);
+    
+    console.log(`   - Total asignadas: ${assigned.size} columnas`);
     
     // Poblar listas asignadas
     currentColumnConfig.identificacion.forEach(col => {

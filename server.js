@@ -13,6 +13,17 @@ const { negationWords } = require('./sentiment-dict');
 const COLUMN_CONFIG = require('./column-config');
 
 const app = express();
+// ============= ENDPOINT PARA ÚLTIMO ANÁLISIS =============
+let lastSentimentAnalysis = null;
+function saveLastAnalysis(result) {
+  lastSentimentAnalysis = result;
+}
+app.get('/api/analisis/ultimo', (req, res) => {
+  if (!lastSentimentAnalysis) {
+    return res.status(404).json({ error: 'No hay análisis disponible' });
+  }
+  res.json(lastSentimentAnalysis);
+});
 const PORT = process.env.PORT || 3000;
 
 // Lista de palabras/frases que deben ser ignoradas en el análisis cualitativo
@@ -265,59 +276,25 @@ function shouldAnalyzeColumn(columnName, value, customConfig = null) {
     columnName.includes(pattern) || pattern.includes(columnName)
   );
   
-  if (isTextoLibre) {
-    // Verificar primero si es string válido
-    if (typeof value !== 'string' || value.trim().length === 0) {
-      console.log(`[FILTRO] ⚠️ Columna texto libre "${columnName}" vacía: tipo=${typeof value} valor="${value}"`);
-      return false;
-    }
-    
-    // PRIORIDAD 1: Si contiene palabras del diccionario, analizar sin importar longitud
-    if (hasWordsInDictionary(value)) {
-      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA (diccionario): "${value.substring(0, 50)}"`);
-      return true;
-    }
-    
-    // PRIORIDAD 2: Si no tiene palabras del diccionario, verificar longitud mínima (3 caracteres)
-    const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 3;
-    const shouldProcess = value.trim().length >= minLength;
-    if (!shouldProcess) {
-      console.log(`[FILTRO] ❌ Columna texto libre "${columnName}" rechazada: longitud ${value.trim().length} < ${minLength} | Valor: "${value.substring(0, 50)}"`);
-    } else {
-      console.log(`[FILTRO] ✅ Columna texto libre "${columnName}" ACEPTADA: longitud ${value.trim().length} >= ${minLength}`);
-    }
-    return shouldProcess;
-  } 
+  // SOLO analizar columnas que estén explícitamente en textoLibre
+  // No analizar columnas "sin asignar" para mejorar rendimiento
+  if (!isTextoLibre) {
+    return false;
+  }
   
-  // Para cualquier otra columna, aplicar reglas generales:
-  // - Debe ser string
-  // - PRIORIDAD 1: Si contiene palabras del diccionario, analizar
-  // - PRIORIDAD 2: Más de 3 caracteres (comentarios significativos)
-  // - No debe ser un número convertido a string
-  
+  // Verificar primero si es string válido
   if (typeof value !== 'string' || value.trim().length === 0) {
     return false;
   }
   
-  // Verificar que no sea solo un número
-  const trimmed = value.trim();
-  if (!isNaN(trimmed) && trimmed !== '') {
-    return false;
-  }
-  
-  // PRIORIDAD 1: Si contiene palabras del diccionario, analizar
+  // PRIORIDAD 1: Si contiene palabras del diccionario, analizar sin importar longitud
   if (hasWordsInDictionary(value)) {
-    console.log(`[FILTRO] ✅ Columna "${columnName}" ACEPTADA (diccionario): "${value.substring(0, 50)}"`);
     return true;
   }
   
-  // PRIORIDAD 2: Verificar longitud mínima (3 caracteres)
-  const minLength = COLUMN_CONFIG.analisis?.longitudMinimaOtros || 3;
-  if (value.trim().length >= minLength) {
-    return true;
-  }
-  
-  return false;
+  // PRIORIDAD 2: Si no tiene palabras del diccionario, verificar longitud mínima (3 caracteres)
+  const minLength = COLUMN_CONFIG.analisis?.longitudMinimaTextoLibre || 3;
+  return value.trim().length >= minLength;
 }
 
 // Función para contar cuántas filas tienen respuestas cualitativas (texto libre)
@@ -547,11 +524,13 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
       };
     });
 
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    // Calcular cuántos registros tienen clasificación válida (excluyendo "No clasificado")
+    const quantitativeResponses = results.filter(r => r.sentiment.classification !== 'No clasificado').length;
     
     // Estadísticas generales (usar quantitativeResponses como base)
     const stats = calculateStats(results, quantitativeResponses);
+    // Agregar el total absoluto al objeto statistics para el Excel
+    stats.totalSurveys = results.length;
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData, customConfig);
@@ -559,14 +538,17 @@ app.post('/api/analyze', upload.single('excelFile'), (req, res) => {
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
 
-    res.json({
-      success: true,
-      totalResponses: results.length,
-      quantitativeResponses: quantitativeResponses,
-      statistics: stats,
-      filterOptions: filterOptions,
-      results: results
-    });
+      if (results.length > 0) {
+        saveLastAnalysis(results[0]);
+      }
+      res.json({
+        success: true,
+        totalResponses: results.length,
+        quantitativeResponses: quantitativeResponses,
+        statistics: stats,
+        filterOptions: filterOptions,
+        results: results
+      });
 
   } catch (error) {
     console.error('Error procesando archivo:', error);
@@ -711,11 +693,13 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
 
     console.log(`✅ Análisis completado con ${engine}`);
 
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    // Calcular cuántos registros tienen clasificación válida (excluyendo "No clasificado")
+    const quantitativeResponses = results.filter(r => r.sentiment.classification !== 'No clasificado').length;
     
     // Estadísticas generales (usar quantitativeResponses como base)
     const stats = calculateStats(results, quantitativeResponses);
+    // Agregar el total absoluto al objeto statistics para el Excel
+    stats.totalSurveys = results.length;
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData, customConfig);
@@ -723,15 +707,18 @@ app.post('/api/analyze-with-engine', upload.single('excelFile'), async (req, res
     // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
 
-    res.json({
-      success: true,
-      totalResponses: results.length,
-      quantitativeResponses: quantitativeResponses,
-      engine: engine,
-      statistics: stats,
-      filterOptions: filterOptions,
-      results: results
-    });
+      if (results.length > 0) {
+        saveLastAnalysis(results[0]);
+      }
+      res.json({
+        success: true,
+        totalResponses: results.length,
+        quantitativeResponses: quantitativeResponses,
+        engine: engine,
+        statistics: stats,
+        filterOptions: filterOptions,
+        results: results
+      });
 
   } catch (error) {
     console.error('Error procesando archivo:', error);
@@ -856,7 +843,7 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
           perColumnAvgScore: parseFloat(normalizedScore.toFixed(2)),
           comparative: parseFloat(averageComparative.toFixed(4)),
           overallComparative: parseFloat(averageComparative.toFixed(4)),
-          confidence: sentimentColumns.length > 0 ? 0.8 : 0.0,
+          confidence: parseFloat(averageConfidence.toFixed(2)),
           engine: 'both',
           analyzedColumns: sentimentColumns.map(c => c.column),
           dualAnalysis,
@@ -867,11 +854,13 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
 
     console.log(`✅ Análisis dual completado`);
 
-    // Calcular cuántos registros tienen análisis cualitativo (texto libre analizado)
-    const quantitativeResponses = countQualitativeResponses(jsonData, customConfig);
+    // Calcular cuántos registros tienen clasificación válida (excluyendo "No clasificado")
+    const quantitativeResponses = results.filter(r => r.sentiment.classification !== 'No clasificado').length;
     
     // Estadísticas generales (usar quantitativeResponses como base)
     const stats = calculateStats(results, quantitativeResponses);
+    // Agregar el total absoluto al objeto statistics para el Excel
+    stats.totalSurveys = results.length;
     
     // Extraer valores únicos para filtros
     const filterOptions = extractFilterOptions(jsonData, customConfig);
@@ -894,6 +883,188 @@ app.post('/api/analyze-dual-file', upload.single('excelFile'), async (req, res) 
     res.status(500).json({ error: 'Error procesando el archivo Excel: ' + error.message });
   }
 });
+
+// ============= NUEVO: Análisis con columna de validación =============
+// Este endpoint NO hace análisis de sentimientos, sólo lee la columna "validación final"
+app.post('/api/analyze-with-validation-column', upload.single('excelFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    console.log('📋 Analizando con columna de validación...');
+
+    // Parsear configuración personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
+
+    // Leer archivo Excel/CSV
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';'
+    });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+    
+    if (jsonData.length > 0) {
+      console.log('📋 Columnas detectadas:', Object.keys(jsonData[0]));
+    }
+
+    if (jsonData.length === 0) {
+      return res.status(400).json({ error: 'El archivo Excel está vacío' });
+    }
+
+    // Buscar la columna de validación (case-insensitive)
+    const firstRow = jsonData[0];
+    let validationColumnName = null;
+    
+    for (const columnName of Object.keys(firstRow)) {
+      const normalizedName = columnName.toLowerCase().trim();
+      if (normalizedName === 'validación final' || normalizedName === 'validacion final') {
+        validationColumnName = columnName;
+        break;
+      }
+    }
+
+    if (!validationColumnName) {
+      return res.status(400).json({ 
+        error: 'No se encontró la columna "validación final" en el archivo. Por favor asegúrese de que existe.' 
+      });
+    }
+
+    console.log(`✅ Columna de validación encontrada: "${validationColumnName}"`);
+
+    // Aplicar límite de filas
+    const MAX_ROWS = 25000;
+    if (jsonData.length > MAX_ROWS) {
+      console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
+      jsonData.splice(MAX_ROWS);
+    }
+
+    const results = [];
+    console.log(`🔄 Procesando ${jsonData.length} registros con columna de validación...`);
+
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      const numericValues = extractNumericValues(row);
+      
+      if (i % 500 === 0 && i > 0) {
+        console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
+      }
+
+      // Leer el valor de la columna de validación
+      const validationValue = (row[validationColumnName] || '').toString().toLowerCase().trim();
+      
+      // Mapear el valor a una clasificación y score
+      let classification = 'No clasificado';
+      let score = 5; // Neutral por defecto
+      let confidence = 0;
+
+      if (validationValue.includes('muy positiv')) {
+        classification = 'Muy Positivo';
+        score = 9;
+        confidence = 1.0;
+      } else if (validationValue.includes('positiv')) {
+        classification = 'Positivo';
+        score = 7;
+        confidence = 1.0;
+      } else if (validationValue.includes('neutral')) {
+        classification = 'Neutral';
+        score = 5;
+        confidence = 1.0;
+      } else if (validationValue.includes('muy negativ')) {
+        classification = 'Muy Negativo';
+        score = 1;
+        confidence = 1.0;
+      } else if (validationValue.includes('negativ')) {
+        classification = 'Negativo';
+        score = 3;
+        confidence = 1.0;
+      }
+
+      // Obtener las columnas de texto para incluir en el resultado
+      const sentimentColumns = getSentimentColumns(row, customConfig);
+      const textDetails = sentimentColumns.map(({ column, text }) => {
+        const limitedText = text.length > 200 ? text.substring(0, 200) + '...' : text;
+        return {
+          column,
+          text: limitedText,
+          score,
+          classification,
+          confidence,
+          validationSource: validationValue,
+          engine: 'Columna de Validación'
+        };
+      });
+
+      results.push({
+        row: i + 1,
+        ...row,
+        numericMetrics: numericValues,
+        sentiment: {
+          score: parseFloat(score.toFixed(2)),
+          perColumnAvgScore: parseFloat(score.toFixed(2)),
+          comparative: 0,
+          overallComparative: 0,
+          confidence: parseFloat(confidence.toFixed(2)),
+          classification,
+          engine: 'Columna de Validación',
+          validationColumn: validationColumnName,
+          validationValue: validationValue,
+          analyzedColumns: sentimentColumns.map(c => c.column),
+          details: textDetails
+        }
+      });
+    }
+
+    console.log(`✅ Análisis completado con columna de validación`);
+
+    // Calcular estadísticas
+    const quantitativeResponses = results.filter(r => r.sentiment.classification !== 'No clasificado').length;
+    const stats = calculateStats(results, quantitativeResponses);
+    // Agregar el total absoluto al objeto statistics para el Excel
+    stats.totalSurveys = results.length;
+    
+    // Extraer valores únicos para filtros
+    const filterOptions = extractFilterOptions(jsonData, customConfig);
+
+    // Limpiar archivo temporal
+    fs.unlinkSync(req.file.path);
+
+    if (results.length > 0) {
+      saveLastAnalysis(results[0]);
+    }
+
+    res.json({
+      success: true,
+      totalResponses: results.length,
+      quantitativeResponses: quantitativeResponses,
+      engine: 'validation-column',
+      validationColumn: validationColumnName,
+      statistics: stats,
+      filterOptions: filterOptions,
+      results: results
+    });
+
+  } catch (error) {
+    console.error('Error procesando archivo con columna de validación:', error);
+    res.status(500).json({ error: 'Error procesando el archivo Excel: ' + error.message });
+  }
+});
+// ============= FIN: Análisis con columna de validación =============
 
 // Función de análisis de sentimientos (solo contenido del diccionario v4 activo)
 function analyzeTextEnhanced(text) {
@@ -1308,22 +1479,36 @@ function calculateStats(results, qualitativeCount = null) {
   const averageScore = validResults > 0 ? totalScore / validResults : 5; // 5 = neutral
   const averageComparative = validResults > 0 ? totalComparative / validResults : 0;
   
-  // Calcular suma total de clasificaciones para usar como base de porcentajes
+  // Calcular suma total de clasificaciones
   const totalClassified = classifications['Muy Positivo'] + classifications['Positivo'] + 
                           classifications['Neutral'] + classifications['Negativo'] + 
                           classifications['Muy Negativo'];
   
-  // Usar la suma real de clasificaciones como base para porcentajes
-  const totalResults = totalClassified > 0 ? totalClassified : 1; // Evitar división por cero
+  // CORRECCIÓN: Usar qualitativeCount (respuestas cualitativas) como base para porcentajes
+  // Si no se proporciona qualitativeCount, usar totalClassified como fallback
+  const baseForPercentages = qualitativeCount !== null && qualitativeCount > 0 ? qualitativeCount : (totalClassified > 0 ? totalClassified : 1);
   
   // DEBUG: Mostrar qué se está usando
   console.log('📊 calculateStats DEBUG:');
   console.log(`  - validResults (filas con sentiment): ${validResults}`);
   console.log(`  - qualitativeCount (filas con texto): ${qualitativeCount}`);
   console.log(`  - totalClassified (suma de clasificaciones): ${totalClassified}`);
+  console.log(`  - baseForPercentages: ${baseForPercentages}`);
   console.log(`  - totalScore acumulado: ${totalScore.toFixed(2)}`);
   console.log(`  - averageScore (totalScore/${validResults}): ${averageScore.toFixed(2)}`);
-  console.log(`  - Clasificaciones: Positivo=${classifications['Muy Positivo']+classifications['Positivo']}, Negativo=${classifications['Muy Negativo']+classifications['Negativo']}, Neutral=${classifications['Neutral']}`);
+  console.log(`  - Clasificaciones: MuyPos=${classifications['Muy Positivo']}, Pos=${classifications['Positivo']}, Neutro=${classifications['Neutral']}, Neg=${classifications['Negativo']}, MuyNeg=${classifications['Muy Negativo']}`);
+  
+  // Calcular porcentajes sobre respuestas cualitativas (los que respondieron)
+  const percentages = {
+    'Muy Positivo': (classifications['Muy Positivo'] / baseForPercentages * 100),
+    'Positivo': (classifications['Positivo'] / baseForPercentages * 100),
+    'Neutral': (classifications['Neutral'] / baseForPercentages * 100),
+    'Negativo': (classifications['Negativo'] / baseForPercentages * 100),
+    'Muy Negativo': (classifications['Muy Negativo'] / baseForPercentages * 100)
+  };
+  
+  console.log(`  - Porcentajes brutos: MuyPos=${percentages['Muy Positivo']}, Pos=${percentages['Positivo']}, Neutro=${percentages['Neutral']}, Neg=${percentages['Negativo']}, MuyNeg=${percentages['Muy Negativo']}`);
+  console.log(`  - Suma de porcentajes: ${(percentages['Muy Positivo'] + percentages['Positivo'] + percentages['Neutral'] + percentages['Negativo'] + percentages['Muy Negativo']).toFixed(1)}%`);
   
   // Score ya está en escala 0..10, no requiere normalización
 
@@ -1332,13 +1517,14 @@ function calculateStats(results, qualitativeCount = null) {
     averageScore: parseFloat(averageScore.toFixed(2)), // Promedio 0..10
     rawScore: parseFloat(averageScore.toFixed(2)), // Score 0..10
     averageComparative: parseFloat(averageComparative.toFixed(4)),
-    totalResults: totalClassified, // Total real de respuestas clasificadas
+    totalResults: totalClassified, // Total de respuestas clasificadas
+    quantitativeResponses: qualitativeCount, // Total que contestó cualitativo
     percentages: {
-      'Muy Positivo': parseFloat((classifications['Muy Positivo'] / totalResults * 100).toFixed(1)),
-      'Positivo': parseFloat((classifications['Positivo'] / totalResults * 100).toFixed(1)),
-      'Neutral': parseFloat((classifications['Neutral'] / totalResults * 100).toFixed(1)),
-      'Negativo': parseFloat((classifications['Negativo'] / totalResults * 100).toFixed(1)),
-      'Muy Negativo': parseFloat((classifications['Muy Negativo'] / totalResults * 100).toFixed(1))
+      'Muy Positivo': parseFloat(percentages['Muy Positivo'].toFixed(1)),
+      'Positivo': parseFloat(percentages['Positivo'].toFixed(1)),
+      'Neutral': parseFloat(percentages['Neutral'].toFixed(1)),
+      'Negativo': parseFloat(percentages['Negativo'].toFixed(1)),
+      'Muy Negativo': parseFloat(percentages['Muy Negativo'].toFixed(1))
     }
   };
 }
@@ -1421,10 +1607,16 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
   
   // PRIORIDAD 1: Usar las columnas que realmente tienen análisis
   // Recorrer todos los registros para encontrar todas las columnas analizadas
+  // IMPORTANTE: Solo incluir columnas que existen en originalColumns (después del filtrado)
   const analyzedColumns = new Set();
   analysisResults.forEach(result => {
     if (result.sentimentAnalysis) {
-      Object.keys(result.sentimentAnalysis).forEach(col => analyzedColumns.add(col));
+      Object.keys(result.sentimentAnalysis).forEach(col => {
+        // Solo agregar si la columna existe en los datos filtrados
+        if (originalColumns.includes(col)) {
+          analyzedColumns.add(col);
+        }
+      });
     }
   });
   
@@ -1678,11 +1870,12 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   currentRow++; // Fila en blanco después del header
   
   // USAR ESTADÍSTICAS PRECALCULADAS (ya vienen de calculateStats)
-  let totalQualitativeRows, avgScore, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
+  let totalSurveys, totalQualitativeRows, avgScore, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
   
   if (statistics) {
     // Usar las estadísticas que ya calculó la app
-    totalQualitativeRows = statistics.totalResults;
+    totalSurveys = statistics.totalSurveys || data.length; // Total absoluto de encuestas
+    totalQualitativeRows = statistics.quantitativeResponses || statistics.totalResults; // Los que contestaron cualitativo
     avgScore = typeof statistics.averageScore === 'number' ? statistics.averageScore.toFixed(2) : statistics.averageScore;
     
     // Parsear porcentajes y sumar correctamente
@@ -1696,21 +1889,23 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
     pctNegativos = (pctNegativo + pctMuyNegativo).toFixed(1);
     pctNeutrales = pctNeutral.toFixed(1);
     
-    // Calcular conteos absolutos desde los porcentajes
+    // Calcular conteos absolutos desde los porcentajes sobre respuestas cualitativas
     positivos = Math.round(totalQualitativeRows * parseFloat(pctPositivos) / 100);
     negativos = Math.round(totalQualitativeRows * parseFloat(pctNegativos) / 100);
     neutrales = Math.round(totalQualitativeRows * parseFloat(pctNeutrales) / 100);
     
     console.log('📊 Portada Excel - Usando estadísticas precalculadas:', {
-      total: totalQualitativeRows,
+      totalSurveys: totalSurveys,
+      qualitative: totalQualitativeRows,
       score: avgScore,
       positivos: `${positivos} (${pctPositivos}%)`,
-      neutrales: `${neutrales} (${pctNeutrales}%)`, 
+      neutrales: `${neutrales} (${pctNeutrales}%)`,
       negativos: `${negativos} (${pctNegativos}%)`
     });
   } else {
     // Fallback si no se pasaron estadísticas
     console.warn('⚠️ No se recibieron estadísticas precalculadas');
+    totalSurveys = data.length;
     totalQualitativeRows = 0;
     avgScore = '0.00';
     pctPositivos = '0.0';
@@ -1725,12 +1920,12 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   const boxRow1 = currentRow;
   currentRow++;
   
-  // Box 1: Total Respuestas Cualitativas
+  // Box 1: Total Respuestas (absoluto)
   sheet.getCell(`B${boxRow1}`).value = 'Total Respuestas';
   sheet.getCell(`B${boxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`B${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`B${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`B${boxRow1 + 1}`).value = totalQualitativeRows;
+  sheet.getCell(`B${boxRow1 + 1}`).value = totalSurveys;
   sheet.getCell(`B${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
   sheet.getCell(`B${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sheet.getCell(`B${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
@@ -1738,33 +1933,26 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getRow(boxRow1).height = 20;
   sheet.getRow(boxRow1 + 1).height = 35;
   
-  // Box 2: Promedio General
-  sheet.getCell(`C${boxRow1}`).value = 'Promedio General';
+  // Box 2: Respuestas Cualitativas  
+  sheet.getCell(`C${boxRow1}`).value = 'Respuestas Cualitativas';
   sheet.getCell(`C${boxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`C${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`C${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`C${boxRow1 + 1}`).value = parseFloat(avgScore);
+  sheet.getCell(`C${boxRow1 + 1}`).value = totalQualitativeRows;
   sheet.getCell(`C${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
   sheet.getCell(`C${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`C${boxRow1 + 1}`).numFmt = '0.00';
   sheet.getCell(`C${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
-  // Box 3: Total Preguntas (nuevo)
-  const qualitativeFields = Object.keys(data[0] || {}).filter(key => 
-    key !== 'CARRERA' && key !== 'MATERIA' && key !== 'SEDE' && key !== 'MODALIDAD' && key !== 'DOCENTE' &&
-    key !== 'carrera' && key !== 'materia' && key !== 'sede' && key !== 'modalidad' && key !== 'docente' &&
-    key !== 'sentimentAnalysis' && key !== 'sentiment' && 
-    typeof (data[0] || {})[key] === 'string'
-  );
-  
-  sheet.getCell(`D${boxRow1}`).value = 'Total Preguntas';
+  // Box 3: Promedio General
+  sheet.getCell(`D${boxRow1}`).value = 'Promedio General';
   sheet.getCell(`D${boxRow1}`).font = { bold: true, size: 11 };
   sheet.getCell(`D${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.getCell(`D${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`D${boxRow1 + 1}`).value = qualitativeFields.length;
+  sheet.getCell(`D${boxRow1 + 1}`).value = parseFloat(avgScore);
   sheet.getCell(`D${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
   sheet.getCell(`D${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getCell(`D${boxRow1 + 1}`).numFmt = '0.00';
   sheet.getCell(`D${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`D${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
@@ -1831,7 +2019,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   const config = customConfig || COLUMN_CONFIG;
   if (config && config.numericas && config.numericas.length > 0) {
     numericFields = config.numericas;
-    console.log(`📊 Usando ${numericFields.length} columnas numéricas desde configuración para Excel`);
+    console.log(`📊 Usando ${numericFields.length} columnas numéricas desde configuración`);
   } else {
     // Fallback: autodetectar solo si no hay configuración
     const firstItem = data[0];
@@ -2411,8 +2599,9 @@ async function createMethodologySheet(workbook) {
     '1. PRIORIDAD A FRASES COMPLETAS:\n' +
     '   Se buscan primero las frases del diccionario (ej: "muy bueno")\n\n' +
     '2. PALABRAS YA USADAS NO SE CUENTAN:\n' +
-    '   Si "muy bueno" fue encontrado como frase, las palabras "muy" y "bueno"\n' +
-    '   individuales NO se analizan\n\n' +
+    '   Si "muy bueno" (+4) está como frase → cuenta +4\n' +
+    '   Si "muy" (+1) y "bueno" (+3) están como palabras individuales → NO se cuentan\n' +
+    '   (porque ya fueron contadas en la frase "muy bueno")\n\n' +
     '3. SIN DUPLICACIÓN:\n' +
     '   Cada palabra/frase se cuenta UNA SOLA VEZ\n\n' +
     'EJEMPLO:\n' +
@@ -2516,7 +2705,7 @@ async function createMethodologySheet(workbook) {
     '1. Se analizan todos los comentarios del registro usando el diccionario de sentimientos\n' +
     '2. Se calcula el score RAW (suma de valores positivos y negativos encontrados)\n' +
     '3. Se promedian los scores si hay múltiples columnas de texto libre respondidas\n' +
-    '4. Se normaliza el resultado a escala 0-10 usando la fórmula: (Score_limitado_[-10,+10] + 10) ÷ 2\n' +
+    '4. Se normaliza el resultado a escala 0-10 usando la fórmula: (Score limitado a [-10,+10] + 10) ÷ 2\n' +
     '5. El valor final se redondea a 2 decimales\n\n' +
     '📊 Por ejemplo:\n' +
     '• Un registro con comentario muy positivo → Score Normalizado: 8.75\n' +
@@ -2652,11 +2841,17 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
   console.log(`📊 Columnas numéricas detectadas (${numericColumns.length}):`, numericColumns.slice(0, 3));
   
   // Configurar columnas del resumen
-  const summaryColumns = [
-    { header: groupField.charAt(0).toUpperCase() + groupField.slice(1), key: 'group', width: 35 },
+  let summaryColumns = [
+    { header: groupField.charAt(0).toUpperCase() + groupField.slice(1), key: 'group', width: 35 }
+  ];
+  // Si es resumen por docente, agregar columna de materias
+  if (groupField.toLowerCase() === 'docente') {
+    summaryColumns.push({ header: 'Materia(s)', key: 'materias', width: 40 });
+  }
+  summaryColumns = summaryColumns.concat([
     { header: 'Total Registros', key: 'total', width: 16 },
     { header: 'Total con Análisis', key: 'totalAnalysis', width: 18 }
-  ];
+  ]);
   
   // Agregar columnas para promedios de campos numéricos
   numericColumns.forEach(col => {
@@ -2786,19 +2981,27 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
   Object.keys(groups).sort().forEach(groupValue => {
     const stats = groups[groupValue];
     const row = sheet.getRow(rowIndex);
-    
     row.getCell('group').value = groupValue;
+    // Si es resumen por docente, enumerar materias
+    if (groupField.toLowerCase() === 'docente') {
+      // Buscar todas las materias asociadas a ese docente
+      const materiasSet = new Set();
+      data.forEach(item => {
+        const docente = extractField(item, ['docente', 'profesor']) || 'Sin Docente';
+        if (docente === groupValue) {
+          const materia = extractField(item, ['materia', 'materias', 'asignatura']);
+          if (materia) materiasSet.add(materia);
+        }
+      });
+      row.getCell('materias').value = Array.from(materiasSet).join(', ');
+    }
     row.getCell('total').value = stats.total;
     row.getCell('totalAnalysis').value = stats.totalAnalysis;
-    
-    // Escribir promedios de columnas numéricas
     numericColumns.forEach(col => {
       const numStat = stats.numericStats[col];
       const avg = numStat.count > 0 ? (numStat.sum / numStat.count).toFixed(2) : 0;
       row.getCell(`${col}_avg`).value = parseFloat(avg);
     });
-    
-    // Escribir stats por cada columna de texto
     textColumns.forEach(col => {
       const textStat = stats.textStats[col];
       const totalAnalyzed = textStat.positivos + textStat.negativos + textStat.neutrales;
@@ -2808,14 +3011,11 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
       const pctPositive = totalAnalyzed > 0 
         ? ((textStat.positivos / totalAnalyzed) * 100).toFixed(1) + '%'
         : '0%';
-      
       row.getCell(`${col}_pos`).value = textStat.positivos;
       row.getCell(`${col}_neg`).value = textStat.negativos;
       row.getCell(`${col}_neu`).value = textStat.neutrales;
       row.getCell(`${col}_avg`).value = parseFloat(avgScore);
       row.getCell(`${col}_pct_pos`).value = pctPositive;
-      
-      // Aplicar formato condicional al score promedio
       const scoreCell = row.getCell(`${col}_avg`);
       const scoreValue = parseFloat(avgScore);
       if (scoreValue >= 6) {
@@ -2829,7 +3029,6 @@ async function createDynamicSummarySheet(sheet, data, groupField, textColumns, c
         scoreCell.font = { color: { argb: 'FF8B5A00' }, bold: true };
       }
     });
-    
     rowIndex++;
   });
   
@@ -2994,6 +3193,7 @@ async function createSummarySheet(sheet, data) {
 async function createDocenteSummarySheet(sheet, data) {
   sheet.columns = [
     { header: 'Docente', key: 'docente', width: 30 },
+    { header: 'Materias', key: 'materias', width: 40 },
     { header: 'Carrera', key: 'carrera', width: 25 },
     { header: 'Total Evaluaciones', key: 'total', width: 18 },
     { header: 'Sentiment Promedio', key: 'avg_sentiment', width: 18 },
@@ -3005,18 +3205,22 @@ async function createDocenteSummarySheet(sheet, data) {
   data.forEach(item => {
     const docente = extractField(item, ['docente', 'profesor']) || 'Sin Docente';
     const carrera = extractField(item, ['carrera', 'programa']) || 'Sin Carrera';
+    const materia = extractField(item, ['materia', 'materias', 'asignatura']) || '';
     const key = `${docente}|${carrera}`;
     
     if (!docenteStats[key]) {
       docenteStats[key] = {
         docente,
         carrera,
+        materias: new Set(),
         total: 0,
         positivas: 0,
         negativas: 0
       };
     }
-    
+    if (materia) {
+      docenteStats[key].materias.add(materia);
+    }
     docenteStats[key].total++;
     
     if (item.sentimentAnalysis?.docente?.consensus) {
@@ -3030,6 +3234,7 @@ async function createDocenteSummarySheet(sheet, data) {
   Object.values(docenteStats).forEach(stats => {
     const row = sheet.getRow(rowIndex++);
     row.getCell('docente').value = stats.docente;
+    row.getCell('materias').value = Array.from(stats.materias).join(', ');
     row.getCell('carrera').value = stats.carrera;
     row.getCell('total').value = stats.total;
     row.getCell('positivas').value = stats.positivas;
@@ -3274,18 +3479,78 @@ app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req
       
       const qualitativeCount = countQualitativeResponses(jsonData, customConfig);
       statistics = calculateStats(resultsForStats, qualitativeCount);
+      // Agregar el total absoluto de encuestas procesadas
+      statistics.totalSurveys = processedResults.length;
     }
     
     console.log('📊 Estadísticas finales para portada:', {
-      total: statistics.totalResults,
+      totalSurveys: statistics.totalSurveys || processedResults.length,
+      totalClassified: statistics.totalResults,
       avgScore: statistics.averageScore,
       positivos: statistics.percentages['Muy Positivo'] + statistics.percentages['Positivo'],
       neutrales: statistics.percentages['Neutral'],
       negativos: statistics.percentages['Negativo'] + statistics.percentages['Muy Negativo']
     });
     
+    // FILTRAR COLUMNAS según configuración antes de generar Excel
+    // Solo incluir: identificación + numéricas + texto libre
+    let filteredResults = processedResults;
+    
+    console.log('\n🔍 DEBUG FILTRADO DE COLUMNAS:');
+    console.log('  customConfig:', customConfig ? 'SÍ existe' : 'NO existe');
+    if (customConfig) {
+      console.log('  - name:', customConfig.name);
+      console.log('  - identificacion:', customConfig.identificacion?.length || 0, 'columnas');
+      console.log('  - numericas:', customConfig.numericas?.length || 0, 'columnas');
+      console.log('  - textoLibre:', customConfig.textoLibre?.length || 0, 'columnas');
+    }
+    console.log('  Total columnas en processedResults[0]:', Object.keys(processedResults[0]).length);
+    console.log('  Columnas:', Object.keys(processedResults[0]).filter(k => k !== 'sentiment' && k !== 'sentimentAnalysis'));
+    
+    if (customConfig && (customConfig.identificacion || customConfig.numericas || customConfig.textoLibre)) {
+      console.log('📋 Filtrando columnas según configuración para reporte Excel...');
+      
+      // Obtener columnas permitidas de la configuración
+      const allowedColumns = new Set([
+        ...(customConfig.identificacion || []),
+        ...(customConfig.numericas || []),
+        ...(customConfig.textoLibre || [])
+      ]);
+      
+      console.log(`✅ Columnas permitidas (${allowedColumns.size}):`, Array.from(allowedColumns));
+      
+      if (allowedColumns.size === 0) {
+        console.log('⚠️ ADVERTENCIA: allowedColumns está vacío, no se filtrará nada');
+      }
+      
+      // Filtrar cada resultado para incluir solo las columnas permitidas
+      filteredResults = processedResults.map(result => {
+        const filtered = {};
+        let addedCount = 0;
+        
+        // Agregar solo las columnas permitidas
+        for (const [key, value] of Object.entries(result)) {
+          if (allowedColumns.has(key)) {
+            filtered[key] = value;
+            addedCount++;
+          } else if (key === 'sentiment' || key === 'sentimentAnalysis') {
+            // Mantener análisis de sentimiento
+            filtered[key] = value;
+          }
+        }
+        
+        return filtered;
+      });
+      
+      const columnsAfterFilter = Object.keys(filteredResults[0]).filter(k => k !== 'sentiment' && k !== 'sentimentAnalysis');
+      console.log(`📊 Resultados filtrados: ${columnsAfterFilter.length} columnas por registro`);
+      console.log('   Columnas resultantes:', columnsAfterFilter);
+    } else {
+      console.log('⚠️ No hay configuración personalizada O las listas están vacías, exportando todas las columnas');
+    }
+    
     // Generar el reporte en Excel con las estadísticas
-    const excelWorkbook = await generateAdvancedExcelReport(processedResults, customConfig, originalFilename, statistics);
+    const excelWorkbook = await generateAdvancedExcelReport(filteredResults, customConfig, originalFilename, statistics);
     
     // Guardar archivo temporal
     const outputPath = path.join(__dirname, 'uploads', `reporte-avanzado-${Date.now()}.xlsx`);
@@ -3335,6 +3600,344 @@ function determineConsensus(naturalResult, nlpResult) {
   
   return naturalScore >= nlpScore ? naturalClass : nlpClass;
 }
+
+// ============= NUEVO: Generar Reporte con Columna de Validación =============
+app.post('/api/generate-validation-report', upload.single('excelFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    console.log('📊 Generando reporte con columna de validación...');
+
+    // Parsear configuración personalizada si existe
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Usando configuración personalizada: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
+    
+    // RECIBIR ESTADÍSTICAS PRECALCULADAS DEL FRONTEND
+    let statisticsFromApp = null;
+    if (req.body.statistics) {
+      try {
+        statisticsFromApp = JSON.parse(req.body.statistics);
+        console.log('📊 ✅ Estadísticas recibidas del frontend (valores de la app):', {
+          total: statisticsFromApp.totalResults,
+          avgScore: statisticsFromApp.averageScore,
+          percentages: statisticsFromApp.percentages
+        });
+      } catch (e) {
+        console.error('❌ Error parseando statistics:', e);
+      }
+    }
+    
+    // RECIBIR ÍNDICES FILTRADOS SI EXISTEN
+    let filteredIndices = null;
+    if (req.body.filteredIndices) {
+      try {
+        filteredIndices = JSON.parse(req.body.filteredIndices);
+        console.log(`🔍 Filtros aplicados: exportando ${filteredIndices.length} filas específicas`);
+      } catch (e) {
+        console.error('❌ Error parseando filteredIndices:', e);
+      }
+    }
+
+    let processedResults = [];
+    let originalFilename = req.file.originalname || 'reporte.xlsx';
+    
+    // Procesar archivo Excel
+    const workbook = XLSX.readFile(req.file.path, { 
+      raw: false,
+      FS: ';'
+    });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    let jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      defval: ''
+    });
+    
+    console.log(`📊 Archivo procesado: ${jsonData.length} filas`);
+
+    if (jsonData.length === 0) {
+      return res.status(400).json({ error: 'El archivo Excel está vacío' });
+    }
+
+    // Buscar la columna de validación (case-insensitive)
+    const firstRow = jsonData[0];
+    let validationColumnName = null;
+    
+    for (const columnName of Object.keys(firstRow)) {
+      const normalizedName = columnName.toLowerCase().trim();
+      if (normalizedName === 'validación final' || normalizedName === 'validacion final') {
+        validationColumnName = columnName;
+        break;
+      }
+    }
+
+    if (!validationColumnName) {
+      return res.status(400).json({ 
+        error: 'No se encontró la columna "validación final" en el archivo. Por favor asegúrese de que existe.' 
+      });
+    }
+
+    console.log(`✅ Columna de validación encontrada: "${validationColumnName}"`);
+
+    // APLICAR FILTRO SI EXISTE
+    if (filteredIndices && filteredIndices.length > 0) {
+      const originalLength = jsonData.length;
+      jsonData = jsonData.filter((row, index) => filteredIndices.includes(index));
+      console.log(`✂️ Filtrado aplicado: ${jsonData.length} de ${originalLength} filas`);
+    }
+
+    const MAX_ROWS = 25000;
+    if (jsonData.length > MAX_ROWS) {
+      console.log(`⚠️ Archivo muy grande (${jsonData.length} filas). Procesando solo las primeras ${MAX_ROWS}.`);
+      jsonData.splice(MAX_ROWS);
+    }
+
+    console.log(`🔄 Procesando ${jsonData.length} registros...`);
+
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      
+      if (i % 500 === 0 && i > 0) {
+        console.log(`📈 Progreso: ${i}/${jsonData.length} (${Math.round(i/jsonData.length*100)}%)`);
+      }
+
+      const result = { ...row };
+      const sentimentColumns = getSentimentColumns(row, customConfig);
+
+      // Leer el valor de la columna de validación
+      const validationValue = (row[validationColumnName] || '').toString().toLowerCase().trim();
+      
+      // Mapear el valor a una clasificación y score
+      let classification = 'No clasificado';
+      let score = 5;
+      let confidence = 0;
+
+      if (validationValue.includes('muy positiv')) {
+        classification = 'Muy Positivo';
+        score = 9;
+        confidence = 1.0;
+      } else if (validationValue.includes('positiv')) {
+        classification = 'Positivo';
+        score = 7;
+        confidence = 1.0;
+      } else if (validationValue.includes('neutral')) {
+        classification = 'Neutral';
+        score = 5;
+        confidence = 1.0;
+      } else if (validationValue.includes('muy negativ')) {
+        classification = 'Muy Negativo';
+        score = 1;
+        confidence = 1.0;
+      } else if (validationValue.includes('negativ')) {
+        classification = 'Negativo';
+        score = 3;
+        confidence = 1.0;
+      }
+
+      if (sentimentColumns.length > 0) {
+        result.sentimentAnalysis = {};
+        
+        let overallScore = 0;
+        let sentimentResults = [];
+        
+        for (const colInfo of sentimentColumns) {
+          const columnName = colInfo.column;
+          const text = colInfo.text;
+          
+          if (text && text.trim().length > 0) {
+            // En lugar de analyzeTextEnhanced, usar la validación
+            result.sentimentAnalysis[columnName] = {
+              classification: classification,
+              score: score,
+              scoreRaw: score,
+              consensus: classification
+            };
+            
+            // Acumular para cálculo de score normalizado
+            overallScore += score;
+            sentimentResults.push({
+              classification: classification,
+              score: score,
+              normalizedScore: score,
+              confidence: confidence,
+              validationSource: validationValue
+            });
+          }
+        }
+        
+        // Calcular score normalizado para este registro
+        const perColumnAvgScore = sentimentResults.length > 0 ? overallScore / sentimentResults.length : 0;
+        
+        // Calcular confianza promedio
+        const averageConfidence = sentimentResults.length > 0 
+          ? sentimentResults.reduce((sum, r) => sum + (r.confidence || 0.5), 0) / sentimentResults.length 
+          : 0.5;
+        
+        // Agregar la propiedad sentiment con el score normalizado
+        result.sentiment = {
+          overallScore: overallScore,
+          perColumnAvgScore: parseFloat(perColumnAvgScore.toFixed(2)),
+          classification: classification,
+          confidence: Math.round(averageConfidence * 100) / 100,
+          details: sentimentResults,
+          analyzedColumns: sentimentResults.length
+        };
+      }
+
+      processedResults.push(result);
+    }
+    
+    // Limpiar archivo temporal
+    fs.unlinkSync(req.file.path);
+
+    
+    console.log('📝 Generando archivo Excel avanzado con columna de validación...');
+    
+    // USAR ESTADÍSTICAS QUE VIENEN DEL FRONTEND (ya calculadas correctamente)
+    let statistics;
+    
+    if (statisticsFromApp) {
+      // Usar las estadísticas que envió el frontend (filtradas o completas)
+      console.log('✅ Usando estadísticas del frontend');
+      statistics = statisticsFromApp;
+      
+      console.log('📊 Estadísticas para portada:', {
+        total: statistics.totalResults,
+        avgScore: statistics.averageScore,
+        positivos: (parseFloat(statistics.percentages['Muy Positivo'] || 0) + parseFloat(statistics.percentages['Positivo'] || 0)).toFixed(1) + '%',
+        neutrales: statistics.percentages['Neutral'] + '%',
+        negativos: (parseFloat(statistics.percentages['Negativo'] || 0) + parseFloat(statistics.percentages['Muy Negativo'] || 0)).toFixed(1) + '%'
+      });
+    } else {
+      // Fallback: calcular estadísticas en el backend
+      console.log('⚠️ Calculando estadísticas en el backend (fallback)');
+      
+      const resultsForStats = processedResults.map((item, index) => {
+        if (item.sentiment && item.sentiment.perColumnAvgScore !== undefined) {
+          // Usar perColumnAvgScore que ya está normalizado 0-10
+          const avgScore = item.sentiment.perColumnAvgScore;
+          const classification = item.sentiment.classification || getClassification(avgScore);
+          
+          return {
+            row: index + 1,
+            sentiment: {
+              perColumnAvgScore: avgScore,
+              classification: classification,
+              details: [{ score: avgScore }]
+            }
+          };
+        }
+        return null;
+      }).filter(r => r !== null);
+      
+      const qualitativeCount = processedResults.filter(r => r.sentiment && r.sentiment.classification !== 'No clasificado').length;
+      statistics = calculateStats(resultsForStats, qualitativeCount);
+      // Agregar el total absoluto de encuestas procesadas
+      statistics.totalSurveys = processedResults.length;
+    }
+    
+    console.log('📊 Estadísticas finales para portada:', {
+      totalSurveys: statistics.totalSurveys || processedResults.length,
+      totalClassified: statistics.totalResults,
+      avgScore: statistics.averageScore,
+      positivos: statistics.percentages['Muy Positivo'] + statistics.percentages['Positivo'],
+      neutrales: statistics.percentages['Neutral'],
+      negativos: statistics.percentages['Negativo'] + statistics.percentages['Muy Negativo']
+    });
+    
+    // FILTRAR COLUMNAS según configuración antes de generar Excel
+    // Solo incluir: identificación + numéricas + texto libre
+    let filteredResults = processedResults;
+    
+    console.log('\n🔍 DEBUG FILTRADO DE COLUMNAS (VALIDACIÓN):');
+    console.log('  customConfig:', customConfig ? 'SÍ existe' : 'NO existe');
+    if (customConfig) {
+      console.log('  - name:', customConfig.name);
+      console.log('  - identificacion:', customConfig.identificacion?.length || 0, 'columnas');
+      console.log('  - numericas:', customConfig.numericas?.length || 0, 'columnas');
+      console.log('  - textoLibre:', customConfig.textoLibre?.length || 0, 'columnas');
+    }
+    console.log('  Total columnas en processedResults[0]:', Object.keys(processedResults[0]).length);
+    console.log('  Columnas:', Object.keys(processedResults[0]).filter(k => k !== 'sentiment' && k !== 'sentimentAnalysis'));
+    
+    if (customConfig && (customConfig.identificacion || customConfig.numericas || customConfig.textoLibre)) {
+      console.log('📋 Filtrando columnas según configuración para reporte de validación...');
+      
+      // Obtener columnas permitidas de la configuración
+      const allowedColumns = new Set([
+        ...(customConfig.identificacion || []),
+        ...(customConfig.numericas || []),
+        ...(customConfig.textoLibre || [])
+      ]);
+      
+      console.log(`✅ Columnas permitidas (${allowedColumns.size}):`, Array.from(allowedColumns));
+      
+      if (allowedColumns.size === 0) {
+        console.log('⚠️ ADVERTENCIA: allowedColumns está vacío, no se filtrará nada');
+      }
+      
+      // Filtrar cada resultado para incluir solo las columnas permitidas
+      filteredResults = processedResults.map(result => {
+        const filtered = {};
+        let addedCount = 0;
+        
+        // Agregar solo las columnas permitidas
+        for (const [key, value] of Object.entries(result)) {
+          if (allowedColumns.has(key)) {
+            filtered[key] = value;
+            addedCount++;
+          } else if (key === 'sentiment' || key === 'sentimentAnalysis') {
+            // Mantener análisis de sentimiento
+            filtered[key] = value;
+          }
+        }
+        
+        return filtered;
+      });
+      
+      const columnsAfterFilter = Object.keys(filteredResults[0]).filter(k => k !== 'sentiment' && k !== 'sentimentAnalysis');
+      console.log(`📊 Resultados filtrados: ${columnsAfterFilter.length} columnas por registro`);
+      console.log('   Columnas resultantes:', columnsAfterFilter);
+    } else {
+      console.log('⚠️ No hay configuración personalizada O las listas están vacías, exportando todas las columnas');
+    }
+    
+    // Generar el reporte en Excel con las estadísticas (MISMO QUE REPORTE COMPLETO)
+    const excelWorkbook = await generateAdvancedExcelReport(filteredResults, customConfig, originalFilename, statistics);
+    
+    // Guardar archivo temporal
+    const outputPath = path.join(__dirname, 'uploads', `reporte-validacion-${Date.now()}.xlsx`);
+    await excelWorkbook.xlsx.writeFile(outputPath);
+    
+    console.log('✅ Reporte de validación generado exitosamente');
+
+    // Enviar archivo
+    res.download(outputPath, 'reporte-validacion-sentiment-analysis.xlsx', (err) => {
+      if (err) {
+        console.error('Error enviando archivo:', err);
+      } else {
+        // Limpiar archivo temporal después de enviarlo
+        setTimeout(() => {
+          fs.unlink(outputPath, () => {});
+        }, 5000);
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generando reporte con columna de validación:', error);
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+  }
+});
+// ============= FIN: Generar Reporte con Columna de Validación =============
 
 // Iniciar servidor
 app.listen(PORT, () => {
@@ -4168,7 +4771,7 @@ app.post('/api/dictionary/import', upload.single('dictionaryFile'), async (req, 
       fileName: fileName,
       wordCount: Object.keys(importedDict).length,
       customWords: 0,
-      labels: importedDict
+      labels: currentLabels
     };
     
     // Cargar palabras ignoradas del nuevo diccionario
@@ -4546,6 +5149,7 @@ function analyzeColumnsContent(data, columns) {
     if (scaleValues.length >= 2) {
       const min = Math.min(...scaleValues);
       const max = Math.max(...scaleValues);
+      
       scaleInfo = {
         min: min,
         max: max,

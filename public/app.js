@@ -53,6 +53,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // ===== NUEVO: Event listeners para análisis con columna de validación =====
+    const analyzeValidationBtn = document.getElementById('analyzeValidationBtn');
+    const validationReportBtn = document.getElementById('validationReportBtn');
+    
+    console.log('📋 Configurando botones de validación...');
+    console.log('analyzeValidationBtn:', analyzeValidationBtn ? '✓' : '✗');
+    console.log('validationReportBtn:', validationReportBtn ? '✓' : '✗');
+    
+    if (analyzeValidationBtn) {
+        analyzeValidationBtn.addEventListener('click', function() {
+            analyzeWithValidationColumn();
+        });
+    }
+    
+    if (validationReportBtn) {
+        validationReportBtn.addEventListener('click', function() {
+            generateValidationReport();
+        });
+    }
+
     // ===== EVENT LISTENERS PARA PESTAÑAS DE DICCIONARIO =====
     
     // Gestión de pestañas (Diccionario / Palabras Ignoradas)
@@ -1084,10 +1104,25 @@ function calculateFilteredStats(results) {
         }
     });
 
-    const total = scoreCount > 0 ? scoreCount : 1; // Base = registros con análisis
+    // CORRECCIÓN: Calcular porcentajes solo sobre clasificaciones VÁLIDAS (excluyendo "No clasificado")
+    // Base = solo las respuestas con clasificación válida: muy positivo, positivo, neutral, negativo, muy negativo
+    const validClassifications = classifications['Muy Positivo'] + 
+                                 classifications['Positivo'] + 
+                                 classifications['Neutral'] + 
+                                 classifications['Negativo'] + 
+                                 classifications['Muy Negativo'];
+    
+    const baseForPercentages = validClassifications > 0 ? validClassifications : 1;
+    
     const percentages = {};
     Object.keys(classifications).forEach(key => {
-        percentages[key] = total > 0 ? ((classifications[key] / total) * 100).toFixed(1) : '0.0';
+        if (key === 'No clasificado') {
+            // No clasificado NO se incluye en los porcentajes
+            percentages[key] = '0.0';
+        } else {
+            // Porcentajes sobre la base de clasificaciones válidas
+            percentages[key] = ((classifications[key] / baseForPercentages) * 100).toFixed(1);
+        }
     });
 
     // Los perColumnAvgScore ya están normalizados a 0-10 por el servidor
@@ -1097,7 +1132,8 @@ function calculateFilteredStats(results) {
         classifications,
         percentages,
         averageScore: parseFloat(averageScore.toFixed(2)), // Escala 0-10
-        totalResults: scoreCount
+        totalResults: validClassifications, // Total de clasificaciones válidas
+        qualitativeResponses: validClassifications // Respuestas cualitativas (con clasificación válida)
     };
 }
 
@@ -1107,9 +1143,14 @@ function updateStatsCards(results, stats) {
     const totalElement = document.getElementById('totalResponses');
     if (totalElement) totalElement.textContent = results.length;
     
-    // Contar respuestas cualitativas (con análisis de texto)
+    // Contar respuestas cualitativas (con clasificación VÁLIDA, excluyendo "No clasificado")
     const qualitativeCount = results.filter(row => {
-        return row.sentiment && row.sentiment.details && row.sentiment.details.length > 0;
+        if (!row.sentiment || !row.sentiment.details || row.sentiment.details.length === 0) {
+            return false;
+        }
+        // Excluir "No clasificado"
+        const classification = row.sentiment.classification || '';
+        return classification !== 'No clasificado' && classification !== '';
     }).length;
     const quantElement = document.getElementById('quantitativeResponses');
     if (quantElement) quantElement.textContent = qualitativeCount;
@@ -2403,6 +2444,175 @@ function getSentimentClass(score) {
     if (score < -1) return 'negative';
     return 'neutral';
 }
+
+// ============= NUEVO: Funciones para análisis con columna de validación =============
+
+async function analyzeWithValidationColumn() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('⚠️ Por favor selecciona un archivo Excel primero');
+        return;
+    }
+
+    // Obtener configuración de columnas actual
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
+    
+    if (!columnConfig || !columnConfig.name) {
+        alert('⚠️ Por favor selecciona una configuración de columnas primero');
+        return;
+    }
+    
+    console.log('📋 Analizando con columna de validación...');
+    console.log('Configuración de columnas:', columnConfig);
+
+    const formData = new FormData();
+    formData.append('excelFile', file);
+    formData.append('columnConfig', JSON.stringify(columnConfig));
+
+    try {
+        // Limpiar análisis anterior
+        cleanupMemory();
+        
+        // Mostrar loading
+        const loading = document.getElementById('loading');
+        loading.querySelector('p').textContent = '📋 Analizando con columna de validación...';
+        loading.classList.remove('hidden');
+
+        const response = await fetch('/api/analyze-with-validation-column', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            currentResults = data;
+            currentResults.originalFilename = file.name;
+            displayResults(data);
+            
+            // Mostrar mensaje de éxito
+            showNotification(`✅ Análisis completado: ${data.totalResponses} registros procesados con columna "${data.validationColumn}"`, 'success');
+        } else {
+            throw new Error(data.error || 'Error procesando el archivo');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error: ' + error.message);
+    } finally {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+async function generateValidationReport() {
+    // Validar que haya resultados analizados
+    if (!currentResults || !currentResults.results) {
+        alert('⚠️ Por favor analiza el archivo con "Analizar con Columna Validación" primero');
+        return;
+    }
+
+    // Validar que sea un análisis de validación
+    if (currentResults.engine !== 'validation-column') {
+        alert('⚠️ Este botón es solo para análisis con columna de validación.\n\nPara generar un reporte del análisis normal, usa el botón "Generar Reporte XLSX Completo" de arriba.');
+        return;
+    }
+
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('⚠️ No se encontró el archivo original');
+        return;
+    }
+
+    // Obtener configuración de columnas actual
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
+    
+    if (!columnConfig || !columnConfig.name) {
+        alert('⚠️ Por favor selecciona una configuración de columnas');
+        return;
+    }
+
+    const validationBtn = document.getElementById('validationReportBtn');
+    const loading = document.getElementById('loading');
+    
+    try {
+        // Deshabilitar botón y mostrar loading
+        validationBtn.disabled = true;
+        validationBtn.innerHTML = '<span class="btn-icon">⏳</span>Generando...';
+        loading.classList.remove('hidden');
+        
+        // Determinar qué datos exportar (filtrados o todos)
+        const dataToExport = filteredResults.length > 0 ? filteredResults : currentResults.results;
+        const isFiltered = filteredResults.length > 0;
+        
+        if (isFiltered) {
+            loading.querySelector('p').textContent = `Generando reporte con ${dataToExport.length} resultados filtrados...`;
+            console.log(`📊 Exportando ${dataToExport.length} resultados filtrados`);
+        } else {
+            loading.querySelector('p').textContent = 'Generando reporte con columna de validación...';
+            console.log(`📊 Exportando todos los ${dataToExport.length} resultados`);
+        }
+
+        // Crear FormData
+        const formData = new FormData();
+        formData.append('excelFile', file);
+        formData.append('columnConfig', JSON.stringify(columnConfig));
+        
+        // Si hay filtros, enviar los índices
+        if (isFiltered) {
+            const filteredIndices = dataToExport.map(item => item.row - 1);
+            formData.append('filteredIndices', JSON.stringify(filteredIndices));
+            
+            if (filteredStats) {
+                formData.append('statistics', JSON.stringify(filteredStats));
+            }
+        } else {
+            if (filteredStats) {
+                formData.append('statistics', JSON.stringify(filteredStats));
+            } else if (currentResults && currentResults.statistics) {
+                formData.append('statistics', JSON.stringify(currentResults.statistics));
+            }
+        }
+
+        // Hacer petición al endpoint de reporte validación
+        const response = await fetch('/api/generate-validation-report', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error generando el reporte');
+        }
+
+        // Descargar archivo
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = 'reporte-validacion.xlsx';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        // Mostrar mensaje de éxito
+        showNotification('✅ Reporte con columna de validación generado exitosamente', 'success');
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error generando el reporte: ' + error.message);
+    } finally {
+        // Restaurar botón y ocultar loading
+        validationBtn.disabled = false;
+        validationBtn.innerHTML = '<span class="btn-icon">📊</span>Generar Reporte Validación';
+        loading.classList.add('hidden');
+    }
+}
+
+// ============= FIN: Funciones para análisis con columna de validación =============
 
 // ===== GESTIÓN DE PALABRAS IGNORADAS =====
 
