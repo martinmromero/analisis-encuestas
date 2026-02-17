@@ -99,7 +99,10 @@ const corsOptions = {
     // y desde dominios permitidos
     const allowedOrigins = [
       'https://itd.barcelo.edu.ar',
+      'https://itd.barcelo.edu.ar:3000',
       'http://itd.barcelo.edu.ar',
+      'http://itd.barcelo.edu.ar:3000',
+      'http://192.168.30.12',
       'http://192.168.30.12:3000',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
