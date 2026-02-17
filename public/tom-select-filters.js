@@ -49,9 +49,128 @@ function destroyTomSelectInstances() {
 }
 
 /**
+ * Actualizar opciones en cascada basándose en selecciones actuales
+ * @param {string} changedFilter - Nombre del filtro que cambió
+ */
+function updateCascadeOptions(changedFilter) {
+    console.log(`🔄 Actualizando opciones en cascada desde: ${changedFilter}`);
+    
+    // Obtener selecciones actuales
+    const selectedCarreras = tomSelectInstances.carrera?.getValue() || [];
+    const selectedMaterias = tomSelectInstances.materia?.getValue() || [];
+    const selectedModalidades = tomSelectInstances.modalidad?.getValue() || [];
+    const selectedSedes = tomSelectInstances.sede?.getValue() || [];
+    const selectedDocentes = tomSelectInstances.docente?.getValue() || [];
+    
+    // Filtrar resultados basándose en selecciones actuales
+    let filteredData = allResults.slice();
+    
+    if (selectedCarreras.length > 0) {
+        filteredData = filteredData.filter(row => 
+            selectedCarreras.includes(row.originalData?.CARRERA || row.CARRERA)
+        );
+    }
+    if (selectedMaterias.length > 0) {
+        filteredData = filteredData.filter(row => 
+            selectedMaterias.includes(row.originalData?.MATERIA || row.MATERIA)
+        );
+    }
+    if (selectedModalidades.length > 0) {
+        filteredData = filteredData.filter(row => 
+            selectedModalidades.includes(row.originalData?.MODALIDAD || row.MODALIDAD)
+        );
+    }
+    if (selectedSedes.length > 0) {
+        filteredData = filteredData.filter(row => 
+            selectedSedes.includes(row.originalData?.SEDE || row.SEDE)
+        );
+    }
+    if (selectedDocentes.length > 0) {
+        filteredData = filteredData.filter(row => 
+            selectedDocentes.includes(row.originalData?.DOCENTE || row.DOCENTE)
+        );
+    }
+    
+    // Extraer opciones únicas de datos filtrados
+    const availableOptions = {
+        carreras: [...new Set(filteredData.map(r => r.originalData?.CARRERA || r.CARRERA).filter(Boolean))],
+        materias: [...new Set(filteredData.map(r => r.originalData?.MATERIA || r.MATERIA).filter(Boolean))],
+        modalidades: [...new Set(filteredData.map(r => r.originalData?.MODALIDAD || r.MODALIDAD).filter(Boolean))],
+        sedes: [...new Set(filteredData.map(r => r.originalData?.SEDE || r.SEDE).filter(Boolean))],
+        docentes: [...new Set(filteredData.map(r => r.originalData?.DOCENTE || r.DOCENTE).filter(Boolean))]
+    };
+    
+    // Si no hay selecciones, usar todas las opciones originales
+    if (selectedCarreras.length === 0 && selectedMaterias.length === 0 && 
+        selectedModalidades.length === 0 && selectedSedes.length === 0 && 
+        selectedDocentes.length === 0) {
+        availableOptions.carreras = allFilterOptions.carreras || [];
+        availableOptions.materias = allFilterOptions.materias || [];
+        availableOptions.modalidades = allFilterOptions.modalidades || [];
+        availableOptions.sedes = allFilterOptions.sedes || [];
+        availableOptions.docentes = allFilterOptions.docentes || [];
+    }
+    
+    // Actualizar opciones en cada Tom-Select (excepto el que cambió para evitar parpadeo)
+    if (changedFilter !== 'carrera') {
+        updateTomSelectOptions(tomSelectInstances.carrera, availableOptions.carreras, selectedCarreras);
+    }
+    if (changedFilter !== 'materia') {
+        updateTomSelectOptions(tomSelectInstances.materia, availableOptions.materias, selectedMaterias);
+    }
+    if (changedFilter !== 'modalidad') {
+        updateTomSelectOptions(tomSelectInstances.modalidad, availableOptions.modalidades, selectedModalidades);
+    }
+    if (changedFilter !== 'sede') {
+        updateTomSelectOptions(tomSelectInstances.sede, availableOptions.sedes, selectedSedes);
+    }
+    if (changedFilter !== 'docente') {
+        updateTomSelectOptions(tomSelectInstances.docente, availableOptions.docentes, selectedDocentes);
+    }
+    
+    console.log(`✅ Opciones actualizadas:`, {
+        carreras: availableOptions.carreras.length,
+        materias: availableOptions.materias.length,
+        modalidades: availableOptions.modalidades.length,
+        sedes: availableOptions.sedes.length,
+        docentes: availableOptions.docentes.length
+    });
+}
+
+/**
+ * Actualizar opciones de un Tom-Select manteniendo las selecciones
+ * @param {Object} instance - Instancia de Tom-Select
+ * @param {Array} newOptions - Nuevas opciones disponibles
+ * @param {Array} selectedValues - Valores actualmente seleccionados
+ */
+function updateTomSelectOptions(instance, newOptions, selectedValues) {
+    if (!instance) return;
+    
+    // Guardar selecciones válidas (que existen en las nuevas opciones)
+    const validSelections = selectedValues.filter(val => newOptions.includes(val));
+    
+    // Limpiar opciones actuales
+    instance.clearOptions();
+    
+    // Agregar nuevas opciones
+    newOptions.sort().forEach(option => {
+        instance.addOption({
+            value: option,
+            text: option
+        });
+    });
+    
+    // Restaurar selecciones válidas
+    instance.setValue(validSelections, true); // true = silent (no trigger onChange)
+    
+    // Refrescar UI
+    instance.refreshOptions(false);
+}
+
+/**
  * Configuración base para Tom-Select
  */
-function getBaseTomSelectConfig(placeholder) {
+function getBaseTomSelectConfig(placeholder, filterName) {
     return {
         plugins: {
             'remove_button': {
@@ -79,6 +198,8 @@ function getBaseTomSelectConfig(placeholder) {
             }
         },
         onChange: function(values) {
+            // Actualizar opciones en cascada cuando cambia la selección
+            updateCascadeOptions(filterName);
             // Aplicar filtros cuando cambia la selección
             applyTomSelectFilters();
         }
@@ -106,7 +227,7 @@ function initCarreraFilter() {
     }
     
     // Inicializar Tom-Select
-    const config = getBaseTomSelectConfig('Seleccionar carreras...');
+    const config = getBaseTomSelectConfig('Seleccionar carreras...', 'carrera');
     tomSelectInstances.carrera = new TomSelect('#filterCarrera', config);
     
     console.log(`✅ Filtro Carrera: ${allFilterOptions?.carreras?.length || 0} opciones`);
@@ -130,7 +251,7 @@ function initMateriaFilter() {
         });
     }
     
-    const config = getBaseTomSelectConfig('Seleccionar materias...');
+    const config = getBaseTomSelectConfig('Seleccionar materias...', 'materia');
     tomSelectInstances.materia = new TomSelect('#filterMateria', config);
     
     console.log(`✅ Filtro Materia: ${allFilterOptions?.materias?.length || 0} opciones`);
@@ -154,7 +275,7 @@ function initModalidadFilter() {
         });
     }
     
-    const config = getBaseTomSelectConfig('Seleccionar modalidades...');
+    const config = getBaseTomSelectConfig('Seleccionar modalidades...', 'modalidad');
     tomSelectInstances.modalidad = new TomSelect('#filterModalidad', config);
     
     console.log(`✅ Filtro Modalidad: ${allFilterOptions?.modalidades?.length || 0} opciones`);
@@ -178,7 +299,7 @@ function initSedeFilter() {
         });
     }
     
-    const config = getBaseTomSelectConfig('Seleccionar sedes...');
+    const config = getBaseTomSelectConfig('Seleccionar sedes...', 'sede');
     tomSelectInstances.sede = new TomSelect('#filterSede', config);
     
     console.log(`✅ Filtro Sede: ${allFilterOptions?.sedes?.length || 0} opciones`);
@@ -202,7 +323,7 @@ function initDocenteFilter() {
         });
     }
     
-    const config = getBaseTomSelectConfig('Seleccionar docentes...');
+    const config = getBaseTomSelectConfig('Seleccionar docentes...', 'docente');
     tomSelectInstances.docente = new TomSelect('#filterDocente', config);
     
     console.log(`✅ Filtro Docente: ${allFilterOptions?.docentes?.length || 0} opciones`);
