@@ -198,10 +198,14 @@ function getBaseTomSelectConfig(placeholder, filterName) {
             }
         },
         onChange: function(values) {
-            // Actualizar opciones en cascada cuando cambia la selección
-            updateCascadeOptions(filterName);
-            // Aplicar filtros cuando cambia la selección
-            applyTomSelectFilters();
+            // Solo ejecutar si hay valores seleccionados o si se está deseleccionando
+            // Evitar ejecución durante inicialización vacía
+            if (this.items && this.items.length > 0) {
+                // Actualizar opciones en cascada cuando cambia la selección
+                updateCascadeOptions(filterName);
+                // Aplicar filtros cuando cambia la selección
+                applyTomSelectFilters();
+            }
         }
     };
 }
@@ -492,6 +496,30 @@ function clearTomSelectFilters() {
         }
     });
     
+    // Restaurar TODAS las opciones originales en cada filtro
+    if (allFilterOptions) {
+        // Restaurar carreras
+        if (tomSelectInstances.carrera && allFilterOptions.carreras) {
+            updateTomSelectOptions(tomSelectInstances.carrera, allFilterOptions.carreras, []);
+        }
+        // Restaurar materias
+        if (tomSelectInstances.materia && allFilterOptions.materias) {
+            updateTomSelectOptions(tomSelectInstances.materia, allFilterOptions.materias, []);
+        }
+        // Restaurar modalidades
+        if (tomSelectInstances.modalidad && allFilterOptions.modalidades) {
+            updateTomSelectOptions(tomSelectInstances.modalidad, allFilterOptions.modalidades, []);
+        }
+        // Restaurar sedes
+        if (tomSelectInstances.sede && allFilterOptions.sedes) {
+            updateTomSelectOptions(tomSelectInstances.sede, allFilterOptions.sedes, []);
+        }
+        // Restaurar docentes
+        if (tomSelectInstances.docente && allFilterOptions.docentes) {
+            updateTomSelectOptions(tomSelectInstances.docente, allFilterOptions.docentes, []);
+        }
+    }
+    
     // Limpiar otros filtros
     const sentimentFilter = document.getElementById('filterSentiment');
     const searchText = document.getElementById('searchText');
@@ -508,7 +536,7 @@ function clearTomSelectFilters() {
     // Aplicar filtros (mostrará todos los resultados)
     applyTomSelectFilters();
     
-    console.log('✅ Filtros limpiados');
+    console.log('✅ Filtros limpiados y opciones restauradas');
 }
 
 /**
