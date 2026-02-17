@@ -171,35 +171,69 @@
                         🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
                     </h3>
                     <div id="filtersContent" class="filters-grid hidden">
+                        <!-- Filtro: Carrera -->
                         <div class="filter-group">
                             <label for="filterCarrera">Carrera:</label>
                             <select id="filterCarrera" class="filter-select">
                                 <option value="">Todas las carreras</option>
                             </select>
+                            <div class="multi-select-area" id="multiCarrera" data-filter="carrera">
+                                <div class="multi-label">Selección múltiple:</div>
+                                <div class="multi-chips" id="chipsCarrera"></div>
+                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                            </div>
                         </div>
+                        
+                        <!-- Filtro: Materia -->
                         <div class="filter-group">
                             <label for="filterMateria">Materia:</label>
                             <select id="filterMateria" class="filter-select">
                                 <option value="">Todas las materias</option>
                             </select>
+                            <div class="multi-select-area" id="multiMateria" data-filter="materia">
+                                <div class="multi-label">Selección múltiple:</div>
+                                <div class="multi-chips" id="chipsMateria"></div>
+                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                            </div>
                         </div>
+                        
+                        <!-- Filtro: Modalidad -->
                         <div class="filter-group">
                             <label for="filterModalidad">Modalidad:</label>
                             <select id="filterModalidad" class="filter-select">
                                 <option value="">Todas las modalidades</option>
                             </select>
+                            <div class="multi-select-area" id="multiModalidad" data-filter="modalidad">
+                                <div class="multi-label">Selección múltiple:</div>
+                                <div class="multi-chips" id="chipsModalidad"></div>
+                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                            </div>
                         </div>
+                        
+                        <!-- Filtro: Sede -->
                         <div class="filter-group">
                             <label for="filterSede">Sede:</label>
                             <select id="filterSede" class="filter-select">
                                 <option value="">Todas las sedes</option>
                             </select>
+                            <div class="multi-select-area" id="multiSede" data-filter="sede">
+                                <div class="multi-label">Selección múltiple:</div>
+                                <div class="multi-chips" id="chipsSede"></div>
+                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                            </div>
                         </div>
+                        
+                        <!-- Filtro: Docente -->
                         <div class="filter-group">
                             <label for="filterDocente">Docente:</label>
                             <select id="filterDocente" class="filter-select">
                                 <option value="">Todos los docentes</option>
                             </select>
+                            <div class="multi-select-area" id="multiDocente" data-filter="docente">
+                                <div class="multi-label">Selección múltiple:</div>
+                                <div class="multi-chips" id="chipsDocente"></div>
+                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                            </div>
                         </div>
                         <div class="filter-actions">
                             <button id="applyFilters" class="filter-btn apply">
@@ -921,7 +955,7 @@
 
     <!-- Tom-Select JS para multiselect -->
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-    <script src="tom-select-filters.js"></script>
+    <script src="dual-filters.js"></script>
     <script src="cascade-filters.js"></script>
     <script src="app.js"></script>
     <script src="column-config-manager.js"></script>

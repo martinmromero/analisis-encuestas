@@ -473,8 +473,8 @@ function displayResults(data) {
     if (data.filterOptions) {
         displayNumericMetrics(data.results, data.filterOptions);
         // Inicializar filtros multiselect con Tom-Select
-        if (typeof initTomSelectFilters === 'function') {
-            initTomSelectFilters(data.filterOptions, data.results);
+        if (typeof initDualFilters === 'function') {
+            initDualFilters(data.filterOptions, data.results);
         } else if (typeof initCascadeFilters === 'function') {
             // Fallback a filtros en cascada si Tom-Select no está disponible
             initCascadeFilters(data.filterOptions, data.results);

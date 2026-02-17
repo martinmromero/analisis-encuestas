@@ -585,6 +585,84 @@ header p {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+/* Multi-select area */
+.multi-select-area {
+    margin-top: 8px;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px dashed #ddd;
+    border-radius: 6px;
+    min-height: 50px;
+}
+
+.multi-label {
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.multi-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    min-height: 24px;
+}
+
+.multi-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.multi-chip:hover {
+    filter: brightness(1.1);
+}
+
+.multi-chip .remove-chip {
+    cursor: pointer;
+    opacity: 0.8;
+    font-weight: bold;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    padding-left: 6px;
+    margin-left: 2px;
+}
+
+.multi-chip .remove-chip:hover {
+    opacity: 1;
+}
+
+.add-multi-btn {
+    padding: 6px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-multi-btn:hover {
+    background: #764ba2;
+    transform: translateY(-1px);
+}
+
+.add-multi-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .filter-actions {
     display: flex;
     gap: 10px;
