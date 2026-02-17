@@ -518,15 +518,22 @@ function createSentimentChart(statistics) {
         sentimentChart = null;
     }
 
-    const labels = Object.keys(statistics.classifications);
-    const data = Object.values(statistics.classifications);
+    // FILTRAR "No clasificado" - solo mostrar clasificaciones válidas
+    const labels = [];
+    const data = [];
+    Object.entries(statistics.classifications).forEach(([key, value]) => {
+        if (key !== 'No clasificado') {
+            labels.push(key);
+            data.push(value);
+        }
+    });
+    
     const colors = [
         '#28a745', // Muy Positivo
         '#17a2b8', // Positivo
         '#6c757d', // Neutral
         '#fd7e14', // Negativo
-        '#dc3545', // Muy Negativo
-        '#9ca3af'  // No clasificado - gris claro
+        '#dc3545'  // Muy Negativo
     ];
 
     // Configurar canvas con tamaño fijo
@@ -626,16 +633,24 @@ function createCategoryChart(statistics) {
         categoryChart = null;
     }
 
-    const labels = Object.keys(statistics.percentages);
-    const data = Object.values(statistics.percentages).map(p => parseFloat(p));
-    const counts = Object.keys(statistics.classifications).map(key => statistics.classifications[key]);
+    // FILTRAR "No clasificado" - solo mostrar clasificaciones válidas
+    const labels = [];
+    const data = [];
+    const counts = [];
+    Object.entries(statistics.percentages).forEach(([key, value]) => {
+        if (key !== 'No clasificado') {
+            labels.push(key);
+            data.push(parseFloat(value));
+            counts.push(statistics.classifications[key]);
+        }
+    });
+    
     const colors = [
         '#22c55e', // Muy Positivo - verde
         '#4ade80', // Positivo - verde claro
         '#6b7280', // Neutral - gris
         '#fb923c', // Negativo - naranja
-        '#ef4444', // Muy Negativo - rojo
-        '#9ca3af'  // No clasificado - gris claro
+        '#ef4444'  // Muy Negativo - rojo
     ];
 
     // Configurar canvas con tamaño fijo
