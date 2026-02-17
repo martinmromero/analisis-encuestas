@@ -69,6 +69,16 @@ function initSimpleSelect(selectId, filterName, options) {
         select.appendChild(opt);
     });
     
+    // Resetear estado inicial
+    select.value = '';
+    select.disabled = false;
+    select.style.opacity = '1';
+    
+    // Deshabilitar botón +Agregar inicialmente (hasta que se seleccione algo)
+    const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
+    const addBtn = multiArea?.querySelector('.add-multi-btn');
+    if (addBtn) addBtn.disabled = true;
+    
     // Event listener para detectar cambio
     select.addEventListener('change', () => {
         handleSimpleSelectChange(filterName, select.value);
@@ -81,20 +91,22 @@ function initSimpleSelect(selectId, filterName, options) {
 function handleSimpleSelectChange(filterName, value) {
     console.log(`📌 Cambio en ${filterName}: ${value || '(vacío)'}`);
     
-    // Si hay valor seleccionado, deshabilitar área multi
     const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
     const addBtn = multiArea?.querySelector('.add-multi-btn');
     
+    // Si ya hay chips, no permitir cambiar dropdown
+    if (multiSelections[filterName].length > 0) {
+        return;
+    }
+    
+    // Habilitar/deshabilitar botón +Agregar según si hay selección
     if (value && value !== '') {
-        // Hay selección simple - deshabilitar multi
-        if (addBtn) addBtn.disabled = true;
-        if (multiArea) multiArea.style.opacity = '0.5';
+        // HAY selección en dropdown → HABILITAR botón para agregar a chips
+        if (addBtn) addBtn.disabled = false;
+        console.log(`✅ Botón +Agregar habilitado para ${filterName}`);
     } else {
-        // No hay selección simple - habilitar multi si no hay chips
-        if (multiSelections[filterName].length === 0) {
-            if (addBtn) addBtn.disabled = false;
-            if (multiArea) multiArea.style.opacity = '1';
-        }
+        // NO hay selección → DESHABILITAR botón
+        if (addBtn) addBtn.disabled = true;
     }
     
     // Actualizar cascada
@@ -123,10 +135,12 @@ function setupMultiButtons() {
 function addToMultiSelection(filterName) {
     const selectId = `filter${capitalize(filterName)}`;
     const select = document.getElementById(selectId);
-    const value = select.value;
+    const value = select?.value;
+    
+    console.log(`🔵 Intentando agregar a multi ${filterName}:`, value);
     
     if (!value || value === '') {
-        alert(`Por favor selecciona un${filterName === 'carrera' || filterName === 'materia' || filterName === 'modalidad' || filterName === 'sede' ? 'a' : ''} ${filterName}`);
+        alert(`Por favor selecciona ${filterName === 'carrera' ? 'una carrera' : filterName === 'materia' ? 'una materia' : filterName === 'modalidad' ? 'una modalidad' : filterName === 'sede' ? 'una sede' : 'un docente'}`);
         return;
     }
     
@@ -142,10 +156,16 @@ function addToMultiSelection(filterName) {
     // Renderizar chip
     renderMultiChips(filterName);
     
-    // Resetear dropdown y deshabilitarlo
+    // Resetear dropdown y deshabilitarlo (ahora estamos en modo multi)
     select.value = '';
     select.disabled = true;
     select.style.opacity = '0.5';
+    
+    // Deshabilitar botón +Agregar
+    const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
+    const addBtn = multiArea?.querySelector('.add-multi-btn');
+    if (addBtn) addBtn.disabled = true;
+    if (multiArea) multiArea.style.opacity = '1'; // Mantener área visible
     
     // Actualizar cascada
     updateCascadeFilter();
@@ -188,7 +208,7 @@ function removeFromMultiSelection(filterName, value) {
     // Renderizar chips actualizados
     renderMultiChips(filterName);
     
-    // Si no hay más chips, habilitar dropdown simple
+    // Si no hay más chips, volver a modo simple
     if (multiSelections[filterName].length === 0) {
         const selectId = `filter${capitalize(filterName)}`;
         const select = document.getElementById(selectId);
@@ -197,10 +217,11 @@ function removeFromMultiSelection(filterName, value) {
             select.style.opacity = '1';
         }
         
+        // Botón +Agregar deshabilitado hasta nueva selección
         const multiArea = document.getElementById(`multi${capitalize(filterName)}`);
         if (multiArea) multiArea.style.opacity = '1';
         const addBtn = multiArea?.querySelector('.add-multi-btn');
-        if (addBtn) addBtn.disabled = false;
+        if (addBtn) addBtn.disabled = true; // Deshabilitado hasta que se seleccione algo
     }
     
     // Actualizar cascada

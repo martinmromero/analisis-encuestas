@@ -592,7 +592,8 @@ header p {
     background: #f8f9fa;
     border: 1px dashed #ddd;
     border-radius: 6px;
-    min-height: 50px;
+    min-height: 60px;
+    transition: all 0.3s ease;
 }
 
 .multi-label {
@@ -607,7 +608,7 @@ header p {
     flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 8px;
-    min-height: 24px;
+    min-height: 30px;
 }
 
 .multi-chip {
