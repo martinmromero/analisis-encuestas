@@ -1,0 +1,233 @@
+/**
+ * TOM-SELECT CUSTOM STYLES
+ * Estilos personalizados para que Tom-Select coincida con el diseño de la app
+ */
+
+/* Container principal de Tom-Select */
+.ts-wrapper {
+    width: 100%;
+}
+
+/* Input principal */
+.ts-wrapper.single .ts-control,
+.ts-wrapper.multi .ts-control {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    min-height: 44px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.ts-wrapper.single .ts-control:hover,
+.ts-wrapper.multi .ts-control:hover {
+    border-color: #6366f1;
+}
+
+.ts-wrapper.focus .ts-control {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Items seleccionados (chips) */
+.ts-wrapper.multi .ts-control > div {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 2px;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Botón de remover en chips */
+.ts-wrapper.multi .ts-control > div .remove {
+    color: white;
+    opacity: 0.8;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    padding-left: 6px;
+    margin-left: 6px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.ts-wrapper.multi .ts-control > div .remove:hover {
+    opacity: 1;
+    background: none;
+}
+
+/* Input dentro del control */
+.ts-wrapper.multi .ts-control > input {
+    font-size: 14px;
+    color: #333;
+}
+
+.ts-wrapper.multi .ts-control > input::placeholder {
+    color: #999;
+}
+
+/* Dropdown */
+.ts-dropdown {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    margin-top: 4px;
+    background: white;
+    max-height: 350px;
+}
+
+/* Input de búsqueda en dropdown */
+.ts-dropdown .ts-dropdown-content {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.ts-dropdown-content .optgroup-header {
+    padding: 8px 12px;
+    font-weight: 600;
+    color: #6366f1;
+    background: #f5f5ff;
+    border-bottom: 1px solid #e0e0ff;
+}
+
+/* Opciones en dropdown */
+.ts-dropdown .option {
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 14px;
+    color: #333;
+}
+
+.ts-dropdown .option:hover {
+    background: #f5f5ff;
+    color: #6366f1;
+}
+
+.ts-dropdown .option.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 500;
+}
+
+.ts-dropdown .option.selected {
+    background: #e0e0ff;
+    color: #6366f1;
+    position: relative;
+}
+
+.ts-dropdown .option.selected::after {
+    content: "✓";
+    position: absolute;
+    right: 12px;
+    font-weight: bold;
+}
+
+/* Mensaje "No results" */
+.ts-dropdown .no-results {
+    padding: 16px 12px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+/* Scrollbar personalizado para dropdown */
+.ts-dropdown-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ts-dropdown-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.ts-dropdown-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.ts-dropdown-content::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Estado disabled */
+.ts-wrapper.disabled .ts-control {
+    background: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Ajustar labels para Tom-Select */
+.filter-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+/* Contador de selecciones */
+.ts-wrapper.has-items .ts-control {
+    padding: 6px 8px;
+}
+
+/* Animación al abrir dropdown */
+.ts-dropdown {
+    animation: dropdownFadeIn 0.2s ease;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ts-wrapper.single .ts-control,
+    .ts-wrapper.multi .ts-control {
+        font-size: 16px; /* Evita zoom en iOS */
+        min-height: 48px;
+    }
+    
+    .ts-dropdown {
+        max-height: 250px;
+    }
+    
+    .ts-dropdown-content {
+        max-height: 200px;
+    }
+}
+
+/* Ajuste para filtros en grid */
+.filters-grid .filter-group .ts-wrapper {
+    width: 100%;
+}
+
+/* Placeholder más visible cuando no hay selección */
+.ts-wrapper.multi .ts-control.has-items + .ts-wrapper::before {
+    display: none;
+}
+
+/* Loading state */
+.ts-wrapper.loading .ts-control::after {
+    content: "⏳";
+    margin-left: 8px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
