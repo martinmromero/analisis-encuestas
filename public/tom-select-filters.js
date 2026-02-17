@@ -212,6 +212,9 @@ function getBaseTomSelectConfig(placeholder, filterName) {
         closeAfterSelect: false, // Mantener abierto después de seleccionar
         hidePlaceholder: false,
         loadThrottle: 300, // Throttle de búsqueda
+        controlInput: '<input>', // Asegurar que siempre haya input visible
+        allowEmptyOption: false,
+        selectOnTab: true
         render: {
             no_results: function(data, escape) {
                 return '<div class="no-results">No se encontraron resultados para "' + escape(data.input) + '"</div>';

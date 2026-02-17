@@ -11,13 +11,17 @@
 /* Input principal */
 .ts-wrapper.single .ts-control,
 .ts-wrapper.multi .ts-control {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid #ddd;
     border-radius: 8px;
     background: white;
     min-height: 44px;
     font-size: 14px;
     transition: all 0.3s ease;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
 }
 
 .ts-wrapper.single .ts-control:hover,
@@ -35,13 +39,16 @@
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
     border-radius: 6px;
-    padding: 4px 8px;
-    margin: 2px;
+    padding: 5px 10px;
+    margin: 0;
     color: white;
     font-size: 13px;
     font-weight: 500;
     transition: all 0.2s ease;
-    transform: scale(1); /* Forzar escala inicial */
+    transform: scale(1);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
 }
 
 /* Hover sutil en chips - solo cambia ligeramente el brillo, sin agrandar */
@@ -72,6 +79,13 @@
 .ts-wrapper.multi .ts-control > input {
     font-size: 14px;
     color: #333;
+    flex: 1 1 auto;
+    min-width: 120px !important;
+    max-width: 100%;
+    border: none !important;
+    background: transparent !important;
+    padding: 4px 8px !important;
+    margin: 0 !important;
 }
 
 .ts-wrapper.multi .ts-control > input::placeholder {
@@ -180,7 +194,8 @@
 
 /* Contador de selecciones */
 .ts-wrapper.has-items .ts-control {
-    padding: 6px 8px;
+    padding: 8px 10px;
+    min-height: 44px;
 }
 
 /* Animación al abrir dropdown */
