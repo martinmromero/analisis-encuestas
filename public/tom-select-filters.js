@@ -220,15 +220,19 @@ function getBaseTomSelectConfig(placeholder, filterName) {
                 return '<div class="create">Agregar <strong>' + escape(data.input) + '</strong>&hellip;</div>';
             }
         },
-        onChange: function(values) {
-            // Solo ejecutar si hay valores seleccionados o si se está deseleccionando
-            // Evitar ejecución durante inicialización vacía
-            if (this.items && this.items.length > 0) {
-                // Actualizar opciones en cascada cuando cambia la selección
+        onItemAdd: function(value, item) {
+            // Ejecutar actualización en el próximo ciclo para permitir que Tom-Select complete la operación
+            setTimeout(() => {
                 updateCascadeOptions(filterName);
-                // Aplicar filtros cuando cambia la selección
                 applyTomSelectFilters();
-            }
+            }, 0);
+        },
+        onItemRemove: function(value) {
+            // Ejecutar actualización en el próximo ciclo
+            setTimeout(() => {
+                updateCascadeOptions(filterName);
+                applyTomSelectFilters();
+            }, 0);
         }
     };
 }
