@@ -125,10 +125,17 @@ app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     } else if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     } else if (filePath.endsWith('.css')) {
       res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
   }
 }));
@@ -1439,11 +1446,20 @@ function extractFilterOptions(data, customConfig = null) {
     modalidades: Array.from(options.modalidades).sort(),
     sedes: Array.from(options.sedes).sort(),
     docentes: Array.from(options.docentes).sort(),
-    numericQuestions: config.numericas || []
+    numericQuestions: config.numericas || [],
+    // Incluir nombres de columnas para que el frontend sepa qué buscar
+    columnNames: {
+      carrera: carreraCol,
+      materia: materiaCol,
+      modalidad: modalidadCol,
+      sede: sedeCol,
+      docente: docenteCol
+    }
   };
   
   console.log(`📊 Filtros extraídos: ${result.carreras.length} carreras, ${result.materias.length} materias, ${result.modalidades.length} modalidades, ${result.sedes.length} sedes, ${result.docentes.length} docentes`);
   console.log(`📊 Columnas numéricas: ${result.numericQuestions.length} preguntas`);
+  console.log(`📋 Nombres de columnas configurados:`, result.columnNames);
   
   return result;
 }
@@ -5091,9 +5107,22 @@ app.post('/api/detect-columns', upload.single('excelFile'), (req, res) => {
       res.status(400).json({ error: 'El archivo está vacío' });
     }
   } catch (error) {
-    console.error('Error detectando columnas:', error);
-    if (req.file) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: 'Error procesando archivo' });
+    console.error('❌ Error detectando columnas:', error);
+    console.error('❌ Stack:', error.stack);
+    
+    // Intentar limpiar archivo de forma segura
+    try {
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+    } catch (cleanupError) {
+      console.error('⚠️ Error limpiando archivo temporal:', cleanupError.message);
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: 'Error procesando archivo: ' + error.message 
+    });
   }
 });
 
@@ -5452,6 +5481,18 @@ app.post('/api/delete-column-config', (req, res) => {
     console.error('Error eliminando configuración:', error);
     res.status(500).json({ error: 'Error eliminando configuración' });
   }
+});
+
+// Error handler global - captura errores no manejados
+app.use((err, req, res, next) => {
+  console.error('❌ Error no manejado:', err);
+  console.error('❌ Stack:', err.stack);
+  
+  // Asegurar que siempre devolvemos JSON, no HTML
+  res.status(err.status || 500).json({ 
+    success: false,
+    error: err.message || 'Error interno del servidor' 
+  });
 });
 
 module.exports = app;

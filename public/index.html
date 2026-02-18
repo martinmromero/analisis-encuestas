@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Análisis de Encuestas - Análisis de Sentimientos</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Tom-Select CSS para multiselect con búsqueda -->
@@ -170,86 +173,80 @@
                         <span class="toggle-icon">▶</span>
                         🔍 Filtrar Resultados <span style="font-size: 0.85em; color: #666; font-weight: normal;">(para encuestas extensas)</span>
                     </h3>
-                    <div id="filtersContent" class="filters-grid hidden">
-                        <!-- Filtro: Carrera -->
-                        <div class="filter-group">
-                            <label for="filterCarrera">Carrera:</label>
-                            <select id="filterCarrera" class="filter-select">
-                                <option value="">Todas las carreras</option>
-                            </select>
-                            <div class="multi-select-area" id="multiCarrera" data-filter="carrera">
-                                <div class="multi-label">Selección múltiple:</div>
-                                <div class="multi-chips" id="chipsCarrera"></div>
-                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+                    <div id="filtersContent" class="hidden">
+
+                        <!-- BLOQUE A: Filtro simple por dropdown (cascada) -->
+                        <div style="background:#f8f9fa; border-radius:8px; padding:16px; margin-bottom:18px;">
+                            <div style="font-weight:600; color:#495057; margin-bottom:12px; font-size:0.95em;">🔽 Filtro simple (selección única por categoría)</div>
+                            <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+                                <div style="display:flex; flex-direction:column; gap:4px; min-width:160px;">
+                                    <label style="font-size:0.85em; font-weight:600; color:#555;">Carrera</label>
+                                    <select id="filterCarrera" class="filter-select" style="padding:7px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.9em;">
+                                        <option value="">Todas las carreras</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px; min-width:160px;">
+                                    <label style="font-size:0.85em; font-weight:600; color:#555;">Materia</label>
+                                    <select id="filterMateria" class="filter-select" style="padding:7px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.9em;">
+                                        <option value="">Todas las materias</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px; min-width:140px;">
+                                    <label style="font-size:0.85em; font-weight:600; color:#555;">Modalidad</label>
+                                    <select id="filterModalidad" class="filter-select" style="padding:7px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.9em;">
+                                        <option value="">Todas</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px; min-width:140px;">
+                                    <label style="font-size:0.85em; font-weight:600; color:#555;">Sede</label>
+                                    <select id="filterSede" class="filter-select" style="padding:7px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.9em;">
+                                        <option value="">Todas</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px; min-width:180px;">
+                                    <label style="font-size:0.85em; font-weight:600; color:#555;">Docente</label>
+                                    <select id="filterDocente" class="filter-select" style="padding:7px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.9em;">
+                                        <option value="">Todos</option>
+                                    </select>
+                                </div>
+                                <button id="applySimpleFilter" style="padding:7px 18px; background:#6f42c1; color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.9em;">✓ Aplicar</button>
+                                <button id="clearSimpleFilter" style="padding:7px 14px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.9em;">✕ Limpiar</button>
                             </div>
                         </div>
-                        
-                        <!-- Filtro: Materia -->
-                        <div class="filter-group">
-                            <label for="filterMateria">Materia:</label>
-                            <select id="filterMateria" class="filter-select">
-                                <option value="">Todas las materias</option>
-                            </select>
-                            <div class="multi-select-area" id="multiMateria" data-filter="materia">
-                                <div class="multi-label">Selección múltiple:</div>
-                                <div class="multi-chips" id="chipsMateria"></div>
-                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
+
+                        <!-- BLOQUE B: Selección múltiple con checkboxes -->
+                        <div style="background:#f0f4ff; border-radius:8px; padding:16px;">
+                            <div style="font-weight:600; color:#495057; margin-bottom:12px; font-size:0.95em;">☑️ Selección múltiple (checkboxes)</div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                                <button class="multi-tab-btn active" data-cat="carrera" style="padding:5px 14px; border-radius:20px; border:2px solid #6f42c1; background:#6f42c1; color:white; cursor:pointer; font-size:0.85em; font-weight:600;" onclick="switchMultiTab('carrera')">Carrera</button>
+                                <button class="multi-tab-btn" data-cat="materia" style="padding:5px 14px; border-radius:20px; border:2px solid #6f42c1; background:white; color:#6f42c1; cursor:pointer; font-size:0.85em; font-weight:600;" onclick="switchMultiTab('materia')">Materia</button>
+                                <button class="multi-tab-btn" data-cat="modalidad" style="padding:5px 14px; border-radius:20px; border:2px solid #6f42c1; background:white; color:#6f42c1; cursor:pointer; font-size:0.85em; font-weight:600;" onclick="switchMultiTab('modalidad')">Modalidad</button>
+                                <button class="multi-tab-btn" data-cat="sede" style="padding:5px 14px; border-radius:20px; border:2px solid #6f42c1; background:white; color:#6f42c1; cursor:pointer; font-size:0.85em; font-weight:600;" onclick="switchMultiTab('sede')">Sede</button>
+                                <button class="multi-tab-btn" data-cat="docente" style="padding:5px 14px; border-radius:20px; border:2px solid #6f42c1; background:white; color:#6f42c1; cursor:pointer; font-size:0.85em; font-weight:600;" onclick="switchMultiTab('docente')">Docente</button>
+                            </div>
+                            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                <input type="text" id="multiSearchInput" placeholder="Buscar..." style="padding:5px 10px; border:1px solid #ced4da; border-radius:6px; font-size:0.85em; flex:1; max-width:280px;" oninput="filterMultiCheckboxes(this.value)">
+                                <button onclick="selectAllMulti()" style="padding:5px 10px; font-size:0.8em; background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer;">Todos</button>
+                                <button onclick="deselectAllMulti()" style="padding:5px 10px; font-size:0.8em; background:#dc3545; color:white; border:none; border-radius:5px; cursor:pointer;">Ninguno</button>
+                            </div>
+                            <div id="multiCheckboxContainer" style="max-height:180px; overflow-y:auto; background:white; border:1px solid #dee2e6; border-radius:6px; padding:8px; display:flex; flex-wrap:wrap; gap:4px;">
+                                <span style="color:#999; font-size:0.85em;">Cargá un archivo para ver las opciones</span>
+                            </div>
+                            <!-- Chips de seleccionados -->
+                            <div id="multiSelectedChips" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; min-height:28px;"></div>
+                            <div style="margin-top:10px; display:flex; gap:8px;">
+                                <button id="applyMultiFilter" style="padding:7px 18px; background:#6f42c1; color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.9em;">✓ Aplicar selección múltiple</button>
+                                <button id="clearMultiFilter" style="padding:7px 14px; background:#6c757d; color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.9em;">✕ Limpiar</button>
                             </div>
                         </div>
-                        
-                        <!-- Filtro: Modalidad -->
-                        <div class="filter-group">
-                            <label for="filterModalidad">Modalidad:</label>
-                            <select id="filterModalidad" class="filter-select">
-                                <option value="">Todas las modalidades</option>
-                            </select>
-                            <div class="multi-select-area" id="multiModalidad" data-filter="modalidad">
-                                <div class="multi-label">Selección múltiple:</div>
-                                <div class="multi-chips" id="chipsModalidad"></div>
-                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
-                            </div>
+
+                        <!-- Resumen de filtros activos -->
+                        <div class="filter-summary" id="filterSummary" style="display:none; margin-top:12px; padding:8px 14px; background:#e8f4fd; border-radius:6px; font-size:0.9em; color:#0056b3;">
+                            <span id="filterSummaryText"></span>
                         </div>
-                        
-                        <!-- Filtro: Sede -->
-                        <div class="filter-group">
-                            <label for="filterSede">Sede:</label>
-                            <select id="filterSede" class="filter-select">
-                                <option value="">Todas las sedes</option>
-                            </select>
-                            <div class="multi-select-area" id="multiSede" data-filter="sede">
-                                <div class="multi-label">Selección múltiple:</div>
-                                <div class="multi-chips" id="chipsSede"></div>
-                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Filtro: Docente -->
-                        <div class="filter-group">
-                            <label for="filterDocente">Docente:</label>
-                            <select id="filterDocente" class="filter-select">
-                                <option value="">Todos los docentes</option>
-                            </select>
-                            <div class="multi-select-area" id="multiDocente" data-filter="docente">
-                                <div class="multi-label">Selección múltiple:</div>
-                                <div class="multi-chips" id="chipsDocente"></div>
-                                <button type="button" class="add-multi-btn" title="Agregar a selección múltiple">+ Agregar</button>
-                            </div>
-                        </div>
-                        <div class="filter-actions">
-                            <button id="applyFilters" class="filter-btn apply">
-                                <span>✓</span> Aplicar Filtros
-                            </button>
-                            <button id="clearFilters" class="filter-btn clear">
-                                <span>✕</span> Limpiar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="filter-summary" id="filterSummary" style="display: none;">
-                        <span id="filterSummaryText"></span>
                     </div>
                 </div>
             </section>
-
             <!-- Sección de resultados -->
             <section id="results" class="results-section hidden">
                 <div class="results-header">
@@ -953,11 +950,8 @@
         <p>Análisis de Encuestas - Fundación H.A. Barceló | Versión <span id="app-version">cargando...</span></p>
     </footer>
 
-    <!-- Tom-Select JS para multiselect -->
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-    <script src="dual-filters.js"></script>
-    <script src="cascade-filters.js"></script>
-    <script src="app.js"></script>
-    <script src="column-config-manager.js"></script>
+    <script src="filters-redesign.js?v=20260601"></script>
+    <script src="app-v2.js?v=20260218"></script>
+    <script src="column-config-manager-v2.js?v=20260218"></script>
 </body>
 </html>
