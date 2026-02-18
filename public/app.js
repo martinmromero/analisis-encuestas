@@ -185,9 +185,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Event listeners para filtros avanzados
-    const applyFilters = document.getElementById('applyFilters');
+    // NOTA: applyFilters es manejado por dual-filters.js para sistema de multiselección
     const clearFilters = document.getElementById('clearFilters');
-    if (applyFilters) applyFilters.addEventListener('click', filterResults);
     if (clearFilters) clearFilters.addEventListener('click', clearAdvancedFilters);
 
     // Event listeners para gestión del diccionario
@@ -258,8 +257,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners para filtros de resultados
     const filterSentimentSelect = document.getElementById('filterSentiment');
     const searchTextInput = document.getElementById('searchText');
-    if (filterSentimentSelect) filterSentimentSelect.addEventListener('change', filterResults);
-    if (searchTextInput) searchTextInput.addEventListener('input', filterResults);
+    
+    // Estos filtros deben integrarse con el sistema de filtros duales
+    if (filterSentimentSelect) {
+        filterSentimentSelect.addEventListener('change', () => {
+            // Si existe el sistema de filtros duales, reaplicar todos los filtros
+            if (typeof applyFilters === 'function') {
+                console.log('🔄 Replicando filtros duales tras cambio de sentimiento');
+                applyFilters();
+            } else {
+                // Fallback: usar filtros simples
+                filterResults();
+            }
+        });
+    }
+    
+    if (searchTextInput) {
+        searchTextInput.addEventListener('input', () => {
+            // Si existe el sistema de filtros duales, reaplicar todos los filtros
+            if (typeof applyFilters === 'function') {
+                console.log('🔄 Replicando filtros duales tras búsqueda de texto');
+                applyFilters();
+            } else {
+                // Fallback: usar filtros simples
+                filterResults();
+            }
+        });
+    }
     
     console.log('✅ Event listeners configurados correctamente');
 });
@@ -1215,8 +1239,85 @@ function updateStatsCards(results, stats) {
     if (negElement) negElement.textContent = negativePercent.toFixed(1) + '%';
 }
 
+/**
+ * Actualizar resultados con datos ya filtrados 
+ * (Función usada por dual-filters.js)
+ */
+function updateResultsWithFilteredData(filteredData) {
+    console.log('🔄 Actualizando visualización con datos filtrados:', filteredData.length);
+    
+    if (!currentResults) {
+        console.error('❌ No hay resultados cargados');
+        return;
+    }
+    
+    // Aplicar filtros adicionales de sentimiento y texto de búsqueda
+    // (estos NO son manejados por dual-filters.js)
+    let finalFilteredData = filteredData.slice();
+    
+    const sentimentFilter = document.getElementById('filterSentiment')?.value || '';
+    const searchText = document.getElementById('searchText')?.value?.toLowerCase() || '';
+    
+    // Filtrar por sentimiento si está seleccionado
+    if (sentimentFilter) {
+        finalFilteredData = finalFilteredData.filter(result => 
+            result.sentiment?.classification === sentimentFilter
+        );
+        console.log(`🎯 Aplicado filtro de sentimiento: ${sentimentFilter} - ${finalFilteredData.length} resultados`);
+    }
+    
+    // Filtrar por texto de búsqueda si hay alguno
+    if (searchText) {
+        finalFilteredData = finalFilteredData.filter(result => {
+            const mainText = result.sentiment?.details?.[0]?.text || '';
+            return mainText.toLowerCase().includes(searchText);
+        });
+        console.log(`🔍 Aplicado filtro de texto: "${searchText}" - ${finalFilteredData.length} resultados`);
+    }
+    
+    // Actualizar filteredResults global
+    filteredResults = finalFilteredData;
+    
+    // Resetear página a la primera
+    currentPage = 1;
+    
+    // Recalcular métricas numéricas con datos filtrados
+    if (currentResults.filterOptions) {
+        displayNumericMetrics(finalFilteredData, currentResults.filterOptions);
+    }
+    
+    // Recalcular estadísticas con resultados filtrados
+    filteredStats = calculateFilteredStats(finalFilteredData);
+    
+    // Actualizar gráficos con nuevas estadísticas
+    createSentimentChart(filteredStats);
+    createCategoryChart(filteredStats);
+    
+    // Actualizar estadísticas en las tarjetas
+    updateStatsCards(finalFilteredData, filteredStats);
+    
+    // Actualizar tabla de resultados
+    displayResultsTable(finalFilteredData);
+    
+    console.log('✅ Visualización actualizada');
+}
+
+// Exponer función globalmente para que dual-filters.js pueda acceder
+window.updateResultsWithFilteredData = updateResultsWithFilteredData;
+
 // Función para limpiar filtros avanzados
 function clearAdvancedFilters() {
+    console.log('🗑️ Limpiando filtros desde app.js');
+    
+    // Si existe el sistema de filtros duales, usarlo
+    if (typeof clearAllFilters === 'function') {
+        console.log('✅ Usando clearAllFilters de dual-filters.js');
+        clearAllFilters();
+        return;
+    }
+    
+    // Fallback: limpiar selectores simples
+    console.log('⚠️ Usando limpieza simple (fallback)');
     document.getElementById('filterCarrera').value = '';
     document.getElementById('filterMateria').value = '';
     document.getElementById('filterModalidad').value = '';

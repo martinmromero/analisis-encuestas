@@ -246,6 +246,7 @@ function removeFromMultiSelection(filterName, value) {
 function updateCascadeFilter() {
     console.log('🔄 Actualizando cascada de filtros');
     
+    // SOLO usar chips confirmados (multiSelections)
     const chips = {
         carrera: multiSelections.carrera.slice(),
         materia: multiSelections.materia.slice(),
@@ -256,6 +257,8 @@ function updateCascadeFilter() {
     
     console.log('📋 Chips activos:', chips);
     
+    // Función helper: filtra datos por todos los chips EXCEPTO el del campo indicado
+    // Así cada dropdown muestra opciones válidas según los otros filtros, pero no se auto-excluye
     function getDataExcluding(excludeField) {
         let data = allResults.slice();
         if (excludeField !== 'carrera' && chips.carrera.length > 0) {
@@ -276,6 +279,7 @@ function updateCascadeFilter() {
         return data;
     }
     
+    // Cada dropdown recibe opciones del dataset filtrado por todos los OTROS chips
     const optsCarrera   = extractFieldOptions(getDataExcluding('carrera'),   'carrera');
     const optsMateria   = extractFieldOptions(getDataExcluding('materia'),   'materia');
     const optsModalidad = extractFieldOptions(getDataExcluding('modalidad'), 'modalidad');
@@ -321,7 +325,7 @@ function extractFieldOptions(data, field) {
 }
 
 /**
- * Extraer opciones disponibles de datos filtrados (legacy)
+ * Extraer opciones disponibles de datos filtrados (legacy, mantener por compatibilidad)
  */
 function extractAvailableOptions(data) {
     return {
