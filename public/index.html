@@ -131,6 +131,23 @@
                             </button>
                         </div>
 
+                        <!-- Reporte Cuantitativo por Materia y Docente -->
+                        <div style="margin: 25px 0; padding: 15px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 10px; border: 2px dashed #388e3c;">
+                            <div style="text-align: center; margin-bottom: 10px;">
+                                <strong style="font-size: 16px; color: #1b5e20;">📊 Reporte por Materia y Docente (Cuantitativo)</strong>
+                                <p style="margin: 8px 0 0 0; color: #2e7d32; font-size: 13px;">
+                                    Promedio de cada pregunta cuantitativa por materia y por docente<br>
+                                    <span style="font-size: 12px; color: #388e3c;">(No incluye preguntas cualitativas/texto)</span>
+                                </p>
+                            </div>
+                            <div class="button-group" style="margin-top: 15px; justify-content: center;">
+                                <button type="button" id="subjectTeacherReportBtn" class="advanced-report-btn" style="background: linear-gradient(135deg, #43a047 0%, #1b5e20 100%); border: none;">
+                                    <span class="btn-icon">📊</span>
+                                    <span>Generar Reporte Materia/Docente</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- NUEVO: Separador Visual -->
                         <div style="margin: 25px 0; padding: 15px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 10px; border: 2px dashed #4a90e2;">
                             <div style="text-align: center; margin-bottom: 10px;">
@@ -273,10 +290,10 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">⭐</div>
+                        <div class="stat-icon" id="dominantSentimentIcon">🎭</div>
                         <div class="stat-content">
-                            <h3 id="averageScore">0</h3>
-                            <p>Puntuación Promedio (0-10)</p>
+                            <h3 id="averageScore">-</h3>
+                            <p>Sentimiento predominante</p>
                         </div>
                     </div>
                     
@@ -951,7 +968,7 @@
     </footer>
 
     <script src="filters-redesign.js?v=20260601"></script>
-    <script src="app-v2.js?v=20260218"></script>
+    <script src="app-v2.js?v=20260420"></script>
     <script src="column-config-manager-v2.js?v=20260218"></script>
 </body>
 </html>

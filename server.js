@@ -1531,8 +1531,16 @@ function calculateStats(results, qualitativeCount = null) {
   
   // Score ya está en escala 0..10, no requiere normalización
 
+  // Calcular moda: valor más común entre las 5 categorías válidas
+  const _validSentimentKeys = ['Muy Positivo', 'Positivo', 'Neutral', 'Negativo', 'Muy Negativo'];
+  const _dominantSentiment = _validSentimentKeys
+    .map(k => ({ k, v: classifications[k] || 0 }))
+    .filter(x => x.v > 0)
+    .reduce((a, b) => a.v >= b.v ? a : b, { k: 'Sin datos', v: -1 }).k;
+
   return {
     classifications: classifications,
+    dominantSentiment: _dominantSentiment,
     averageScore: parseFloat(averageScore.toFixed(2)), // Promedio 0..10
     rawScore: parseFloat(averageScore.toFixed(2)), // Score 0..10
     averageComparative: parseFloat(averageComparative.toFixed(4)),
@@ -1658,6 +1666,17 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
     console.log(`📝 Columnas de texto auto-detectadas: ${textColumns.join(', ')}`);
   }
 
+  // Columnas cuyo análisis de sentimiento se oculta en el Excel (pero se conservan para cálculos internos)
+  const hideSentimentInExcel = (customConfig && Array.isArray(customConfig.hideSentimentInExcel))
+    ? customConfig.hideSentimentInExcel
+    : [];
+  const displayTextColumns = hideSentimentInExcel.length > 0
+    ? textColumns.filter(col => !hideSentimentInExcel.includes(col))
+    : textColumns;
+  if (hideSentimentInExcel.length > 0) {
+    console.log(`🙈 Columnas de sentimiento ocultas en Excel: ${hideSentimentInExcel.join(', ')}`);
+  }
+
   // Configurar columnas: originales + análisis de sentimientos
   const excelColumns = [];
   
@@ -1670,8 +1689,8 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
     });
   });
   
-  // Agregar columnas de análisis para cada columna de texto
-  textColumns.forEach(col => {
+  // Agregar columnas de análisis para cada columna de texto (solo las visibles)
+  displayTextColumns.forEach(col => {
     excelColumns.push({
       header: `${col} - Sentiment`,
       key: `${col}_sentiment`,
@@ -1718,9 +1737,9 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
       row.getCell(col).value = result[col] || '';
     });
     
-    // Escribir análisis de sentimientos
+    // Escribir análisis de sentimientos (solo columnas visibles en Excel)
     if (result.sentimentAnalysis) {
-      textColumns.forEach(col => {
+      displayTextColumns.forEach(col => {
         const colAnalysis = result.sentimentAnalysis[col];
         if (colAnalysis) {
           const sentiment = colAnalysis.consensus || colAnalysis.classification || 'N/A';
@@ -1889,13 +1908,14 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   currentRow++; // Fila en blanco después del header
   
   // USAR ESTADÍSTICAS PRECALCULADAS (ya vienen de calculateStats)
-  let totalSurveys, totalQualitativeRows, avgScore, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
+  let totalSurveys, totalQualitativeRows, avgScore, dominantSentiment, pctPositivos, pctNegativos, pctNeutrales, positivos, negativos, neutrales;
   
   if (statistics) {
     // Usar las estadísticas que ya calculó la app
     totalSurveys = statistics.totalSurveys || data.length; // Total absoluto de encuestas
     totalQualitativeRows = statistics.quantitativeResponses || statistics.totalResults; // Los que contestaron cualitativo
     avgScore = typeof statistics.averageScore === 'number' ? statistics.averageScore.toFixed(2) : statistics.averageScore;
+    dominantSentiment = statistics.dominantSentiment || 'Sin datos';
     
     // Parsear porcentajes y sumar correctamente
     const pctMuyPositivo = parseFloat(statistics.percentages['Muy Positivo'] || 0);
@@ -1927,6 +1947,7 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
     totalSurveys = data.length;
     totalQualitativeRows = 0;
     avgScore = '0.00';
+    dominantSentiment = 'Sin datos';
     pctPositivos = '0.0';
     pctNegativos = '0.0';
     pctNeutrales = '0.0';
@@ -1963,15 +1984,23 @@ async function createCoverSheet(workbook, data, customConfig, originalFilename, 
   sheet.getCell(`C${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`C${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
-  // Box 3: Promedio General
-  sheet.getCell(`D${boxRow1}`).value = 'Promedio General';
-  sheet.getCell(`D${boxRow1}`).font = { bold: true, size: 11 };
-  sheet.getCell(`D${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  // Box 3: Sentimiento predominante
+  const _dsColorMap = {
+    'Muy Positivo': { hdr: 'FF155724', val: 'FFC6F6D5', txt: 'FF0A3D1F' },
+    'Positivo':     { hdr: 'FF48BB78', val: 'FFF0FFF4', txt: 'FF22543D' },
+    'Neutral':      { hdr: 'FFED8936', val: 'FFFEEBC8', txt: 'FF7C2D12' },
+    'Negativo':     { hdr: 'FFF56565', val: 'FFFED7D7', txt: 'FF742A2A' },
+    'Muy Negativo': { hdr: 'FF9B1C1C', val: 'FFFEB2B2', txt: 'FF63171B' },
+  };
+  const _dsc = _dsColorMap[dominantSentiment] || { hdr: 'FFE2E8F0', val: 'FFF7FAFC', txt: 'FF2D3748' };
+  sheet.getCell(`D${boxRow1}`).value = 'Sentimiento predominante';
+  sheet.getCell(`D${boxRow1}`).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+  sheet.getCell(`D${boxRow1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: _dsc.hdr } };
   sheet.getCell(`D${boxRow1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`D${boxRow1 + 1}`).value = parseFloat(avgScore);
-  sheet.getCell(`D${boxRow1 + 1}`).font = { bold: true, size: 20, color: { argb: 'FF2D3748' } };
+  sheet.getCell(`D${boxRow1 + 1}`).value = dominantSentiment;
+  sheet.getCell(`D${boxRow1 + 1}`).font = { bold: true, size: 16, color: { argb: _dsc.txt } };
+  sheet.getCell(`D${boxRow1 + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: _dsc.val } };
   sheet.getCell(`D${boxRow1 + 1}`).alignment = { vertical: 'middle', horizontal: 'center' };
-  sheet.getCell(`D${boxRow1 + 1}`).numFmt = '0.00';
   sheet.getCell(`D${boxRow1}`).border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   sheet.getCell(`D${boxRow1 + 1}`).border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
   
@@ -3302,6 +3331,413 @@ async function createChartsSheet(sheet, data) {
   sheet.getCell('B12').value = neutrales;
 }
 
+// ============= NUEVO: Reporte Cuantitativo por Materia y Docente =============
+async function generateSubjectTeacherReport(data, customConfig, originalFilename = 'archivo.xlsx') {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Sistema de Análisis de Encuestas';
+  workbook.created = new Date();
+
+  // Detectar columnas numéricas desde configuración
+  const config = customConfig || COLUMN_CONFIG;
+  let numericColumns = [];
+  if (config && config.numericas && config.numericas.length > 0) {
+    numericColumns = config.numericas;
+  }
+
+  // Auto-detección si no hay configuración
+  if (numericColumns.length === 0 && data.length > 0) {
+    const firstRow = data[0];
+    numericColumns = Object.keys(firstRow).filter(col => {
+      const colLower = col.toLowerCase();
+      if (colLower === 'id' || colLower.includes('comision') || colLower.includes('comisión')) return false;
+      const val = parseFloat(firstRow[col]);
+      return !isNaN(val) && firstRow[col] !== '' && firstRow[col] !== null;
+    });
+  }
+
+  // Filtrar a columnas que existen en los datos
+  if (data.length > 0) {
+    const firstRowKeys = Object.keys(data[0]);
+    numericColumns = numericColumns.filter(col =>
+      firstRowKeys.some(k => k.toLowerCase() === col.toLowerCase() || k === col)
+    );
+  }
+
+  console.log(`📊 Reporte Materia/Docente: ${numericColumns.length} columnas cuantitativas`);
+
+  // Helper: obtener valor de columna real (case insensitive)
+  function getRealKey(row, colName) {
+    const exact = row[colName];
+    if (exact !== undefined) return colName;
+    const found = Object.keys(row).find(k => k.toLowerCase() === colName.toLowerCase());
+    return found || null;
+  }
+
+  function getNumVal(row, colName) {
+    const key = getRealKey(row, colName);
+    if (!key) return NaN;
+    return parseFloat(row[key]);
+  }
+
+  // Helpers para materia y docente
+  const getMateria = (row) => extractField(row, ['materia', 'materias', 'asignatura']) || 'Sin Materia';
+  const getDocente = (row) => extractField(row, ['docente', 'profesor', 'docentes']) || 'Sin Docente';
+
+  // Función para colorear celda según puntaje (escala 1-10)
+  function applyScoreColor(cell, score) {
+    let colorClass;
+    if (score >= 7) colorClass = 'green';
+    else if (score >= 4) colorClass = 'yellow';
+    else colorClass = 'red';
+
+    if (colorClass === 'green') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
+      cell.font = { color: { argb: 'FF155724' }, bold: true };
+    } else if (colorClass === 'yellow') {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+      cell.font = { color: { argb: 'FF856404' }, bold: true };
+    } else {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
+      cell.font = { color: { argb: 'FF721C24' }, bold: true };
+    }
+    cell.alignment = { horizontal: 'center' };
+  }
+
+  function applyHeaderStyle(cell, argbColor = 'FF366092') {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argbColor } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' }
+    };
+  }
+
+  function applyTotalRowStyle(row) {
+    row.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.border = {
+        top: { style: 'medium' }, left: { style: 'thin' },
+        bottom: { style: 'medium' }, right: { style: 'thin' }
+      };
+    });
+  }
+
+  function applySubtotalRowStyle(row) {
+    row.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD0E4F7' } };
+      cell.font = { color: { argb: 'FF1E3A5F' }, bold: true };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+  }
+
+  // =========== SHEET 1: Por Materia ===========
+  const sheet1 = workbook.addWorksheet('Por Materia');
+  sheet1.properties.defaultRowHeight = 25;
+
+  const cols1 = [
+    { header: 'Materia', key: 'materia', width: 42 },
+    { header: 'Nº Respuestas', key: 'total', width: 15 }
+  ];
+  numericColumns.forEach(col => {
+    cols1.push({ header: col, key: `${col}__avg`, width: Math.min(Math.max(col.length + 4, 18), 45) });
+  });
+  cols1.push({ header: 'Promedio General', key: '__overall_avg', width: 18 });
+  sheet1.columns = cols1;
+
+  const headerRow1 = sheet1.getRow(1);
+  headerRow1.height = 45;
+  headerRow1.eachCell(cell => applyHeaderStyle(cell));
+
+  // Acumular datos por materia
+  const materiaGroups = {};
+  data.forEach(row => {
+    const mat = getMateria(row);
+    if (!materiaGroups[mat]) {
+      materiaGroups[mat] = { total: 0, stats: {} };
+      numericColumns.forEach(col => { materiaGroups[mat].stats[col] = { sum: 0, count: 0 }; });
+    }
+    materiaGroups[mat].total++;
+    numericColumns.forEach(col => {
+      const v = getNumVal(row, col);
+      if (!isNaN(v) && v > 0) {
+        materiaGroups[mat].stats[col].sum += v;
+        materiaGroups[mat].stats[col].count++;
+      }
+    });
+  });
+
+  // Totales globales para la fila TOTAL GENERAL
+  const globalStats = {};
+  numericColumns.forEach(col => { globalStats[col] = { sum: 0, count: 0 }; });
+  let globalTotal = 0;
+
+  let rowIdx1 = 2;
+  Object.keys(materiaGroups).sort().forEach((mat, i) => {
+    const g = materiaGroups[mat];
+    const dataRow = sheet1.getRow(rowIdx1++);
+    dataRow.getCell('materia').value = mat;
+    dataRow.getCell('total').value = g.total;
+    globalTotal += g.total;
+
+    const avgValues = [];
+    numericColumns.forEach(col => {
+      const s = g.stats[col];
+      const avg = s.count > 0 ? parseFloat((s.sum / s.count).toFixed(2)) : null;
+      const cell = dataRow.getCell(`${col}__avg`);
+      cell.value = avg;
+      if (avg !== null) {
+        cell.numFmt = '0.00';
+        applyScoreColor(cell, avg);
+        avgValues.push(avg);
+        globalStats[col].sum += s.sum;
+        globalStats[col].count += s.count;
+      }
+    });
+    const overall = avgValues.length > 0
+      ? parseFloat((avgValues.reduce((a, b) => a + b, 0) / avgValues.length).toFixed(2)) : null;
+    const overallCell = dataRow.getCell('__overall_avg');
+    overallCell.value = overall;
+    if (overall !== null) {
+      overallCell.numFmt = '0.00';
+      applyScoreColor(overallCell, overall);
+    }
+    // Alternate row color
+    if (i % 2 === 0) {
+      dataRow.eachCell({ includeEmpty: true }, (cell) => {
+        if (!cell.fill || !cell.fill.fgColor) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F8FC' } };
+        }
+      });
+    }
+  });
+
+  // Fila TOTAL GENERAL
+  const totalRow1 = sheet1.getRow(rowIdx1);
+  totalRow1.getCell('materia').value = 'TOTAL GENERAL';
+  totalRow1.getCell('total').value = globalTotal;
+  const globalAvgValues = [];
+  numericColumns.forEach(col => {
+    const s = globalStats[col];
+    const avg = s.count > 0 ? parseFloat((s.sum / s.count).toFixed(2)) : null;
+    const cell = totalRow1.getCell(`${col}__avg`);
+    cell.value = avg;
+    if (avg !== null) { cell.numFmt = '0.00'; globalAvgValues.push(avg); }
+  });
+  const globalOverall = globalAvgValues.length > 0
+    ? parseFloat((globalAvgValues.reduce((a, b) => a + b, 0) / globalAvgValues.length).toFixed(2)) : null;
+  const gOverallCell = totalRow1.getCell('__overall_avg');
+  gOverallCell.value = globalOverall;
+  if (globalOverall !== null) gOverallCell.numFmt = '0.00';
+  applyTotalRowStyle(totalRow1);
+
+  sheet1.autoFilter = { from: 'A1', to: sheet1.lastColumn.letter + '1' };
+
+  // =========== SHEET 2: Por Materia y Docente ===========
+  const sheet2 = workbook.addWorksheet('Por Materia y Docente');
+  sheet2.properties.defaultRowHeight = 25;
+
+  const cols2 = [
+    { header: 'Materia', key: 'materia', width: 42 },
+    { header: 'Docente', key: 'docente', width: 32 },
+    { header: 'Nº Respuestas', key: 'total', width: 15 }
+  ];
+  numericColumns.forEach(col => {
+    cols2.push({ header: col, key: `${col}__avg`, width: Math.min(Math.max(col.length + 4, 18), 45) });
+  });
+  cols2.push({ header: 'Promedio General', key: '__overall_avg', width: 18 });
+  sheet2.columns = cols2;
+
+  const headerRow2 = sheet2.getRow(1);
+  headerRow2.height = 45;
+  headerRow2.eachCell(cell => applyHeaderStyle(cell));
+
+  // Acumular datos por materia+docente
+  const matDocGroups = {};
+  const materiaDocMap = {}; // materia -> set of docentes
+  data.forEach(row => {
+    const mat = getMateria(row);
+    const doc = getDocente(row);
+    const key = `${mat}|||${doc}`;
+    if (!matDocGroups[key]) {
+      matDocGroups[key] = { materia: mat, docente: doc, total: 0, stats: {} };
+      numericColumns.forEach(col => { matDocGroups[key].stats[col] = { sum: 0, count: 0 }; });
+    }
+    matDocGroups[key].total++;
+    numericColumns.forEach(col => {
+      const v = getNumVal(row, col);
+      if (!isNaN(v) && v > 0) {
+        matDocGroups[key].stats[col].sum += v;
+        matDocGroups[key].stats[col].count++;
+      }
+    });
+    if (!materiaDocMap[mat]) materiaDocMap[mat] = new Set();
+    materiaDocMap[mat].add(doc);
+  });
+
+  // Ordenar: por materia, luego docente
+  const sortedMatDocKeys = Object.keys(matDocGroups).sort((a, b) => {
+    const [matA, docA] = a.split('|||');
+    const [matB, docB] = b.split('|||');
+    if (matA !== matB) return matA.localeCompare(matB, 'es');
+    return docA.localeCompare(docB, 'es');
+  });
+
+  // Agrupar por materia para subtotales
+  const sortedMaterias2 = [...new Set(sortedMatDocKeys.map(k => k.split('|||')[0]))].sort((a, b) => a.localeCompare(b, 'es'));
+
+  let rowIdx2 = 2;
+  sortedMaterias2.forEach(mat => {
+    const docKeys = sortedMatDocKeys.filter(k => k.startsWith(`${mat}|||`));
+    const materiaSubStats = {};
+    numericColumns.forEach(col => { materiaSubStats[col] = { sum: 0, count: 0 }; });
+    let matTotal = 0;
+
+    docKeys.forEach((key, i) => {
+      const g = matDocGroups[key];
+      const dataRow = sheet2.getRow(rowIdx2++);
+      dataRow.getCell('materia').value = g.materia;
+      dataRow.getCell('docente').value = g.docente;
+      dataRow.getCell('total').value = g.total;
+      matTotal += g.total;
+
+      const avgVals = [];
+      numericColumns.forEach(col => {
+        const s = g.stats[col];
+        const avg = s.count > 0 ? parseFloat((s.sum / s.count).toFixed(2)) : null;
+        const cell = dataRow.getCell(`${col}__avg`);
+        cell.value = avg;
+        if (avg !== null) {
+          cell.numFmt = '0.00';
+          applyScoreColor(cell, avg);
+          avgVals.push(avg);
+          materiaSubStats[col].sum += s.sum;
+          materiaSubStats[col].count += s.count;
+        }
+      });
+      const overall = avgVals.length > 0
+        ? parseFloat((avgVals.reduce((a, b) => a + b, 0) / avgVals.length).toFixed(2)) : null;
+      const overallCell = dataRow.getCell('__overall_avg');
+      overallCell.value = overall;
+      if (overall !== null) { overallCell.numFmt = '0.00'; applyScoreColor(overallCell, overall); }
+
+      if (i % 2 === 0) {
+        dataRow.eachCell({ includeEmpty: true }, cell => {
+          if (!cell.fill || !cell.fill.fgColor) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F8FC' } };
+          }
+        });
+      }
+    });
+
+    // Subtotal por materia si tiene más de un docente
+    if (docKeys.length > 1) {
+      const subRow = sheet2.getRow(rowIdx2++);
+      subRow.getCell('materia').value = `SUBTOTAL: ${mat}`;
+      subRow.getCell('docente').value = `${docKeys.length} docentes`;
+      subRow.getCell('total').value = matTotal;
+      const subAvgVals = [];
+      numericColumns.forEach(col => {
+        const s = materiaSubStats[col];
+        const avg = s.count > 0 ? parseFloat((s.sum / s.count).toFixed(2)) : null;
+        const cell = subRow.getCell(`${col}__avg`);
+        cell.value = avg;
+        if (avg !== null) { cell.numFmt = '0.00'; subAvgVals.push(avg); }
+      });
+      const subOverall = subAvgVals.length > 0
+        ? parseFloat((subAvgVals.reduce((a, b) => a + b, 0) / subAvgVals.length).toFixed(2)) : null;
+      const subOverallCell = subRow.getCell('__overall_avg');
+      subOverallCell.value = subOverall;
+      if (subOverall !== null) subOverallCell.numFmt = '0.00';
+      applySubtotalRowStyle(subRow);
+    }
+  });
+
+  // Fila TOTAL GENERAL sheet2
+  const totalRow2 = sheet2.getRow(rowIdx2);
+  totalRow2.getCell('materia').value = 'TOTAL GENERAL';
+  totalRow2.getCell('docente').value = '';
+  totalRow2.getCell('total').value = data.length;
+  const g2AvgVals = [];
+  numericColumns.forEach(col => {
+    const s = globalStats[col]; // reuse from sheet1
+    const avg = s.count > 0 ? parseFloat((s.sum / s.count).toFixed(2)) : null;
+    const cell = totalRow2.getCell(`${col}__avg`);
+    cell.value = avg;
+    if (avg !== null) { cell.numFmt = '0.00'; g2AvgVals.push(avg); }
+  });
+  const g2Overall = g2AvgVals.length > 0
+    ? parseFloat((g2AvgVals.reduce((a, b) => a + b, 0) / g2AvgVals.length).toFixed(2)) : null;
+  const g2OverallCell = totalRow2.getCell('__overall_avg');
+  g2OverallCell.value = g2Overall;
+  if (g2Overall !== null) g2OverallCell.numFmt = '0.00';
+  applyTotalRowStyle(totalRow2);
+
+  sheet2.autoFilter = { from: 'A1', to: sheet2.lastColumn.letter + '1' };
+
+  // =========== SHEET 3: Detalle por Alumno ===========
+  const sheet3 = workbook.addWorksheet('Detalle por Alumno');
+  sheet3.properties.defaultRowHeight = 22;
+
+  const cols3 = [
+    { header: 'Materia', key: 'materia', width: 42 },
+    { header: 'Docente', key: 'docente', width: 32 }
+  ];
+  numericColumns.forEach(col => {
+    cols3.push({ header: col, key: col, width: Math.min(Math.max(col.length + 4, 18), 45) });
+  });
+  cols3.push({ header: 'Promedio Alumno', key: '__alumno_avg', width: 18 });
+  sheet3.columns = cols3;
+
+  const headerRow3 = sheet3.getRow(1);
+  headerRow3.height = 45;
+  headerRow3.eachCell(cell => applyHeaderStyle(cell, 'FF2D6A4F'));
+
+  // Ordenar datos por materia, luego docente
+  const sortedData = [...data].sort((a, b) => {
+    const matA = getMateria(a), matB = getMateria(b);
+    if (matA !== matB) return matA.localeCompare(matB, 'es');
+    return getDocente(a).localeCompare(getDocente(b), 'es');
+  });
+
+  let rowIdx3 = 2;
+  sortedData.forEach((item, i) => {
+    const dataRow = sheet3.getRow(rowIdx3++);
+    dataRow.getCell('materia').value = getMateria(item);
+    dataRow.getCell('docente').value = getDocente(item);
+
+    const vals = [];
+    numericColumns.forEach(col => {
+      const v = getNumVal(item, col);
+      const cell = dataRow.getCell(col);
+      cell.value = isNaN(v) ? null : v;
+      if (!isNaN(v) && v > 0) {
+        cell.numFmt = '0.00';
+        applyScoreColor(cell, v);
+        vals.push(v);
+      }
+    });
+
+    const alumnoAvg = vals.length > 0
+      ? parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)) : null;
+    const avgCell = dataRow.getCell('__alumno_avg');
+    avgCell.value = alumnoAvg;
+    if (alumnoAvg !== null) {
+      avgCell.numFmt = '0.00';
+      applyScoreColor(avgCell, alumnoAvg);
+    }
+  });
+
+  sheet3.autoFilter = { from: 'A1', to: sheet3.lastColumn.letter + '1' };
+
+  console.log(`✅ Reporte Materia/Docente generado: ${Object.keys(materiaGroups).length} materias, ${Object.keys(matDocGroups).length} combinaciones materia-docente, ${data.length} alumnos`);
+  return workbook;
+}
+
 // Endpoint para generar reporte avanzado
 app.post('/api/generate-advanced-report', upload.single('excelFile'), async (req, res) => {
   try {
@@ -3619,6 +4055,72 @@ function determineConsensus(naturalResult, nlpResult) {
   
   return naturalScore >= nlpScore ? naturalClass : nlpClass;
 }
+
+// ============= NUEVO: Reporte Cuantitativo por Materia y Docente =============
+app.post('/api/generate-subject-teacher-report', upload.single('excelFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    console.log('📊 Generando reporte cuantitativo por materia/docente...');
+
+    let customConfig = null;
+    if (req.body.columnConfig) {
+      try {
+        customConfig = JSON.parse(req.body.columnConfig);
+        console.log(`⚙️ Config: ${customConfig.name}`);
+      } catch (e) {
+        console.error('❌ Error parseando columnConfig:', e);
+      }
+    }
+
+    let filteredIndices = null;
+    if (req.body.filteredIndices) {
+      try {
+        filteredIndices = JSON.parse(req.body.filteredIndices);
+        console.log(`🔍 Filtros aplicados: ${filteredIndices.length} filas`);
+      } catch (e) {
+        console.error('❌ Error parseando filteredIndices:', e);
+      }
+    }
+
+    const originalFilename = req.file.originalname || 'archivo.xlsx';
+
+    // Parsear archivo
+    const wb = XLSX.readFile(req.file.path, { raw: false, FS: ';' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    let jsonData = XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' });
+
+    fs.unlinkSync(req.file.path);
+
+    if (jsonData.length === 0) {
+      return res.status(400).json({ error: 'El archivo Excel está vacío' });
+    }
+
+    // Aplicar filtros si existen
+    if (filteredIndices && filteredIndices.length > 0) {
+      jsonData = jsonData.filter((_, idx) => filteredIndices.includes(idx));
+      console.log(`✂️ Datos filtrados: ${jsonData.length} filas`);
+    }
+
+    const reportWorkbook = await generateSubjectTeacherReport(jsonData, customConfig, originalFilename);
+
+    const outputPath = path.join(__dirname, 'uploads', `reporte-materia-docente-${Date.now()}.xlsx`);
+    await reportWorkbook.xlsx.writeFile(outputPath);
+
+    console.log('✅ Reporte materia/docente generado exitosamente');
+
+    res.download(outputPath, 'reporte-materia-docente.xlsx', (err) => {
+      if (err) console.error('Error enviando archivo:', err);
+      else setTimeout(() => fs.unlink(outputPath, () => {}), 5000);
+    });
+
+  } catch (error) {
+    console.error('Error generando reporte materia/docente:', error);
+    res.status(500).json({ error: 'Error interno: ' + error.message });
+  }
+});
 
 // ============= NUEVO: Generar Reporte con Columna de Validación =============
 app.post('/api/generate-validation-report', upload.single('excelFile'), async (req, res) => {

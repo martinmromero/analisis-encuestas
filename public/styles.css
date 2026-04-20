@@ -468,6 +468,10 @@ header p {
 }
 
 /* Colores específicos para sentimientos */
+.stat-card.sentiment-muy-positivo {
+    background: linear-gradient(135deg, #155724, #1a7a3c);
+}
+
 .stat-card.sentiment-positive {
     background: linear-gradient(135deg, #28a745, #20c997);
 }
@@ -478,6 +482,10 @@ header p {
 
 .stat-card.sentiment-negative {
     background: linear-gradient(135deg, #dc3545, #e74c3c);
+}
+
+.stat-card.sentiment-muy-negativo {
+    background: linear-gradient(135deg, #7b1a1a, #9b2020);
 }
 
 .stat-icon {

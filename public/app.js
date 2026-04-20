@@ -53,6 +53,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Event listener para reporte cuantitativo por materia/docente
+    const subjectTeacherReportBtn = document.getElementById('subjectTeacherReportBtn');
+    if (subjectTeacherReportBtn) {
+        subjectTeacherReportBtn.addEventListener('click', function() {
+            generateSubjectTeacherReport();
+        });
+    }
+
     // ===== NUEVO: Event listeners para análisis con columna de validación =====
     const analyzeValidationBtn = document.getElementById('analyzeValidationBtn');
     const validationReportBtn = document.getElementById('validationReportBtn');
@@ -400,31 +408,24 @@ function displayResults(data) {
     const quantElement = document.getElementById('quantitativeResponses');
     if (quantElement) quantElement.textContent = data.quantitativeResponses || 0;
     
-    // Verificar que statistics existe y tiene averageScore (0-10)
-    const averageScore = data.statistics && typeof data.statistics.averageScore === 'number' 
-        ? data.statistics.averageScore 
-        : 5;
+    // Sentimiento predominante (moda de las 5 clasificaciones válidas)
+    const dominantSentiment = (data.statistics && data.statistics.dominantSentiment)
+        ? data.statistics.dominantSentiment
+        : 'Sin datos';
     
-    // Aplicar clase de color según el score
+    // Aplicar clase de color según el sentimiento predominante
     const scoreElement = document.getElementById('averageScore');
     if (scoreElement) {
         const scoreCard = scoreElement.closest('.stat-card');
-        
         if (scoreCard) {
-            // Remover clases previas
-            scoreCard.classList.remove('score-high', 'score-medium', 'score-low');
-            
-            // Aplicar nueva clase según valor
-            if (averageScore >= 8) {
-                scoreCard.classList.add('score-high');
-            } else if (averageScore >= 6) {
-                scoreCard.classList.add('score-medium');
-            } else {
-                scoreCard.classList.add('score-low');
-            }
+            scoreCard.classList.remove('score-high', 'score-medium', 'score-low',
+                'sentiment-muy-positivo', 'sentiment-positive', 'sentiment-neutral',
+                'sentiment-negativo', 'sentiment-negative', 'sentiment-muy-negativo');
+            scoreCard.classList.add(getSentimentStatCardClass(dominantSentiment));
         }
-        
-        scoreElement.textContent = averageScore.toFixed(2);
+        scoreElement.textContent = dominantSentiment;
+        const iconEl = document.getElementById('dominantSentimentIcon');
+        if (iconEl) iconEl.textContent = getSentimentIcon(dominantSentiment);
     }
     
     // Verificar que percentages existen
@@ -1170,9 +1171,17 @@ function calculateFilteredStats(results) {
     // Los perColumnAvgScore ya están normalizados a 0-10 por el servidor
     const averageScore = scoreCount > 0 ? totalScore / scoreCount : 5; // 5 = neutral
 
+    // Moda: valor más frecuente entre las 5 categorías válidas
+    const _validKeys = ['Muy Positivo', 'Positivo', 'Neutral', 'Negativo', 'Muy Negativo'];
+    const dominantSentiment = _validKeys
+        .map(k => ({ k, v: classifications[k] || 0 }))
+        .filter(x => x.v > 0)
+        .reduce((a, b) => a.v >= b.v ? a : b, { k: 'Sin datos', v: -1 }).k;
+
     return {
         classifications,
         percentages,
+        dominantSentiment,
         averageScore: parseFloat(averageScore.toFixed(2)), // Escala 0-10
         totalResults: validClassifications, // Total de clasificaciones válidas
         qualitativeResponses: validClassifications // Respuestas cualitativas (con clasificación válida)
@@ -1197,30 +1206,22 @@ function updateStatsCards(results, stats) {
     const quantElement = document.getElementById('quantitativeResponses');
     if (quantElement) quantElement.textContent = qualitativeCount;
     
-    // El score ya viene calculado del servidor o de calculateFilteredStats
-    // Para mantener consistencia, usamos el mismo valor sin normalizar
-    const scoreValue = stats.averageScore;
+    // Sentimiento predominante (moda de las 5 clasificaciones válidas)
+    const dominantSentiment = stats.dominantSentiment || 'Sin datos';
     
-    // Aplicar clase de color según el score normalizado
+    // Aplicar clase de color según el sentimiento predominante
     const scoreElement = document.getElementById('averageScore');
     if (scoreElement) {
         const scoreCard = scoreElement.closest('.stat-card');
-        
         if (scoreCard) {
-            // Remover clases previas
-            scoreCard.classList.remove('score-high', 'score-medium', 'score-low');
-            
-            // Aplicar nueva clase según valor (el servidor ya normaliza a 0-10)
-            if (scoreValue >= 8) {
-                scoreCard.classList.add('score-high');
-            } else if (scoreValue >= 6) {
-                scoreCard.classList.add('score-medium');
-            } else {
-                scoreCard.classList.add('score-low');
-            }
+            scoreCard.classList.remove('score-high', 'score-medium', 'score-low',
+                'sentiment-muy-positivo', 'sentiment-positive', 'sentiment-neutral',
+                'sentiment-negativo', 'sentiment-negative', 'sentiment-muy-negativo');
+            scoreCard.classList.add(getSentimentStatCardClass(dominantSentiment));
         }
-        
-        scoreElement.textContent = scoreValue.toFixed(2);
+        scoreElement.textContent = dominantSentiment;
+        const iconEl = document.getElementById('dominantSentimentIcon');
+        if (iconEl) iconEl.textContent = getSentimentIcon(dominantSentiment);
     }
     
     const positivePercent = parseFloat(stats.percentages['Muy Positivo'] || 0) + 
@@ -2527,6 +2528,72 @@ async function generateAdvancedReport() {
     }
 }
 
+async function generateSubjectTeacherReport() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput ? fileInput.files[0] : null;
+
+    if (!file) {
+        alert('⚠️ No se encontró el archivo original. Por favor selecciona un archivo primero.');
+        return;
+    }
+
+    const columnConfig = window.getCurrentColumnConfig ? window.getCurrentColumnConfig() : null;
+
+    if (!columnConfig || !columnConfig.name) {
+        alert('⚠️ Por favor selecciona una configuración de columnas antes de generar el reporte.\n\nPuedes seleccionarla en el dropdown junto al botón "Analizar".');
+        return;
+    }
+
+    const btn = document.getElementById('subjectTeacherReportBtn');
+    const loading = document.getElementById('loading');
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-icon">⏳</span>Generando reporte...';
+        loading.classList.remove('hidden');
+        loading.querySelector('p').textContent = 'Generando reporte cuantitativo por materia y docente...';
+
+        const formData = new FormData();
+        formData.append('excelFile', file);
+        formData.append('columnConfig', JSON.stringify(columnConfig));
+
+        // Si hay filtros activos, incluir índices filtrados
+        const dataToExport = filteredResults && filteredResults.length > 0 ? filteredResults : (currentResults ? currentResults.results : null);
+        if (filteredResults && filteredResults.length > 0) {
+            const filteredIndices = filteredResults.map(item => item.row - 1);
+            formData.append('filteredIndices', JSON.stringify(filteredIndices));
+        }
+
+        const response = await fetch('/api/generate-subject-teacher-report', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error generando el reporte');
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = 'reporte-materia-docente.xlsx';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        window.URL.revokeObjectURL(downloadUrl);
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error generando el reporte: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="btn-icon">📊</span>Generar Reporte Materia/Docente';
+        loading.classList.add('hidden');
+    }
+}
+
 function showAdvancedReportSuccess() {
     // Crear mensaje de éxito temporal
     const successMessage = document.createElement('div');
@@ -2555,6 +2622,29 @@ function showAdvancedReportSuccess() {
             successMessage.parentNode.removeChild(successMessage);
         }
     }, 5000);
+}
+
+// Helpers para el box de sentimiento predominante
+function getSentimentStatCardClass(sentiment) {
+    if (!sentiment) return '';
+    const s = sentiment.toLowerCase();
+    if (s.includes('muy positiv')) return 'sentiment-muy-positivo';
+    if (s.includes('positiv'))     return 'sentiment-positive';
+    if (s.includes('neutral'))     return 'sentiment-neutral';
+    if (s.includes('muy negativ')) return 'sentiment-muy-negativo';
+    if (s.includes('negativ'))     return 'sentiment-negative';
+    return '';
+}
+
+function getSentimentIcon(sentiment) {
+    if (!sentiment) return '🎭';
+    const s = sentiment.toLowerCase();
+    if (s.includes('muy positiv')) return '😄';
+    if (s.includes('positiv'))     return '😊';
+    if (s.includes('neutral'))     return '😐';
+    if (s.includes('muy negativ')) return '😠';
+    if (s.includes('negativ'))     return '😞';
+    return '🎭';
 }
 
 // Función helper para obtener clase CSS del sentimiento

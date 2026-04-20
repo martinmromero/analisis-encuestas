@@ -1,0 +1,6 @@
+cd /opt/analisis-encuestas/public
+rm -f cascade-filters.js
+echo "Archivo cascade-filters.js eliminado"
+cd /opt/analisis-encuestas
+docker-compose restart app-prod
+docker-compose ps
