@@ -421,7 +421,8 @@ function displayResults(data) {
             scoreCard.classList.remove('score-high', 'score-medium', 'score-low',
                 'sentiment-muy-positivo', 'sentiment-positive', 'sentiment-neutral',
                 'sentiment-negativo', 'sentiment-negative', 'sentiment-muy-negativo');
-            scoreCard.classList.add(getSentimentStatCardClass(dominantSentiment));
+            const cardClass = getSentimentStatCardClass(dominantSentiment);
+            if (cardClass) scoreCard.classList.add(cardClass);
         }
         scoreElement.textContent = dominantSentiment;
         const iconEl = document.getElementById('dominantSentimentIcon');
@@ -946,6 +947,22 @@ function displayNumericMetrics(results, filterOptions) {
             .map(row => {
                 // Buscar en numericMetrics, originalData o directamente
                 let val = row.numericMetrics?.[column] || row.originalData?.[column] || row[column];
+
+                // Si no encontró valor directo, buscar por número de pregunta al inicio del nombre
+                // Esto resuelve problemas de encoding: "15.CORRUPTO..." vs "15. Correcto..."
+                if (val === undefined || val === null || val === '') {
+                    const numMatch = column.match(/^(\d+)/);
+                    if (numMatch) {
+                        const colNum = numMatch[1];
+                        const source = row.originalData || row;
+                        const matchKey = Object.keys(source).find(k => {
+                            const km = String(k).match(/^(\d+)/);
+                            return km && km[1] === colNum;
+                        });
+                        if (matchKey) val = source[matchKey];
+                    }
+                }
+
                 if (typeof val === 'string') {
                     // Extraer número si tiene formato "1. Texto" o "5. Opción"
                     const match = val.match(/^(\d+)\s*[.\-:)]/);
@@ -965,8 +982,17 @@ function displayNumericMetrics(results, filterOptions) {
             ? values.reduce((sum, val) => sum + val, 0) / values.length 
             : 0;
 
-        // Obtener configuración de escala (NO inferir, solo usar si está configurada)
-        const escala = escalas[column] || null;
+        // Obtener configuración de escala (con fallback por número de pregunta)
+        let escala = escalas[column] || null;
+        if (!escala) {
+            const numMatch = column.match(/^(\d+)/);
+            if (numMatch) {
+                const colNum = numMatch[1];
+                const matchKey = Object.keys(escalas).find(k => String(k).match(/^(\d+)/)?.[1] === colNum);
+                if (matchKey) escala = escalas[matchKey];
+            }
+        }
+        console.log(`   escala encontrada:`, escala ? `min=${escala.min} max=${escala.max} dir=${escala.direction}` : 'null');
 
         return { 
             column, 
@@ -987,6 +1013,12 @@ function displayNumericMetrics(results, filterOptions) {
             
             const directionIcon = metric.escala?.direction === 'descending' ? '⬇️' : '⬆️';
             
+            // Si la escala es descendente (1=mejor, 5=peor), mostrar el valor equivalente invertido
+            // Ej: avg=1.46 en escala 1-5 desc → muestra 4.54 (= 5+1-1.46)
+            const displayAvg = (metric.escala?.direction === 'descending' && metric.avg > 0)
+                ? (metric.escala.max + metric.escala.min - metric.avg)
+                : metric.avg;
+            
             const scaleLabel = metric.escala && (metric.escala.min !== 1 || metric.escala.max !== 10)
                 ? `<div class="scale-info" style="font-size: 0.85em; color: #666;">Escala: ${metric.escala.min}-${metric.escala.max} ${directionIcon}</div>`
                 : '';
@@ -994,7 +1026,7 @@ function displayNumericMetrics(results, filterOptions) {
             return `
                 <div class="metric-card ${scoreClass}">
                     <h4>${metric.column}</h4>
-                    <div class="metric-value">${metric.avg.toFixed(2)}</div>
+                    <div class="metric-value">${displayAvg.toFixed(2)}</div>
                     <div class="metric-label">Promedio sobre ${metric.count} respuestas</div>
                     ${scaleLabel}
                 </div>
@@ -1217,7 +1249,8 @@ function updateStatsCards(results, stats) {
             scoreCard.classList.remove('score-high', 'score-medium', 'score-low',
                 'sentiment-muy-positivo', 'sentiment-positive', 'sentiment-neutral',
                 'sentiment-negativo', 'sentiment-negative', 'sentiment-muy-negativo');
-            scoreCard.classList.add(getSentimentStatCardClass(dominantSentiment));
+            const cardClass2 = getSentimentStatCardClass(dominantSentiment);
+            if (cardClass2) scoreCard.classList.add(cardClass2);
         }
         scoreElement.textContent = dominantSentiment;
         const iconEl = document.getElementById('dominantSentimentIcon');

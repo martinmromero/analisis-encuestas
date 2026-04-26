@@ -1387,6 +1387,46 @@ function calculateAgreement(results) {
   return 'Sin consenso';
 }
 
+// ─────────────────────────────────────────────────────────────
+// Helper compartido: resuelve el nombre REAL de una columna de
+// filtro/agrupación a partir del config y las columnas del Excel.
+// Prioridad:
+//   1. config.filtros[filterName]        (mapeo explícito del usuario)
+//   2. keyword en config.identificacion  (solo cols de identificación)
+//   3. keyword en excelColumns           (todas las cols del Excel)
+//   4. null  (no existe)
+// ─────────────────────────────────────────────────────────────
+const FILTER_KEYWORDS = {
+  carrera:   ['CARRERA'],
+  materia:   ['MATERIA', 'ASIGNATURA', 'CURSO'],
+  modalidad: ['MODALIDAD'],
+  sede:      ['SEDE', 'CAMPUS'],
+  docente:   ['DOCENTE', 'PROFESOR', 'TEACHER']
+};
+
+function resolveFilterColumn(config, excelColumns, filterName) {
+  const keywords = FILTER_KEYWORDS[filterName] || [filterName.toUpperCase()];
+  const explicit = config?.filtros?.[filterName];
+  if (explicit && excelColumns.includes(explicit)) return explicit;
+  // Solo buscar en identificacion (evita coincidir con preguntas de la encuesta)
+  const idCols = config?.identificacion || [];
+  for (const col of idCols) {
+    const u = String(col).toUpperCase();
+    if (keywords.some(k => u === k || u.includes(k))) return col;
+  }
+  // Fallback: buscar en todas las columnas del Excel (exacto primero, luego contains)
+  for (const col of excelColumns) {
+    const u = String(col).toUpperCase();
+    if (keywords.some(k => u === k)) return col;   // coincidencia exacta
+  }
+  for (const col of excelColumns) {
+    const u = String(col).toUpperCase();
+    // "contains" solo si la columna NO empieza con número (evita preguntas numeradas)
+    if (!col.match(/^\d/) && keywords.some(k => u.includes(k))) return col;
+  }
+  return null;
+}
+
 // Función para extraer valores únicos de columnas para filtros
 function extractFilterOptions(data, customConfig = null) {
   const config = customConfig || COLUMN_CONFIG;
@@ -1399,18 +1439,19 @@ function extractFilterOptions(data, customConfig = null) {
     docentes: new Set()
   };
   
-  // Mostrar las columnas disponibles en el Excel
-  if (data.length > 0) {
-    const columnNames = Object.keys(data[0]);
-    console.log('📋 Columnas encontradas en el Excel:', columnNames);
+  // Columnas reales del Excel
+  const excelColumns = data.length > 0 ? Object.keys(data[0]) : [];
+  if (excelColumns.length > 0) {
+    console.log('📋 Columnas encontradas en el Excel:', excelColumns);
   }
-  
-  // Usar la configuración de filtros definida en column-config.js o customConfig
-  const carreraCol = config.filtros?.carrera || 'CARRERA';
-  const materiaCol = config.filtros?.materia || 'MATERIA';
-  const modalidadCol = config.filtros?.modalidad || 'MODALIDAD';
-  const sedeCol = config.filtros?.sede || 'SEDE';
-  const docenteCol = config.filtros?.docente || 'DOCENTE';
+
+  const carreraCol   = resolveFilterColumn(config, excelColumns, 'carrera')   || 'CARRERA';
+  const materiaCol   = resolveFilterColumn(config, excelColumns, 'materia')   || 'MATERIA';
+  const modalidadCol = resolveFilterColumn(config, excelColumns, 'modalidad') || 'MODALIDAD';
+  const sedeCol      = resolveFilterColumn(config, excelColumns, 'sede')      || 'SEDE';
+  const docenteCol   = resolveFilterColumn(config, excelColumns, 'docente')   || 'DOCENTE';
+
+  console.log(`📋 Columnas de filtro resueltas: carrera="${carreraCol}" materia="${materiaCol}" modalidad="${modalidadCol}" sede="${sedeCol}" docente="${docenteCol}"`);
   
   data.forEach(row => {
     // Buscar CARRERA
@@ -1789,19 +1830,19 @@ async function generateAdvancedExcelReport(analysisResults, customConfig = null,
 
   // ========== HOJAS DE RESUMEN ==========
   const groupFields = ['carrera', 'docente', 'materia', 'sede', 'modalidad'];
+  const configForSummary = customConfig || COLUMN_CONFIG;
   
   for (const field of groupFields) {
-    // Verificar si existe este campo en los datos
-    const hasField = originalColumns.some(col => 
-      col.toLowerCase() === field || 
-      col.toLowerCase().includes(field)
-    );
+    // Verificar si existe una columna real (no una pregunta de encuesta) para este campo
+    const resolvedCol = resolveFilterColumn(configForSummary, originalColumns, field);
     
-    if (hasField || field === 'carrera') { // Siempre crear carrera aunque no exista
+    if (resolvedCol) {
       const sheetName = `Resumen por ${field.charAt(0).toUpperCase() + field.slice(1)}`;
       const summarySheet = workbook.addWorksheet(sheetName);
       await createDynamicSummarySheet(summarySheet, analysisResults, field, textColumns, customConfig);
-      console.log(`✅ Hoja "${sheetName}" creada`);
+      console.log(`✅ Hoja "${sheetName}" creada (columna: "${resolvedCol}")`);
+    } else {
+      console.log(`⏭️ Sin columna para "${field}", se omite la hoja de resumen.`);
     }
   }
 
@@ -2841,27 +2882,26 @@ async function createMethodologySheet(workbook) {
 async function createDynamicSummarySheet(sheet, data, groupField, textColumns, customConfig = null) {
   console.log(`📊 Creando resumen por ${groupField}, textColumns:`, textColumns);
   
-  // Encontrar la columna real que coincide con el campo de agrupación
   const firstRow = data[0] || {};
   const allColumns = Object.keys(firstRow).filter(key => 
     key !== 'sentimentAnalysis' && 
     key !== 'sentiment'
   );
-  const actualField = allColumns.find(col => 
-    col.toLowerCase() === groupField.toLowerCase() || 
-    col.toLowerCase().includes(groupField.toLowerCase())
-  );
+
+  // Usar el mismo helper que extractFilterOptions para resolver la columna real
+  const config = customConfig || COLUMN_CONFIG;
+  const actualField = resolveFilterColumn(config, allColumns, groupField);
   
   console.log(`🔍 Campo de agrupación "${groupField}" mapeado a columna: "${actualField}"`);
   
-  if (!actualField && groupField !== 'carrera') {
-    console.warn(`⚠️ Campo "${groupField}" no encontrado en los datos`);
+  if (!actualField) {
+    console.warn(`⚠️ Campo "${groupField}" no encontrado en los datos, omitiendo hoja`);
     return;
   }
   
   // Identificar columnas numéricas desde configuración (igual que frontend)
   let numericColumns = [];
-  const config = customConfig || COLUMN_CONFIG;
+  // config ya está declarado arriba
   
   if (config && config.numericas && config.numericas.length > 0) {
     numericColumns = config.numericas;
