@@ -937,21 +937,27 @@ app.post('/api/analyze-with-validation-column', upload.single('excelFile'), asyn
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
     }
 
-    // Buscar la columna de validación (case-insensitive)
+    // Buscar la columna de validación (flexible: normaliza acentos, case-insensitive, contains)
     const firstRow = jsonData[0];
     let validationColumnName = null;
     
+    const normalize = s => s.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
+      .replace(/\s+/g, ' ');                              // colapsar espacios
+
     for (const columnName of Object.keys(firstRow)) {
-      const normalizedName = columnName.toLowerCase().trim();
-      if (normalizedName === 'validación final' || normalizedName === 'validacion final') {
+      const n = normalize(columnName);
+      if (n === 'validacion final' || n.includes('validacion final') || n.includes('validación final')) {
         validationColumnName = columnName;
         break;
       }
     }
 
     if (!validationColumnName) {
+      const allCols = Object.keys(firstRow).join(', ');
+      console.log('❌ Columnas disponibles en el Excel:', allCols);
       return res.status(400).json({ 
-        error: 'No se encontró la columna "validación final" en el archivo. Por favor asegúrese de que existe.' 
+        error: `No se encontró la columna "validación final" en el archivo. Columnas disponibles: ${allCols}` 
       });
     }
 
@@ -4229,21 +4235,27 @@ app.post('/api/generate-validation-report', upload.single('excelFile'), async (r
       return res.status(400).json({ error: 'El archivo Excel está vacío' });
     }
 
-    // Buscar la columna de validación (case-insensitive)
+    // Buscar la columna de validación (flexible: normaliza acentos, case-insensitive, contains)
     const firstRow = jsonData[0];
     let validationColumnName = null;
     
+    const normalize = s => s.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+
     for (const columnName of Object.keys(firstRow)) {
-      const normalizedName = columnName.toLowerCase().trim();
-      if (normalizedName === 'validación final' || normalizedName === 'validacion final') {
+      const n = normalize(columnName);
+      if (n === 'validacion final' || n.includes('validacion final') || n.includes('validación final')) {
         validationColumnName = columnName;
         break;
       }
     }
 
     if (!validationColumnName) {
+      const allCols = Object.keys(firstRow).join(', ');
+      console.log('❌ Columnas disponibles en el Excel:', allCols);
       return res.status(400).json({ 
-        error: 'No se encontró la columna "validación final" en el archivo. Por favor asegúrese de que existe.' 
+        error: `No se encontró la columna "validación final" en el archivo. Columnas disponibles: ${allCols}` 
       });
     }
 
